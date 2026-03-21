@@ -280,7 +280,7 @@ second-brain/
 
 ---
 
-### Phase 6：Lark 集成 + 完善（Day 14-16）
+### Phase 6：Lark 集成 + 完善（Day 14-16）✅ DONE
 
 1. 飞书文档 MCP 对接
 2. 首页仪表盘

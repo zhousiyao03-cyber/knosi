@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Providers } from "@/components/providers";
+import { SearchDialog } from "@/components/search-dialog";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,8 @@ export default function RootLayout({
         <Providers>
           <div className="flex h-full">
             <Sidebar />
-            <main className="flex-1 overflow-auto p-6">{children}</main>
+            <main className="flex-1 overflow-auto p-6 dark:bg-gray-950 dark:text-gray-100">{children}</main>
+            <SearchDialog />
           </div>
         </Providers>
       </body>

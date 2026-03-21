@@ -4,6 +4,7 @@ import { bookmarksRouter } from "./bookmarks";
 import { todosRouter } from "./todos";
 import { learningRouter } from "./learning";
 import { workflowsRouter } from "./workflows";
+import { dashboardRouter } from "./dashboard";
 
 export const appRouter = router({
   notes: notesRouter,
@@ -11,6 +12,7 @@ export const appRouter = router({
   todos: todosRouter,
   learning: learningRouter,
   workflows: workflowsRouter,
+  dashboard: dashboardRouter,
 });
 
 export type AppRouter = typeof appRouter;
