@@ -47,7 +47,7 @@ docs/changelog/     各 Phase 完成留档
 ## 进度
 
 - [x] Phase 1: 项目骨架 + 基础布局
-- [ ] Phase 2: 笔记本模块
+- [x] Phase 2: 笔记本模块
 - [ ] Phase 3: Todo + 收藏箱模块
 - [ ] Phase 4: AI 能力集成
 - [ ] Phase 5: AI 探索 + AI 工作流 + 学习模块
