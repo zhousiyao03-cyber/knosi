@@ -2,6 +2,10 @@ import { test, expect } from "@playwright/test";
 
 // Use unique names per test run to avoid cross-test collisions
 const uid = () => Math.random().toString(36).slice(2, 8);
+const tinyPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==",
+  "base64"
+);
 
 test.describe("Phase 2: 笔记本模块", () => {
   test("笔记列表页加载成功", async ({ page }) => {
@@ -72,6 +76,100 @@ test.describe("Phase 2: 笔记本模块", () => {
 
     await page.reload();
     await expect(page.locator(".ProseMirror")).toContainText(text);
+  });
+
+  test("悬浮插入按钮支持无序列表", async ({ page }) => {
+    const listText = `bullet-${uid()}`;
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    const editor = page.locator(".ProseMirror");
+    const firstBlock = page.locator(".ProseMirror p").first();
+    await firstBlock.hover();
+    await page.getByTestId("editor-insert-trigger").click();
+    await page.getByRole("button", { name: "无序列表" }).click();
+    await editor.pressSequentially(listText, { delay: 30 });
+
+    await expect(page.locator(".ProseMirror ul li").first()).toContainText(
+      listText
+    );
+    await expect
+      .poll(async () =>
+        page.locator(".ProseMirror ul").first().evaluate((element) => {
+          return window.getComputedStyle(element).listStyleType;
+        })
+      )
+      .toBe("disc");
+    await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("悬浮插入按钮支持有序列表", async ({ page }) => {
+    const orderedText = `ordered-${uid()}`;
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    const editor = page.locator(".ProseMirror");
+    const firstBlock = page.locator(".ProseMirror p").first();
+    await firstBlock.hover();
+    await page.getByTestId("editor-insert-trigger").click();
+    await page.getByRole("button", { name: "有序列表" }).click();
+    await editor.pressSequentially(orderedText, { delay: 30 });
+
+    await expect(page.locator(".ProseMirror ol li").first()).toContainText(
+      orderedText
+    );
+    await expect
+      .poll(async () =>
+        page.locator(".ProseMirror ol").first().evaluate((element) => {
+          return window.getComputedStyle(element).listStyleType;
+        })
+      )
+      .toBe("decimal");
+  });
+
+  test("悬浮插入按钮支持待办列表并可勾选", async ({ page }) => {
+    const todoText = `todo-${uid()}`;
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    const editor = page.locator(".ProseMirror");
+    const firstBlock = page.locator(".ProseMirror p").first();
+    await firstBlock.hover();
+    await page.getByTestId("editor-insert-trigger").click();
+    await page.getByRole("button", { name: "待办列表" }).click();
+    await editor.pressSequentially(todoText, { delay: 30 });
+
+    const todoItem = page.locator(".ProseMirror ul[data-type='taskList'] li").first();
+    await expect(todoItem).toContainText(todoText);
+
+    const checkbox = todoItem.locator("input[type='checkbox']").first();
+    await checkbox.check();
+    await expect(todoItem).toHaveAttribute("data-checked", "true");
+  });
+
+  test("可以插入本地图片并保存", async ({ page }) => {
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    await page.getByTestId("editor-image-input").setInputFiles({
+      name: "tiny.png",
+      mimeType: "image/png",
+      buffer: tinyPng,
+    });
+
+    await expect(page.locator(".ProseMirror img")).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
+
+    await page.reload();
+    await expect(page.locator(".ProseMirror img")).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test("切换笔记类型", async ({ page }) => {

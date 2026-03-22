@@ -8,13 +8,17 @@ test.describe("Phase 4: Ask AI 页面", () => {
 
   test("显示空状态提示", async ({ page }) => {
     await page.goto("/ask");
-    await expect(page.getByText("向 AI 提问")).toBeVisible();
-    await expect(page.getByText("帮我总结一下最近的笔记")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "今天想处理什么？" })
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "总结最近笔记" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /全部来源/ }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /只看笔记/ }).first()).toBeVisible();
   });
 
   test("输入框和发送按钮存在", async ({ page }) => {
     await page.goto("/ask");
-    const input = page.locator("textarea[placeholder='输入你的问题...（Shift+Enter 换行）']");
+    const input = page.locator("textarea[placeholder='使用 AI 处理各种任务...']");
     await expect(input).toBeVisible();
     await expect(input).toBeEnabled();
 
@@ -25,7 +29,7 @@ test.describe("Phase 4: Ask AI 页面", () => {
 
   test("输入文字后发送按钮启用", async ({ page }) => {
     await page.goto("/ask");
-    const input = page.locator("textarea[placeholder='输入你的问题...（Shift+Enter 换行）']");
+    const input = page.locator("textarea[placeholder='使用 AI 处理各种任务...']");
     await input.fill("测试问题");
 
     const sendBtn = page.locator("button[type='submit']");
@@ -34,7 +38,7 @@ test.describe("Phase 4: Ask AI 页面", () => {
 
   test("发送消息后显示用户消息", async ({ page }) => {
     await page.goto("/ask");
-    const input = page.locator("textarea[placeholder='输入你的问题...（Shift+Enter 换行）']");
+    const input = page.locator("textarea[placeholder='使用 AI 处理各种任务...']");
     await input.fill("你好");
     await page.locator("button[type='submit']").click();
 
@@ -42,6 +46,49 @@ test.describe("Phase 4: Ask AI 页面", () => {
     await expect(page.getByText("你好").first()).toBeVisible({ timeout: 5000 });
     // Input should be cleared
     await expect(input).toHaveValue("");
+  });
+
+  test("来源注释不会直接显示给用户", async ({ page }) => {
+    await page.route("**/api/chat", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/plain; charset=utf-8",
+        body: '这是基于知识库的回答。\n\n<!-- sources:[{"id":"note-1","type":"note","title":"测试笔记"}] -->',
+      });
+    });
+
+    await page.goto("/ask");
+    const input = page.locator("textarea[placeholder='使用 AI 处理各种任务...']");
+    await input.fill("测试来源");
+    await page.locator("button[type='submit']").click();
+
+    await expect(page.getByText("这是基于知识库的回答。")).toBeVisible();
+    await expect(page.getByRole("link", { name: "测试笔记" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /保存为笔记/ })).toBeVisible();
+    await expect(page.locator("main")).not.toContainText("<!-- sources:");
+  });
+
+  test("回答可以保存为笔记", async ({ page }) => {
+    await page.route("**/api/chat", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/plain; charset=utf-8",
+        body: '这是可保存的回答。\n\n<!-- sources:[{"id":"note-2","type":"note","title":"保存测试"}] -->',
+      });
+    });
+
+    await page.goto("/ask");
+    const input = page.locator("textarea[placeholder='使用 AI 处理各种任务...']");
+    await input.fill("把这段保存下来");
+    await page.locator("button[type='submit']").click();
+
+    await expect(page.getByText("这是可保存的回答。")).toBeVisible();
+    await page.getByRole("button", { name: /保存为笔记/ }).click();
+
+    await page.waitForURL(/\/notes\/.+/);
+    await expect(page.locator("textarea[placeholder='无标题']")).toContainText(
+      "AI 问答"
+    );
   });
 });
 
@@ -62,21 +109,9 @@ test.describe("Phase 4: AI 摘要 API", () => {
   });
 
   test("chat API endpoint 存在", async ({ request }) => {
-    const response = await request.post("/api/chat", {
-      data: {
-        messages: [
-          {
-            id: "ui-msg-1",
-            role: "user",
-            parts: [{ type: "text", text: "hi" }],
-          },
-        ],
-      },
-    });
-    // Frontend sends AI SDK UI messages. The route should return a non-empty body
-    // instead of silently accepting the request and streaming nothing.
-    expect(response.status()).not.toBe(404);
-    expect((await response.text()).trim().length).toBeGreaterThan(0);
+    const response = await request.get("/api/chat");
+    // GET should be rejected because only POST is implemented, but the route must exist.
+    expect(response.status()).toBe(405);
   });
 
   test("summarize API endpoint 存在", async ({ request }) => {

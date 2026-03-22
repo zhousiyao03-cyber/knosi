@@ -6,6 +6,11 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod/v4";
+import {
+  ASK_AI_SOURCE_SCOPES,
+  type AskAiSourceScope,
+  stripAssistantSourceMetadata,
+} from "@/lib/ask-ai";
 import { retrieveContext } from "@/server/ai/rag";
 import { getAIErrorMessage, getChatModel } from "@/server/ai/openai";
 
@@ -13,6 +18,7 @@ export const maxDuration = 30;
 
 const chatInputSchema = z.object({
   messages: z.array(z.unknown()),
+  sourceScope: z.enum(ASK_AI_SOURCE_SCOPES).optional(),
 });
 
 const uiMessageSchema = z
@@ -26,11 +32,23 @@ const uiMessageSchema = z
 const SKIP_RAG_KEYWORDS = ["不用搜索", "直接回答", "不需要搜索", "不要搜索"];
 
 function buildSystemPrompt(
-  context: Awaited<ReturnType<typeof retrieveContext>>
+  context: Awaited<ReturnType<typeof retrieveContext>>,
+  sourceScope: AskAiSourceScope
 ): string {
   if (context.length === 0) {
-    return "你是 Second Brain 的 AI 助手。用户的知识库中没有找到相关内容，请直接用中文回答问户的问题，简洁准确。";
+    if (sourceScope === "direct") {
+      return "你是 Second Brain 的 AI 助手。当前请求选择了直接回答模式，不要引用知识库，直接用中文回答用户的问题，简洁准确。";
+    }
+
+    return "你是 Second Brain 的 AI 助手。用户的知识库中没有找到相关内容，请直接用中文回答用户的问题，简洁准确。";
   }
+
+  const scopeHint =
+    sourceScope === "notes"
+      ? "当前只检索了笔记。"
+      : sourceScope === "bookmarks"
+        ? "当前只检索了收藏。"
+        : "当前检索了笔记和收藏。";
 
   const knowledgeBlock = context
     .map(
@@ -40,6 +58,8 @@ function buildSystemPrompt(
     .join("\n\n");
 
   return `你是 Second Brain 的 AI 助手，帮助用户管理和理解他们的知识库。用中文回答问题，简洁准确。
+
+${scopeHint}
 
 以下是从用户知识库中检索到的相关内容，请优先基于这些内容回答用户的问题：
 
@@ -73,6 +93,33 @@ async function normalizeMessages(messages: unknown[]): Promise<ModelMessage[]> {
   );
 }
 
+function sanitizeMessages(messages: ModelMessage[]) {
+  return messages.map((message) => {
+    if (message.role !== "assistant") {
+      return message;
+    }
+
+    if (typeof message.content === "string") {
+      return {
+        ...message,
+        content: stripAssistantSourceMetadata(message.content),
+      };
+    }
+
+    return {
+      ...message,
+      content: message.content.map((part) =>
+        part.type === "text"
+          ? {
+              ...part,
+              text: stripAssistantSourceMetadata(part.text),
+            }
+          : part
+      ),
+    };
+  });
+}
+
 function getUserMessageText(message: ModelMessage | undefined) {
   if (!message || message.role !== "user") {
     return "";
@@ -96,19 +143,26 @@ export async function POST(req: Request) {
   }
 
   try {
-    const messages = await normalizeMessages(parsed.data.messages);
+    const messages = sanitizeMessages(
+      await normalizeMessages(parsed.data.messages)
+    );
+    const sourceScope = parsed.data.sourceScope ?? "all";
 
     const lastUserMessage = [...messages]
       .reverse()
       .find((message) => message.role === "user");
     const userQuery = getUserMessageText(lastUserMessage);
 
-    const skipRag = SKIP_RAG_KEYWORDS.some((kw) => userQuery.includes(kw));
-    const context = skipRag ? [] : await retrieveContext(userQuery);
+    const skipRag =
+      sourceScope === "direct" ||
+      SKIP_RAG_KEYWORDS.some((kw) => userQuery.includes(kw));
+    const context = skipRag
+      ? []
+      : await retrieveContext(userQuery, { scope: sourceScope });
 
     const result = streamText({
       model: getChatModel(),
-      system: buildSystemPrompt(context),
+      system: buildSystemPrompt(context, sourceScope),
       messages,
     });
 

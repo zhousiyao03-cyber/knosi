@@ -31,12 +31,14 @@ export default function RootLayout({
       lang="zh"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="h-full">
+      <body className="h-full bg-[var(--background)] text-[var(--foreground)]">
         <Providers>
           <ToastProvider>
-            <div className="flex h-full">
+            <div className="flex h-full bg-[var(--background)]">
               <Sidebar />
-              <main className="flex-1 overflow-auto p-6 dark:bg-gray-950 dark:text-gray-100">{children}</main>
+              <main className="min-w-0 flex-1 overflow-auto bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.88),rgba(251,251,250,1)_32%)] px-4 py-5 md:px-6 md:py-6 dark:bg-[radial-gradient(circle_at_top,rgba(38,38,38,0.96),rgba(25,25,25,1)_36%)] dark:text-stone-100">
+                {children}
+              </main>
               <SearchDialog />
             </div>
           </ToastProvider>

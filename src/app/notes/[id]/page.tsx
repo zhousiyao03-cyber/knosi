@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { useRouter } from "next/navigation";
 import { TiptapEditor } from "@/components/editor/tiptap-editor";
 import { ArrowLeft, Tag, X, MoreHorizontal } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
 
 interface NoteData {
   title: string;
@@ -16,6 +17,7 @@ interface NoteData {
 
 function NoteEditor({ id, note }: { id: string; note: NoteData }) {
   const router = useRouter();
+  const { toast } = useToast();
   const utils = trpc.useUtils();
   const updateNote = trpc.notes.update.useMutation({
     onSuccess: () => utils.notes.get.invalidate({ id }),
@@ -125,7 +127,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-4">
+    <div className="mx-auto w-full max-w-[980px] px-6 py-6 md:px-10">
       {/* Top bar — minimal */}
       <div className="flex items-center justify-between mb-6 px-1">
         <button
@@ -215,7 +217,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
       )}
 
       {/* Title — large, Notion-style */}
-      <div className="px-1 mb-1">
+      <div className="px-1 mb-3">
         <textarea
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
@@ -237,6 +239,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
         <TiptapEditor
           content={note.content ?? undefined}
           onChange={handleContentChange}
+          onError={(message) => toast(message, "error")}
         />
       </div>
     </div>
@@ -274,5 +277,5 @@ export default function NoteEditPage({
     );
   }
 
-  return <NoteEditor id={id} note={note} />;
+  return <NoteEditor key={id} id={id} note={note} />;
 }

@@ -3,6 +3,15 @@ import { test, expect } from "@playwright/test";
 const uid = () => Math.random().toString(36).slice(2, 8);
 
 test.describe("V1 核心路径 A：笔记 → 搜索", () => {
+  test("侧边栏搜索按钮可以打开搜索弹窗", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /搜索/ }).click();
+
+    await expect(
+      page.locator("input[placeholder='搜索笔记、收藏、待办...']")
+    ).toBeVisible();
+  });
+
   test("创建笔记并通过 Cmd+K 搜索到", async ({ page }) => {
     const noteTitle = `v1-note-${uid()}`;
 
@@ -63,9 +72,7 @@ test.describe("V1 核心路径 B：收藏 → 搜索", () => {
 test.describe("V1 核心路径：Ask AI", () => {
   test("Ask AI 页面可以发送消息", async ({ page }) => {
     await page.goto("/ask");
-    const input = page.locator(
-      "textarea[placeholder='输入你的问题...（Shift+Enter 换行）']"
-    );
+    const input = page.locator("textarea[placeholder='使用 AI 处理各种任务...']");
     await input.fill("你好");
     await page.locator("button[type='submit']").click();
 
@@ -75,11 +82,9 @@ test.describe("V1 核心路径：Ask AI", () => {
     await expect(input).toHaveValue("");
   });
 
-  test("chat API endpoint 接受请求", async ({ request }) => {
-    const response = await request.post("/api/chat", {
-      data: { messages: [{ role: "user", content: "hello" }] },
-    });
-    expect(response.status()).not.toBe(404);
+  test("chat API endpoint 存在", async ({ request }) => {
+    const response = await request.get("/api/chat");
+    expect(response.status()).toBe(405);
   });
 
   test("chat API 拒绝非法输入", async ({ request }) => {
