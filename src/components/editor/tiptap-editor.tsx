@@ -26,7 +26,14 @@ import Image from "@tiptap/extension-image";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Typography from "@tiptap/extension-typography";
 import { common, createLowlight } from "lowlight";
-import { GripVertical, Plus } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Copy,
+  GripVertical,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import {
   createSlashCommandExtension,
   SlashCommandMenu,
@@ -35,7 +42,18 @@ import { BubbleToolbar } from "./bubble-toolbar";
 import {
   createEditorCommandGroups,
   flattenEditorCommandGroups,
+  type EditorCommandItem,
 } from "./editor-commands";
+import {
+  deleteTopLevelBlock,
+  duplicateTopLevelBlock,
+  focusTopLevelBlock,
+  getTopLevelBlockContext,
+  insertHorizontalRuleRelativeToBlock,
+  insertParagraphRelativeToBlock,
+  moveTopLevelBlock,
+  type BlockInsertDirection,
+} from "./editor-block-ops";
 
 const lowlight = createLowlight(common);
 
@@ -63,6 +81,17 @@ interface HoveredBlock {
   top: number;
   bottom: number;
   contentLeft: number;
+}
+
+interface InsertMenuState {
+  coords: { top: number; left: number };
+  targetPos: number;
+  direction: BlockInsertDirection;
+}
+
+interface BlockActionMenuState {
+  coords: { top: number; left: number };
+  targetPos: number;
 }
 
 function parseEditorContent(content?: string): JSONContent | undefined {
@@ -151,18 +180,21 @@ export function TiptapEditor({
   } | null>(null);
   const [slashQuery, setSlashQuery] = useState("");
   const [hoveredBlock, setHoveredBlock] = useState<HoveredBlock | null>(null);
-  const [blockMenuCoords, setBlockMenuCoords] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
+  const [insertMenuState, setInsertMenuState] = useState<InsertMenuState | null>(
+    null
+  );
+  const [blockActionMenuState, setBlockActionMenuState] =
+    useState<BlockActionMenuState | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<TiptapEditorInstance | null>(null);
   const editorSurfaceRef = useRef<HTMLDivElement>(null);
   const hoveredBlockRef = useRef<HoveredBlock | null>(null);
+  const pendingImageInsertPositionRef = useRef<number | null>(null);
 
   const handleSlashActivate = useCallback(
     (query: string, coords: { top: number; left: number }) => {
-      setBlockMenuCoords(null);
+      setInsertMenuState(null);
+      setBlockActionMenuState(null);
       setSlashQuery(query);
       setSlashCoords(coords);
     },
@@ -196,25 +228,63 @@ export function TiptapEditor({
   );
 
   const insertImageFromUrl = useCallback(() => {
+    const currentEditor = editorRef.current;
     const url = window.prompt("输入图片地址：")?.trim();
+    const insertPosition = pendingImageInsertPositionRef.current ?? undefined;
+    pendingImageInsertPositionRef.current = null;
 
-    if (!url) return;
+    if (!url || !currentEditor) return;
 
     if (!/^https?:\/\//.test(url) && !url.startsWith("data:image/")) {
       reportError("请输入有效的图片地址。");
       return;
     }
 
-    editorRef.current
-      ?.chain()
-      .focus()
-      .setImage({ src: url, alt: "插入图片" })
-      .run();
+    if (insertPosition !== undefined) {
+      insertImagesIntoView(currentEditor.view, [url], insertPosition);
+      return;
+    }
+
+    currentEditor.chain().focus().setImage({ src: url, alt: "插入图片" }).run();
   }, [reportError]);
 
   const handleFileSelection = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
+  const handleOpenInsertMenu = useCallback(
+    (direction: BlockInsertDirection) => {
+      if (!hoveredBlock) return;
+
+      setSlashCoords(null);
+      setSlashQuery("");
+      setBlockActionMenuState(null);
+      setInsertMenuState({
+        coords: {
+          top: hoveredBlock.menuTop,
+          left: hoveredBlock.menuLeft,
+        },
+        targetPos: hoveredBlock.pos,
+        direction,
+      });
+    },
+    [hoveredBlock]
+  );
+
+  const handleOpenBlockActionMenu = useCallback(() => {
+    if (!hoveredBlock) return;
+
+    setSlashCoords(null);
+    setSlashQuery("");
+    setInsertMenuState(null);
+    setBlockActionMenuState({
+      coords: {
+        top: hoveredBlock.menuTop,
+        left: hoveredBlock.menuLeft,
+      },
+      targetPos: hoveredBlock.pos,
+    });
+  }, [hoveredBlock]);
 
   const updateHoveredBlock = useCallback(
     (target: EventTarget | null) => {
@@ -247,7 +317,7 @@ export function TiptapEditor({
           buttonTop:
             blockRect.top - surfaceRect.top + blockRect.height / 2 - 16,
           menuTop: blockRect.top + blockRect.height / 2 - 12,
-          menuLeft: blockRect.left - 20,
+          menuLeft: blockRect.left + 12,
           top: blockRect.top - surfaceRect.top,
           bottom: blockRect.bottom - surfaceRect.top,
           contentLeft: blockRect.left - surfaceRect.left,
@@ -334,25 +404,6 @@ export function TiptapEditor({
     setHoveredBlock(null);
     hoveredBlockRef.current = null;
   }, []);
-
-  const handleOpenBlockMenu = useCallback(() => {
-    const currentEditor = editorRef.current;
-
-    if (!currentEditor || !hoveredBlock) return;
-
-    setSlashCoords(null);
-    setSlashQuery("");
-    setBlockMenuCoords({
-      top: hoveredBlock.menuTop,
-      left: hoveredBlock.menuLeft,
-    });
-
-    try {
-      currentEditor.chain().focus(hoveredBlock.pos).run();
-    } catch {
-      currentEditor.chain().focus().run();
-    }
-  }, [hoveredBlock]);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -486,10 +537,141 @@ export function TiptapEditor({
     [commandGroups]
   );
 
+  const handleInsertMenuSelection = useCallback(
+    (item: EditorCommandItem) => {
+      const currentEditor = editorRef.current;
+
+      if (!currentEditor || !insertMenuState) return;
+
+      if (item.id === "image-upload" || item.id === "image-url") {
+        const block = getTopLevelBlockContext(
+          currentEditor,
+          insertMenuState.targetPos
+        );
+
+        if (!block) return;
+
+        pendingImageInsertPositionRef.current =
+          insertMenuState.direction === "above"
+            ? block.pos
+            : block.pos + block.node.nodeSize;
+        item.run(currentEditor);
+        return;
+      }
+
+      if (item.id === "horizontal-rule") {
+        insertHorizontalRuleRelativeToBlock(
+          currentEditor,
+          insertMenuState.targetPos,
+          insertMenuState.direction
+        );
+        return;
+      }
+
+      const insertedPosition = insertParagraphRelativeToBlock(
+        currentEditor,
+        insertMenuState.targetPos,
+        insertMenuState.direction
+      );
+
+      if (insertedPosition === null) return;
+
+      item.run(currentEditor);
+    },
+    [insertMenuState]
+  );
+
+  const blockActionItems = useMemo(() => {
+    const currentEditor = editorRef.current;
+    const state = blockActionMenuState;
+
+    if (!currentEditor || !state) return [] as EditorCommandItem[];
+
+    const block = getTopLevelBlockContext(currentEditor, state.targetPos);
+    if (!block) return [] as EditorCommandItem[];
+
+    const items: EditorCommandItem[] = [];
+
+    if (block.index > 0) {
+      items.push({
+        id: "move-up",
+        title: "上移",
+        description: "将当前块向上移动一行",
+        keywords: ["move", "up", "上移"],
+        icon: ArrowUp,
+        run: (editor) => {
+          moveTopLevelBlock(editor, state.targetPos, "up");
+        },
+      });
+    }
+
+    if (block.index < currentEditor.state.doc.childCount - 1) {
+      items.push({
+        id: "move-down",
+        title: "下移",
+        description: "将当前块向下移动一行",
+        keywords: ["move", "down", "下移"],
+        icon: ArrowDown,
+        run: (editor) => {
+          moveTopLevelBlock(editor, state.targetPos, "down");
+        },
+      });
+    }
+
+    items.push(
+      {
+        id: "duplicate-block",
+        title: "复制块",
+        description: "复制当前块内容",
+        keywords: ["duplicate", "copy", "复制"],
+        icon: Copy,
+        run: (editor) => {
+          duplicateTopLevelBlock(editor, state.targetPos);
+        },
+      },
+      {
+        id: "delete-block",
+        title: "删除块",
+        description: "删除当前块",
+        keywords: ["delete", "remove", "删除"],
+        icon: Trash2,
+        run: (editor) => {
+          deleteTopLevelBlock(editor, state.targetPos);
+        },
+        tone: "danger",
+      }
+    );
+
+    const transformable = !["image", "horizontalRule"].includes(block.node.type.name);
+
+    if (transformable) {
+      const transformItems = flattenEditorCommandGroups(
+        commandGroups.filter((group) => group.id !== "media")
+      )
+        .filter((item) => item.id !== "horizontal-rule")
+        .map((item) => ({
+          ...item,
+          id: `transform-${item.id}`,
+          title: `转为${item.title}`,
+          description: `将当前块转换为${item.title}`,
+          run: (editor: TiptapEditorInstance) => {
+            focusTopLevelBlock(editor, state.targetPos);
+            item.run(editor);
+          },
+        }));
+
+      items.push(...transformItems);
+    }
+
+    return items;
+  }, [blockActionMenuState, commandGroups]);
+
   const handleImageInputChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files ?? []);
       const currentEditor = editorRef.current;
+      const insertPosition = pendingImageInsertPositionRef.current ?? undefined;
+      pendingImageInsertPositionRef.current = null;
 
       if (!files.length || !currentEditor) {
         event.target.value = "";
@@ -509,7 +691,7 @@ export function TiptapEditor({
           sources.push(await readFileAsDataUrl(file));
         }
 
-        insertImagesIntoView(currentEditor.view, sources);
+        insertImagesIntoView(currentEditor.view, sources, insertPosition);
       } catch {
         reportError("插入图片失败，请重试。");
       } finally {
@@ -540,19 +722,27 @@ export function TiptapEditor({
             <button
               type="button"
               aria-label="插入块"
-              title="插入块"
+              title="在下方插入块（按住 Option 在上方插入）"
               data-testid="editor-insert-trigger"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                handleOpenBlockMenu();
+              onClick={(event) => {
+                handleOpenInsertMenu(event.altKey ? "above" : "below");
               }}
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 shadow-sm transition-colors hover:border-stone-300 hover:text-stone-900 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-stone-100"
             >
               <Plus size={15} />
             </button>
-            <div className="flex h-8 w-6 items-center justify-center text-stone-300 dark:text-stone-700">
+            <button
+              type="button"
+              aria-label="块菜单"
+              title="块菜单"
+              data-testid="editor-block-menu-trigger"
+              onClick={() => {
+                handleOpenBlockActionMenu();
+              }}
+              className="flex h-8 w-6 items-center justify-center rounded-md text-stone-300 transition-colors hover:bg-stone-100 hover:text-stone-500 dark:text-stone-700 dark:hover:bg-stone-900 dark:hover:text-stone-300"
+            >
               <GripVertical size={14} />
-            </div>
+            </button>
           </div>
         )}
 
@@ -568,19 +758,34 @@ export function TiptapEditor({
           coords={slashCoords}
           query={slashQuery}
           items={slashItems}
+          testId="editor-slash-menu"
           onClose={handleSlashDeactivate}
         />
       )}
 
-      {blockMenuCoords && (
+      {insertMenuState && (
         <SlashCommandMenu
-          key={`block-${blockMenuCoords.top}-${blockMenuCoords.left}`}
+          key={`insert-${insertMenuState.coords.top}-${insertMenuState.coords.left}-${insertMenuState.direction}`}
           editor={editor}
-          coords={blockMenuCoords}
+          coords={insertMenuState.coords}
           query=""
           items={slashItems}
+          testId="editor-insert-menu"
+          onSelectItem={handleInsertMenuSelection}
+          onClose={() => setInsertMenuState(null)}
+        />
+      )}
+
+      {blockActionMenuState && blockActionItems.length > 0 && (
+        <SlashCommandMenu
+          key={`actions-${blockActionMenuState.coords.top}-${blockActionMenuState.coords.left}`}
+          editor={editor}
+          coords={blockActionMenuState.coords}
+          query=""
+          items={blockActionItems}
           deleteTrigger={false}
-          onClose={() => setBlockMenuCoords(null)}
+          testId="editor-block-action-menu"
+          onClose={() => setBlockActionMenuState(null)}
         />
       )}
 

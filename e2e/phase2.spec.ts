@@ -88,7 +88,10 @@ test.describe("Phase 2: 笔记本模块", () => {
     const firstBlock = page.locator(".ProseMirror p").first();
     await firstBlock.hover();
     await page.getByTestId("editor-insert-trigger").click();
-    await page.getByRole("button", { name: "无序列表" }).click();
+    await page
+      .getByTestId("editor-insert-menu")
+      .getByRole("button", { name: "无序列表" })
+      .click();
     await editor.pressSequentially(listText, { delay: 30 });
 
     await expect(page.locator(".ProseMirror ul li").first()).toContainText(
@@ -114,7 +117,10 @@ test.describe("Phase 2: 笔记本模块", () => {
     const firstBlock = page.locator(".ProseMirror p").first();
     await firstBlock.hover();
     await page.getByTestId("editor-insert-trigger").click();
-    await page.getByRole("button", { name: "有序列表" }).click();
+    await page
+      .getByTestId("editor-insert-menu")
+      .getByRole("button", { name: "有序列表" })
+      .click();
     await editor.pressSequentially(orderedText, { delay: 30 });
 
     await expect(page.locator(".ProseMirror ol li").first()).toContainText(
@@ -129,6 +135,31 @@ test.describe("Phase 2: 笔记本模块", () => {
       .toBe("decimal");
   });
 
+  test("悬浮插入按钮会插入新块而不是改写当前块", async ({ page }) => {
+    const firstText = `first-${uid()}`;
+    const secondText = `second-${uid()}`;
+
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    const editor = page.locator(".ProseMirror");
+    await editor.click();
+    await editor.pressSequentially(firstText, { delay: 30 });
+
+    const firstBlock = page.locator(".ProseMirror p").first();
+    await firstBlock.hover();
+    await page.getByTestId("editor-insert-trigger").click();
+    await page
+      .getByTestId("editor-insert-menu")
+      .getByRole("button", { name: "标题 2" })
+      .click();
+    await editor.pressSequentially(secondText, { delay: 30 });
+
+    await expect(page.locator(".ProseMirror p").first()).toContainText(firstText);
+    await expect(page.locator(".ProseMirror h2").first()).toContainText(secondText);
+  });
+
   test("悬浮插入按钮支持待办列表并可勾选", async ({ page }) => {
     const todoText = `todo-${uid()}`;
     await page.goto("/notes");
@@ -139,7 +170,10 @@ test.describe("Phase 2: 笔记本模块", () => {
     const firstBlock = page.locator(".ProseMirror p").first();
     await firstBlock.hover();
     await page.getByTestId("editor-insert-trigger").click();
-    await page.getByRole("button", { name: "待办列表" }).click();
+    await page
+      .getByTestId("editor-insert-menu")
+      .getByRole("button", { name: "待办列表" })
+      .click();
     await editor.pressSequentially(todoText, { delay: 30 });
 
     const todoItem = page.locator(".ProseMirror ul[data-type='taskList'] li").first();
@@ -148,6 +182,63 @@ test.describe("Phase 2: 笔记本模块", () => {
     const checkbox = todoItem.locator("input[type='checkbox']").first();
     await checkbox.check();
     await expect(todoItem).toHaveAttribute("data-checked", "true");
+  });
+
+  test("块菜单支持复制和删除", async ({ page }) => {
+    const text = `dup-${uid()}`;
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    const editor = page.locator(".ProseMirror");
+    await editor.click();
+    await editor.pressSequentially(text, { delay: 30 });
+
+    const firstParagraph = page.locator(".ProseMirror p").filter({ hasText: text }).first();
+    await firstParagraph.hover();
+    await page.getByTestId("editor-block-menu-trigger").click();
+    await page
+      .getByTestId("editor-block-action-menu")
+      .getByRole("button", { name: "复制块" })
+      .click();
+
+    await expect(page.locator(".ProseMirror p").filter({ hasText: text })).toHaveCount(2);
+
+    const secondParagraph = page.locator(".ProseMirror p").filter({ hasText: text }).nth(1);
+    await secondParagraph.hover();
+    await page.getByTestId("editor-block-menu-trigger").click();
+    await page
+      .getByTestId("editor-block-action-menu")
+      .getByRole("button", { name: "删除块" })
+      .click();
+
+    await expect(page.locator(".ProseMirror p").filter({ hasText: text })).toHaveCount(1);
+  });
+
+  test("块菜单支持上下移动", async ({ page }) => {
+    const firstText = `move-a-${uid()}`;
+    const secondText = `move-b-${uid()}`;
+
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    const editor = page.locator(".ProseMirror");
+    await editor.click();
+    await editor.pressSequentially(firstText, { delay: 30 });
+    await page.keyboard.press("Enter");
+    await editor.pressSequentially(secondText, { delay: 30 });
+
+    const firstParagraph = page.locator(".ProseMirror p").filter({ hasText: firstText }).first();
+    await firstParagraph.hover();
+    await page.getByTestId("editor-block-menu-trigger").click();
+    await page
+      .getByTestId("editor-block-action-menu")
+      .getByRole("button", { name: "下移" })
+      .click();
+
+    await expect(page.locator(".ProseMirror p").nth(0)).toContainText(secondText);
+    await expect(page.locator(".ProseMirror p").nth(1)).toContainText(firstText);
   });
 
   test("可以插入本地图片并保存", async ({ page }) => {

@@ -23,6 +23,7 @@ export interface EditorCommandItem {
   icon: LucideIcon;
   run: (editor: Editor) => void;
   isActive?: (editor: Editor) => boolean;
+  tone?: "default" | "danger";
 }
 
 export interface EditorCommandGroup {
