@@ -38,3 +38,22 @@
 
 **已知遗留**：
 - phase3 中 2 个 Todo 测试失败（`getByText('学习')` 匹配到隐藏的 `<option>` 元素）— 属于 Todo 模块既有问题，不在 Pass 2 范围
+
+---
+
+### Pass 3：Ask AI RAG 实现（2026-03-22）
+
+**变更内容**：
+- 新增 `src/server/ai/rag.ts`：RAG 检索层，query 拆词 → SQLite 内存匹配 notes.plainText + bookmarks.content/summary，返回 top 5 结果（每条截断 2000 字）
+- `src/app/api/chat/route.ts`：集成 RAG 检索，构建带 `<knowledge_base>` 的 system prompt，支持跳过检索关键词（"不用搜索"等），指示 Claude 在回复末尾追加 `<!-- sources:[...] -->` 隐藏标记
+- `src/app/ask/page.tsx`：input 改为 textarea（支持 Shift+Enter 换行），解析 AI 回复中的 sources 标记并渲染为可点击的引用来源列表（笔记跳 `/notes/[id]`，收藏跳 `/bookmarks`）
+- `e2e/phase4.spec.ts`：更新选择器从 `input` 改为 `textarea`，适配新 placeholder
+
+**验证结果**：
+- pnpm build：✅
+- pnpm lint：✅
+- E2E（phase4）：8 passed
+
+**已知遗留**：
+- Claude 可能不稳定地遵循 sources 格式约定 — 前端已做容错（无标记时不展示引用区）
+- SQLite LIKE 对中文检索效果有限（无分词器）— V1 可接受，V2 引入 FTS5

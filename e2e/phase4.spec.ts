@@ -14,7 +14,7 @@ test.describe("Phase 4: Ask AI 页面", () => {
 
   test("输入框和发送按钮存在", async ({ page }) => {
     await page.goto("/ask");
-    const input = page.locator("input[placeholder='输入你的问题...']");
+    const input = page.locator("textarea[placeholder='输入你的问题...（Shift+Enter 换行）']");
     await expect(input).toBeVisible();
     await expect(input).toBeEnabled();
 
@@ -25,7 +25,7 @@ test.describe("Phase 4: Ask AI 页面", () => {
 
   test("输入文字后发送按钮启用", async ({ page }) => {
     await page.goto("/ask");
-    const input = page.locator("input[placeholder='输入你的问题...']");
+    const input = page.locator("textarea[placeholder='输入你的问题...（Shift+Enter 换行）']");
     await input.fill("测试问题");
 
     const sendBtn = page.locator("button[type='submit']");
@@ -34,7 +34,7 @@ test.describe("Phase 4: Ask AI 页面", () => {
 
   test("发送消息后显示用户消息", async ({ page }) => {
     await page.goto("/ask");
-    const input = page.locator("input[placeholder='输入你的问题...']");
+    const input = page.locator("textarea[placeholder='输入你的问题...（Shift+Enter 换行）']");
     await input.fill("你好");
     await page.locator("button[type='submit']").click();
 
