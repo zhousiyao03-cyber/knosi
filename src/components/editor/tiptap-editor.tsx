@@ -1,24 +1,24 @@
 "use client";
 
+import { useState, useCallback, useMemo } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import { cn } from "@/lib/utils";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
+import Highlight from "@tiptap/extension-highlight";
+import Underline from "@tiptap/extension-underline";
+import Link from "@tiptap/extension-link";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import Typography from "@tiptap/extension-typography";
+import { common, createLowlight } from "lowlight";
 import {
-  Bold,
-  Italic,
-  Strikethrough,
-  Code,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  Quote,
-  Minus,
-  Undo,
-  Redo,
-} from "lucide-react";
+  createSlashCommandExtension,
+  SlashCommandMenu,
+} from "./slash-command";
+import { BubbleToolbar } from "./bubble-toolbar";
+
+const lowlight = createLowlight(common);
 
 interface TiptapEditorProps {
   content?: string;
@@ -27,45 +27,71 @@ interface TiptapEditorProps {
   placeholder?: string;
 }
 
-function ToolbarButton({
-  onClick,
-  isActive,
-  children,
-  title,
-}: {
-  onClick: () => void;
-  isActive?: boolean;
-  children: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={cn(
-        "p-1.5 rounded hover:bg-gray-200 transition-colors",
-        isActive && "bg-gray-200 text-blue-600"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 export function TiptapEditor({
   content,
   onChange,
   editable = true,
-  placeholder = "开始写点什么...",
+  placeholder = "输入 / 以插入命令...",
 }: TiptapEditorProps) {
+  const [slashCoords, setSlashCoords] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const [slashQuery, setSlashQuery] = useState("");
+
+  const handleSlashActivate = useCallback(
+    (query: string, coords: { top: number; left: number }) => {
+      setSlashQuery(query);
+      setSlashCoords(coords);
+    },
+    []
+  );
+
+  const handleSlashDeactivate = useCallback(() => {
+    setSlashCoords(null);
+    setSlashQuery("");
+  }, []);
+
+  const handleSlashQueryChange = useCallback((query: string) => {
+    setSlashQuery(query);
+  }, []);
+
+  const slashCommandExtension = useMemo(
+    () =>
+      createSlashCommandExtension(
+        handleSlashActivate,
+        handleSlashDeactivate,
+        handleSlashQueryChange
+      ),
+    [handleSlashActivate, handleSlashDeactivate, handleSlashQueryChange]
+  );
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        codeBlock: false,
       }),
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({
+        placeholder: ({ node }) => {
+          if (node.type.name === "heading") {
+            return `标题 ${node.attrs.level}`;
+          }
+          return placeholder;
+        },
+      }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Highlight.configure({ multicolor: false }),
+      Underline,
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: { class: "text-blue-600 underline cursor-pointer" },
+      }),
+      CodeBlockLowlight.configure({ lowlight }),
+      Typography,
+      slashCommandExtension,
     ],
     content: content ? JSON.parse(content) : undefined,
     editable,
@@ -76,119 +102,28 @@ export function TiptapEditor({
     },
     editorProps: {
       attributes: {
-        class: "prose prose-sm max-w-none focus:outline-none min-h-[300px] px-4 py-3",
+        class: "notion-editor focus:outline-none min-h-[60vh] px-1 py-2",
       },
     },
   });
 
   if (!editor) return null;
 
-  const iconSize = 16;
-
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      {editable && (
-        <div className="flex items-center gap-0.5 p-1.5 border-b border-gray-200 bg-gray-50 flex-wrap">
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            isActive={editor.isActive("heading", { level: 1 })}
-            title="标题 1"
-          >
-            <Heading1 size={iconSize} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            isActive={editor.isActive("heading", { level: 2 })}
-            title="标题 2"
-          >
-            <Heading2 size={iconSize} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-            isActive={editor.isActive("heading", { level: 3 })}
-            title="标题 3"
-          >
-            <Heading3 size={iconSize} />
-          </ToolbarButton>
+    <div className="relative">
+      {editable && <BubbleToolbar editor={editor} />}
 
-          <div className="w-px h-5 bg-gray-300 mx-1" />
-
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            isActive={editor.isActive("bold")}
-            title="粗体"
-          >
-            <Bold size={iconSize} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            isActive={editor.isActive("italic")}
-            title="斜体"
-          >
-            <Italic size={iconSize} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            isActive={editor.isActive("strike")}
-            title="删除线"
-          >
-            <Strikethrough size={iconSize} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleCode().run()}
-            isActive={editor.isActive("code")}
-            title="行内代码"
-          >
-            <Code size={iconSize} />
-          </ToolbarButton>
-
-          <div className="w-px h-5 bg-gray-300 mx-1" />
-
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            isActive={editor.isActive("bulletList")}
-            title="无序列表"
-          >
-            <List size={iconSize} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            isActive={editor.isActive("orderedList")}
-            title="有序列表"
-          >
-            <ListOrdered size={iconSize} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            isActive={editor.isActive("blockquote")}
-            title="引用"
-          >
-            <Quote size={iconSize} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setHorizontalRule().run()}
-            title="分割线"
-          >
-            <Minus size={iconSize} />
-          </ToolbarButton>
-
-          <div className="w-px h-5 bg-gray-300 mx-1" />
-
-          <ToolbarButton
-            onClick={() => editor.chain().focus().undo().run()}
-            title="撤销"
-          >
-            <Undo size={iconSize} />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().redo().run()}
-            title="重做"
-          >
-            <Redo size={iconSize} />
-          </ToolbarButton>
-        </div>
-      )}
       <EditorContent editor={editor} />
+
+      {slashCoords && (
+        <SlashCommandMenu
+          key={slashQuery}
+          editor={editor}
+          coords={slashCoords}
+          query={slashQuery}
+          onClose={handleSlashDeactivate}
+        />
+      )}
     </div>
   );
 }

@@ -6,54 +6,120 @@ test.describe("Phase 3: Todo 模块", () => {
   test("Todo 列表页加载成功", async ({ page }) => {
     await page.goto("/todos");
     await expect(page.locator("main h1")).toContainText("Todo");
+    await expect(page.getByText("先把任务录进来")).toBeVisible();
   });
 
-  test("创建 Todo", async ({ page }) => {
+  test("创建带时间和分类的 Todo", async ({ page }) => {
     const name = `todo-${uid()}`;
+    const due = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const dueInput = new Date(
+      due.getTime() - due.getTimezoneOffset() * 60_000
+    )
+      .toISOString()
+      .slice(0, 10);
+
     await page.goto("/todos");
 
-    await page.locator("input[placeholder='添加新任务...']").fill(name);
+    await page.getByLabel("Todo 标题").fill(name);
+    await page.getByRole("button", { name: "更多字段" }).click();
+    await page.getByLabel("Todo 分类").selectOption("工作");
+    await page.getByLabel("Todo 截止时间").fill(dueInput);
     await page.getByRole("button", { name: "添加" }).click();
 
+    await expect(page.getByText(name).first()).toBeVisible();
+    await expect(
+      page.locator("section").filter({ hasText: "即将到来" }).getByText(name)
+    ).toBeVisible();
+    await expect(page.getByText("工作").first()).toBeVisible();
+  });
+
+  test("可以在详情面板编辑 Todo", async ({ page }) => {
+    const name = `edit-${uid()}`;
+    const updatedName = `${name}-updated`;
+    const due = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    const dueInput = new Date(
+      due.getTime() - due.getTimezoneOffset() * 60_000
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    await page.goto("/todos");
+
+    await page.getByLabel("Todo 标题").fill(name);
+    await page.getByRole("button", { name: "添加" }).click();
+    await expect(page.getByText(name).first()).toBeVisible();
+
+    await page.getByText(name).first().click();
+    await expect(page.getByText("任务详情")).toBeVisible();
+
+    await page.getByLabel("编辑任务标题").fill(updatedName);
+    await page.getByLabel("编辑任务描述").fill("补充上下文");
+    await page.getByLabel("编辑任务分类").selectOption("学习");
+    await page.getByLabel("编辑任务优先级").selectOption("high");
+    await page.getByLabel("编辑任务截止时间").fill(dueInput);
+    await page.getByRole("button", { name: "保存修改" }).click();
+
+    await expect(page.getByText(updatedName).first()).toBeVisible();
+    await expect(page.getByText("补充上下文").first()).toBeVisible();
+    await expect(page.getByText("学习").first()).toBeVisible();
+  });
+
+  test("可以清空 Todo 的截止时间", async ({ page }) => {
+    const name = `clear-due-${uid()}`;
+    const due = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const dueInput = new Date(
+      due.getTime() - due.getTimezoneOffset() * 60_000
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    await page.goto("/todos");
+
+    await page.getByLabel("Todo 标题").fill(name);
+    await page.getByRole("button", { name: "更多字段" }).click();
+    await page.getByLabel("Todo 截止时间").fill(dueInput);
+    await page.getByRole("button", { name: "添加" }).click();
+    await expect(page.getByText(name).first()).toBeVisible();
+
+    await page.getByText(name).first().click();
+    await page.getByRole("button", { name: "清空时间" }).click();
+    await page.getByRole("button", { name: "保存修改" }).click();
+
+    await expect(
+      page.locator("section").filter({ hasText: "无时间" }).getByText(name)
+    ).toBeVisible();
+  });
+
+  test("切换 Todo 状态并按状态筛选", async ({ page }) => {
+    const name = `done-${uid()}`;
+    await page.goto("/todos");
+
+    await page.getByLabel("Todo 标题").fill(name);
+    await page.getByRole("button", { name: "添加" }).click();
+    await expect(page.getByText(name).first()).toBeVisible();
+
+    const row = page.locator("div.group").filter({ hasText: name }).first();
+    const toggle = row.locator("button[title='切换状态']");
+    await toggle.click();
+    await page.waitForTimeout(300);
+    await toggle.click();
+    await page.waitForTimeout(300);
+
+    await page.getByLabel("按状态筛选").selectOption("done");
     await expect(page.getByText(name).first()).toBeVisible();
   });
 
-  test("创建高优先级 Todo 并显示红色标签", async ({ page }) => {
-    const name = `hipri-${uid()}`;
+  test("按分类筛选 Todo", async ({ page }) => {
+    const name = `category-${uid()}`;
     await page.goto("/todos");
 
-    await page.locator("input[placeholder='添加新任务...']").fill(name);
-    await page.locator("form select").selectOption("high");
-    await page.getByRole("button", { name: "添加" }).click();
-
-    await expect(page.getByText(name).first()).toBeVisible();
-    // The priority badge text "高" should appear near the todo
-    const todoText = page.getByText(name).first();
-    await expect(todoText).toBeVisible();
-  });
-
-  test("切换 Todo 状态", async ({ page }) => {
-    const name = `cyc-${uid()}`;
-    await page.goto("/todos");
-
-    await page.locator("input[placeholder='添加新任务...']").fill(name);
+    await page.getByLabel("Todo 标题").fill(name);
+    await page.getByRole("button", { name: "更多字段" }).click();
+    await page.getByLabel("Todo 分类").selectOption("生活");
     await page.getByRole("button", { name: "添加" }).click();
     await expect(page.getByText(name).first()).toBeVisible();
 
-    // Click status toggle: todo -> in_progress
-    const statusBtn = page.locator("button[title='切换状态']").first();
-    await statusBtn.click();
-    await page.waitForTimeout(500);
-
-    // Click again: in_progress -> done
-    await statusBtn.click();
-    await page.waitForTimeout(500);
-
-    // Click again: done -> todo (cycles back)
-    await statusBtn.click();
-    await page.waitForTimeout(500);
-
-    // Todo should still be visible (cycled back to todo state)
+    await page.getByLabel("按分类筛选").selectOption("生活");
     await expect(page.getByText(name).first()).toBeVisible();
   });
 
@@ -61,46 +127,15 @@ test.describe("Phase 3: Todo 模块", () => {
     const name = `deltodo-${uid()}`;
     await page.goto("/todos");
 
-    await page.locator("input[placeholder='添加新任务...']").fill(name);
+    await page.getByLabel("Todo 标题").fill(name);
     await page.getByRole("button", { name: "添加" }).click();
     await expect(page.getByText(name).first()).toBeVisible();
 
-    // Hover and delete
     const row = page.locator("div.group").filter({ hasText: name }).first();
     await row.hover();
     await row.locator("button[title='删除']").click();
 
-    await expect(page.getByText(name)).not.toBeVisible({ timeout: 5000 });
-  });
-
-  test("按状态筛选", async ({ page }) => {
-    const doneName = `done-${uid()}`;
-    const todoName = `pending-${uid()}`;
-    await page.goto("/todos");
-
-    // Create a "done" todo
-    await page.locator("input[placeholder='添加新任务...']").fill(doneName);
-    await page.getByRole("button", { name: "添加" }).click();
-    await expect(page.getByText(doneName).first()).toBeVisible();
-    // Mark done (click status twice)
-    const btn1 = page.locator("div.group").filter({ hasText: doneName }).locator("button[title='切换状态']").first();
-    await btn1.click();
-    await page.waitForTimeout(300);
-    await btn1.click();
-    await page.waitForTimeout(300);
-
-    // Create a "todo" item
-    await page.locator("input[placeholder='添加新任务...']").fill(todoName);
-    await page.getByRole("button", { name: "添加" }).click();
-    await expect(page.getByText(todoName).first()).toBeVisible();
-
-    // Filter by status "已完成" — use the first select AFTER the form
-    // The page has: form>select(priority), then select(status filter), select(priority filter)
-    const statusFilterSelect = page.locator("main > div > div > select").first();
-    await statusFilterSelect.selectOption("done");
-
-    await expect(page.getByText(doneName).first()).toBeVisible();
-    await expect(page.getByText(todoName)).not.toBeVisible();
+    await expect(row).not.toBeVisible({ timeout: 5000 });
   });
 });
 

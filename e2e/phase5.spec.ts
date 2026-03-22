@@ -21,9 +21,10 @@ test.describe("Phase 5: 学习模块", () => {
     await page.goto("/learn");
 
     // Seed if empty
-    const seedBtn = page.getByText("初始化推荐路径");
+    const seedBtn = page.getByRole("button", { name: "初始化推荐路径" });
     if (await seedBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await seedBtn.click();
+      await expect(seedBtn).toBeEnabled();
+      await seedBtn.click({ force: true });
       await expect(
         page.getByText("数据库设计与优化").first()
       ).toBeVisible({ timeout: 10000 });

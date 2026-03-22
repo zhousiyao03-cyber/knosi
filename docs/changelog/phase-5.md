@@ -52,3 +52,27 @@
 - 工作流执行引擎目前为模拟运行，未实际调用 AI
 - 学习模块课程内容为纯文本展示，暂未集成 Markdown 渲染
 - AI 探索和课程生成需要 ANTHROPIC_API_KEY
+
+---
+
+## 2026-03-22 - 学习模块 E2E 稳定性修复
+
+Task / goal:
+- 修复学习模块初始化流程在全量回归中偶发失败的 Playwright 用例，并重新完成全仓验证。
+
+Key changes:
+- 将“初始化推荐路径”按钮的定位改为更稳定的角色选择器。
+- 在按钮存在时先校验可用态，再使用更稳的点击方式避免按钮在重渲染时脱离 DOM 导致测试误报。
+- 重新执行生产构建和全量 E2E，确认 Todo 改版与笔记编辑器新实现合并后仓库整体可通过验证。
+
+Files touched:
+- `e2e/phase5.spec.ts`
+
+Verification commands and results:
+- `pnpm rebuild better-sqlite3` -> ✅ 重新编译本地原生模块，修复 Node ABI 不匹配。
+- `pnpm build` -> ✅ 通过。
+- `PLAYWRIGHT_HTML_OPEN=never pnpm exec playwright test --reporter=line` -> ✅ 66/66 通过。
+
+Remaining risks / follow-up:
+- 当前修复的是测试稳定性问题，未改变学习模块的业务交互设计。
+- 仓库仍依赖本地 `better-sqlite3` 原生模块，切换 Node 主版本后需要重新编译。

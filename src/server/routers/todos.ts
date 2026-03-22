@@ -14,9 +14,9 @@ export const todosRouter = router({
     .input(
       z.object({
         title: z.string(),
-        description: z.string().optional(),
+        description: z.string().nullable().optional(),
         priority: z.enum(["low", "medium", "high"]).default("medium"),
-        category: z.string().optional(),
+        category: z.string().nullable().optional(),
         dueDate: z.coerce.date().optional(),
       })
     )
@@ -31,11 +31,11 @@ export const todosRouter = router({
       z.object({
         id: z.string(),
         title: z.string().optional(),
-        description: z.string().optional(),
+        description: z.string().nullable().optional(),
         priority: z.enum(["low", "medium", "high"]).optional(),
         status: z.enum(["todo", "in_progress", "done"]).optional(),
-        category: z.string().optional(),
-        dueDate: z.coerce.date().optional(),
+        category: z.string().nullable().optional(),
+        dueDate: z.union([z.null(), z.coerce.date()]).optional(),
       })
     )
     .mutation(async ({ input }) => {

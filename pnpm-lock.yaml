@@ -14,12 +14,36 @@ dependencies:
   '@tanstack/react-query':
     specifier: ^5.91.3
     version: 5.91.3(react@19.2.4)
+  '@tiptap/extension-bubble-menu':
+    specifier: ^3.20.4
+    version: 3.20.4(@tiptap/core@3.20.4)(@tiptap/pm@3.20.4)
   '@tiptap/extension-code-block-lowlight':
     specifier: ^3.20.4
     version: 3.20.4(@tiptap/core@3.20.4)(@tiptap/extension-code-block@3.20.4)(@tiptap/pm@3.20.4)(highlight.js@11.11.1)(lowlight@3.3.0)
+  '@tiptap/extension-floating-menu':
+    specifier: ^3.20.4
+    version: 3.20.4(@floating-ui/dom@1.7.6)(@tiptap/core@3.20.4)(@tiptap/pm@3.20.4)
+  '@tiptap/extension-highlight':
+    specifier: ^3.20.4
+    version: 3.20.4(@tiptap/core@3.20.4)
+  '@tiptap/extension-link':
+    specifier: ^3.20.4
+    version: 3.20.4(@tiptap/core@3.20.4)(@tiptap/pm@3.20.4)
   '@tiptap/extension-placeholder':
     specifier: ^3.20.4
     version: 3.20.4(@tiptap/extensions@3.20.4)
+  '@tiptap/extension-task-item':
+    specifier: ^3.20.4
+    version: 3.20.4(@tiptap/extension-list@3.20.4)
+  '@tiptap/extension-task-list':
+    specifier: ^3.20.4
+    version: 3.20.4(@tiptap/extension-list@3.20.4)
+  '@tiptap/extension-typography':
+    specifier: ^3.20.4
+    version: 3.20.4(@tiptap/core@3.20.4)
+  '@tiptap/extension-underline':
+    specifier: ^3.20.4
+    version: 3.20.4(@tiptap/core@3.20.4)
   '@tiptap/pm':
     specifier: ^3.20.4
     version: 3.20.4
@@ -1106,7 +1130,6 @@ packages:
     dependencies:
       '@floating-ui/utils': 0.2.11
     dev: false
-    optional: true
 
   /@floating-ui/dom@1.7.6:
     resolution: {integrity: sha512-9gZSAI5XM36880PPMm//9dfiEngYoC6Am2izES1FF406YFsjvyBMmeJ2g4SAju3xWwtuynNRFL2s9hgxpLI5SQ==}
@@ -1114,13 +1137,11 @@ packages:
       '@floating-ui/core': 1.7.5
       '@floating-ui/utils': 0.2.11
     dev: false
-    optional: true
 
   /@floating-ui/utils@0.2.11:
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
     requiresBuild: true
     dev: false
-    optional: true
 
   /@humanfs/core@0.19.1:
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -1778,7 +1799,6 @@ packages:
       '@tiptap/core': 3.20.4(@tiptap/pm@3.20.4)
       '@tiptap/pm': 3.20.4
     dev: false
-    optional: true
 
   /@tiptap/extension-bullet-list@3.20.4(@tiptap/extension-list@3.20.4):
     resolution: {integrity: sha512-1RTGrur1EKoxfnLZ3M6xeNj8GITAz74jH2DHGcjLsd2Xr7Q7BozGaIq6GkkvKguMwbI1zCOxTHFCpUETXAIQQA==}
@@ -1850,7 +1870,6 @@ packages:
       '@tiptap/core': 3.20.4(@tiptap/pm@3.20.4)
       '@tiptap/pm': 3.20.4
     dev: false
-    optional: true
 
   /@tiptap/extension-gapcursor@3.20.4(@tiptap/extensions@3.20.4):
     resolution: {integrity: sha512-JJ6f1iQ1e0s4kISgq55U3UYGwWV/N9f0PYMtB6e3L+SBQjXnywaLK0g6vfN6IvTCC2vdIuqeSOX8VlSO97sJLw==}
@@ -1870,6 +1889,14 @@ packages:
 
   /@tiptap/extension-heading@3.20.4(@tiptap/core@3.20.4):
     resolution: {integrity: sha512-xsnkmTGggJc5P2iCwS1lv8KFG31xC/GNPJKoi/3UH67j/lKDhA3AdtshsLeyv2FKtTtYDb8oV0IqzHB1MM6a7w==}
+    peerDependencies:
+      '@tiptap/core': ^3.20.4
+    dependencies:
+      '@tiptap/core': 3.20.4(@tiptap/pm@3.20.4)
+    dev: false
+
+  /@tiptap/extension-highlight@3.20.4(@tiptap/core@3.20.4):
+    resolution: {integrity: sha512-CyTVPorVWwE4v89+k1nmaoAvjXLo7/fYWBsYlHW6b9Y1Un0iLANgKMFmmuapyfpaqpvg7V0Eg5ElG9U9+rogVA==}
     peerDependencies:
       '@tiptap/core': ^3.20.4
     dependencies:
@@ -1963,8 +1990,32 @@ packages:
       '@tiptap/core': 3.20.4(@tiptap/pm@3.20.4)
     dev: false
 
+  /@tiptap/extension-task-item@3.20.4(@tiptap/extension-list@3.20.4):
+    resolution: {integrity: sha512-mEWyAtZ61USZnKyLDxi2DtnSREfW0yUFXDOFWstNg1i6hva197BuAy6VRQMQxTOq+cFAgAt1MEZKanW0Obsa+g==}
+    peerDependencies:
+      '@tiptap/extension-list': ^3.20.4
+    dependencies:
+      '@tiptap/extension-list': 3.20.4(@tiptap/core@3.20.4)(@tiptap/pm@3.20.4)
+    dev: false
+
+  /@tiptap/extension-task-list@3.20.4(@tiptap/extension-list@3.20.4):
+    resolution: {integrity: sha512-QvLrpffkxkr7TTgMmk6fnPAE34HYrUosHiuZJpRK008MuJDOoANblS221M4lLuRE73w3KI7hd/fi2CliBcCC4A==}
+    peerDependencies:
+      '@tiptap/extension-list': ^3.20.4
+    dependencies:
+      '@tiptap/extension-list': 3.20.4(@tiptap/core@3.20.4)(@tiptap/pm@3.20.4)
+    dev: false
+
   /@tiptap/extension-text@3.20.4(@tiptap/core@3.20.4):
     resolution: {integrity: sha512-jchJcBZixDEO2J66Zx5dchsI2mA6IYsROqF8P1poxL4ienH7RVQRCTsBNnSfIeOtREKKWeOU/tEs5fcpvvGwIQ==}
+    peerDependencies:
+      '@tiptap/core': ^3.20.4
+    dependencies:
+      '@tiptap/core': 3.20.4(@tiptap/pm@3.20.4)
+    dev: false
+
+  /@tiptap/extension-typography@3.20.4(@tiptap/core@3.20.4):
+    resolution: {integrity: sha512-78dlLJViuZehM2P5p9H3HRN6GMARvFQFkdnJrJsC6b6J7SN10ruytCMM7xnUnHlZElz19LU/0/+LDtMrOA814w==}
     peerDependencies:
       '@tiptap/core': ^3.20.4
     dependencies:

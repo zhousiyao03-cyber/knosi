@@ -4,7 +4,7 @@ import { use, useState, useCallback, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useRouter } from "next/navigation";
 import { TiptapEditor } from "@/components/editor/tiptap-editor";
-import { ArrowLeft, Save, Tag, X } from "lucide-react";
+import { ArrowLeft, Tag, X, MoreHorizontal } from "lucide-react";
 
 interface NoteData {
   title: string;
@@ -25,9 +25,14 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
   const [type, setType] = useState<"note" | "journal" | "summary">(
     (note.type as "note" | "journal" | "summary") ?? "note"
   );
-  const [tags, setTags] = useState<string[]>(note.tags ? JSON.parse(note.tags) : []);
+  const [tags, setTags] = useState<string[]>(
+    note.tags ? JSON.parse(note.tags) : []
+  );
   const [tagInput, setTagInput] = useState("");
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">(
+    "saved"
+  );
+  const [showMeta, setShowMeta] = useState(false);
 
   const contentRef = useRef({
     content: note.content ?? "",
@@ -77,6 +82,15 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
     saveTimerRef.current = setTimeout(() => doSave({ title: newTitle }), 1500);
   };
 
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      // Focus the editor below
+      const editorEl = document.querySelector(".notion-editor") as HTMLElement;
+      editorEl?.focus();
+    }
+  };
+
   const handleTypeChange = (newType: "note" | "journal" | "summary") => {
     setType(newType);
     doSave({ type: newType });
@@ -98,90 +112,133 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
     doSave({ tags: newTags });
   };
 
-  const statusLabel = {
-    saved: "已保存",
-    saving: "保存中...",
-    unsaved: "未保存",
+  const typeLabels: Record<string, string> = {
+    note: "笔记",
+    journal: "日记",
+    summary: "总结",
+  };
+
+  const statusDot = {
+    saved: "bg-green-400",
+    saving: "bg-yellow-400 animate-pulse",
+    unsaved: "bg-gray-300",
   };
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex items-center justify-between mb-4">
+    <div className="max-w-3xl mx-auto py-4">
+      {/* Top bar — minimal */}
+      <div className="flex items-center justify-between mb-6 px-1">
         <button
           onClick={() => router.push("/notes")}
-          className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm"
+          className="flex items-center gap-1 text-gray-400 hover:text-gray-600 text-sm transition-colors"
         >
           <ArrowLeft size={16} />
-          返回列表
+          <span className="hidden sm:inline">返回</span>
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400">{statusLabel[saveStatus]}</span>
+          <div className="flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${statusDot[saveStatus]}`} />
+            <span className="text-xs text-gray-400">
+              {saveStatus === "saved"
+                ? "已保存"
+                : saveStatus === "saving"
+                ? "保存中..."
+                : "编辑中"}
+            </span>
+          </div>
           <button
-            onClick={() => doSave()}
-            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+            onClick={() => setShowMeta((v) => !v)}
+            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            title="笔记属性"
           >
-            <Save size={14} />
-            保存
+            <MoreHorizontal size={18} />
           </button>
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
-        <input
-          type="text"
+      {/* Collapsible metadata */}
+      {showMeta && (
+        <div className="mb-4 px-1 py-3 bg-gray-50 rounded-lg space-y-3 animate-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-3 px-3">
+            <span className="text-xs text-gray-500 w-12 shrink-0">类型</span>
+            <div className="flex gap-1.5">
+              {(["note", "journal", "summary"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => handleTypeChange(t)}
+                  className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                    type === t
+                      ? "bg-gray-900 text-white"
+                      : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
+                  }`}
+                >
+                  {typeLabels[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-3">
+            <span className="text-xs text-gray-500 w-12 shrink-0">
+              <Tag size={12} className="inline" /> 标签
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-white text-gray-700 rounded-md border border-gray-200"
+                >
+                  {tag}
+                  <button
+                    onClick={() => handleRemoveTag(tag)}
+                    className="hover:text-red-500 transition-colors"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddTag();
+                  }
+                }}
+                placeholder="添加标签..."
+                className="text-xs border-none outline-none bg-transparent placeholder-gray-400 w-20"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Title — large, Notion-style */}
+      <div className="px-1 mb-1">
+        <textarea
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
-          placeholder="笔记标题"
-          className="flex-1 text-2xl font-bold text-gray-900 border-none outline-none bg-transparent placeholder-gray-300"
-        />
-        <select
-          value={type}
-          onChange={(e) =>
-            handleTypeChange(e.target.value as "note" | "journal" | "summary")
-          }
-          className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="note">笔记</option>
-          <option value="journal">日记</option>
-          <option value="summary">总结</option>
-        </select>
-      </div>
-
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <Tag size={14} className="text-gray-400" />
-        {tags.map((tag) => (
-          <span
-            key={tag}
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded"
-          >
-            {tag}
-            <button
-              onClick={() => handleRemoveTag(tag)}
-              className="hover:text-red-500"
-            >
-              <X size={12} />
-            </button>
-          </span>
-        ))}
-        <input
-          type="text"
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAddTag();
-            }
+          onKeyDown={handleTitleKeyDown}
+          placeholder="无标题"
+          rows={1}
+          className="w-full text-4xl font-bold text-gray-900 border-none outline-none bg-transparent placeholder-gray-300 resize-none leading-tight"
+          style={{ overflow: "hidden" }}
+          onInput={(e) => {
+            const target = e.target as HTMLTextAreaElement;
+            target.style.height = "auto";
+            target.style.height = target.scrollHeight + "px";
           }}
-          placeholder="添加标签..."
-          className="text-sm border-none outline-none bg-transparent placeholder-gray-300 w-24"
         />
       </div>
 
-      <TiptapEditor
-        content={note.content ?? undefined}
-        onChange={handleContentChange}
-      />
+      {/* Editor */}
+      <div className="px-1">
+        <TiptapEditor
+          content={note.content ?? undefined}
+          onChange={handleContentChange}
+        />
+      </div>
     </div>
   );
 }
@@ -196,7 +253,11 @@ export default function NoteEditPage({
   const { data: note, isLoading } = trpc.notes.get.useQuery({ id });
 
   if (isLoading) {
-    return <p className="text-gray-500">加载中...</p>;
+    return (
+      <div className="max-w-3xl mx-auto py-20 text-center">
+        <div className="inline-block w-6 h-6 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+      </div>
+    );
   }
 
   if (!note) {
