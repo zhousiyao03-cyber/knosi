@@ -67,7 +67,14 @@ export const dashboardRouter = router({
       const bookmarkResults = await db
         .select({ id: bookmarks.id, title: bookmarks.title, url: bookmarks.url })
         .from(bookmarks)
-        .where(or(like(bookmarks.title, q), like(bookmarks.url, q)))
+        .where(
+          or(
+            like(bookmarks.title, q),
+            like(bookmarks.url, q),
+            like(bookmarks.summary, q),
+            like(bookmarks.content, q)
+          )
+        )
         .limit(5);
 
       const todoResults = await db

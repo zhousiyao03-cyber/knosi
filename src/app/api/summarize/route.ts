@@ -1,11 +1,21 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
+import { z } from "zod/v4";
 import { db } from "@/server/db";
 import { bookmarks } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 
+const summarizeInputSchema = z.object({
+  bookmarkId: z.string(),
+});
+
 export async function POST(req: Request) {
-  const { bookmarkId } = await req.json();
+  const body = await req.json();
+  const parsed = summarizeInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json({ error: "Invalid input" }, { status: 400 });
+  }
+  const { bookmarkId } = parsed.data;
 
   // Get the bookmark
   const [bookmark] = await db

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Trash2, FileText } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 export default function NotesPage() {
   const router = useRouter();
@@ -41,16 +41,6 @@ export default function NotesPage() {
     if (confirm("确定删除这条笔记吗？")) {
       deleteNote.mutate({ id });
     }
-  };
-
-  const formatDate = (date: Date | null) => {
-    if (!date) return "";
-    return new Date(date).toLocaleDateString("zh-CN", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   const typeLabels: Record<string, string> = {

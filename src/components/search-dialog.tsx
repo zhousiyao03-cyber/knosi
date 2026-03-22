@@ -5,6 +5,30 @@ import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { Search, FileText, Bookmark, CheckSquare, X } from "lucide-react";
 
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query.trim()) return <>{text}</>;
+
+  const regex = new RegExp(
+    `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+    "gi"
+  );
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark key={i} className="bg-yellow-200 text-gray-900 rounded-sm px-0.5">
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 export function SearchDialog() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -120,7 +144,7 @@ export function SearchDialog() {
                   >
                     <item.icon size={16} className="text-gray-400 flex-shrink-0" />
                     <span className="text-sm text-gray-900 truncate flex-1">
-                      {item.title}
+                      <HighlightText text={item.title} query={query} />
                     </span>
                     <span className="text-xs text-gray-400">
                       {item.type === "note"

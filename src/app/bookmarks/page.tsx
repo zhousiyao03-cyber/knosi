@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { formatDate } from "@/lib/utils";
 import {
   Plus,
   Trash2,
@@ -45,16 +46,6 @@ export default function BookmarksPage() {
       url: url.trim() || undefined,
       title: title.trim() || url.trim(),
       source: url.trim() ? "url" : "text",
-    });
-  };
-
-  const formatDate = (date: Date | null) => {
-    if (!date) return "";
-    return new Date(date).toLocaleDateString("zh-CN", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     });
   };
 

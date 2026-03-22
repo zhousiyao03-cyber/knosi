@@ -57,3 +57,24 @@
 **已知遗留**：
 - Claude 可能不稳定地遵循 sources 格式约定 — 前端已做容错（无标记时不展示引用区）
 - SQLite LIKE 对中文检索效果有限（无分词器）— V1 可接受，V2 引入 FTS5
+
+---
+
+### Pass 4：Search 增强 + API 加固（2026-03-22）
+
+**变更内容**：
+- `src/server/routers/dashboard.ts`：search procedure 扩展 bookmark 搜索范围，新增 `summary` 和 `content` 字段匹配
+- `src/components/search-dialog.tsx`：搜索结果关键词高亮（`HighlightText` 组件），类型图标区分
+- `src/app/api/chat/route.ts`：新增 zod 输入校验（验证 messages 数组存在），非法输入返回 400
+- `src/app/api/summarize/route.ts`：新增 zod 输入校验（验证 bookmarkId 为 string），非法输入返回 400
+- `src/lib/utils.ts`：新增公共 `formatDate` 和 `truncateText` 函数
+- `src/app/notes/page.tsx`：移除本地 `formatDate`，改用 `src/lib/utils.ts` 公共函数
+- `src/app/bookmarks/page.tsx`：同上
+
+**验证结果**：
+- pnpm build：✅
+- pnpm lint：✅
+- E2E（phase6）：12 passed
+
+**已知遗留**：
+- 无

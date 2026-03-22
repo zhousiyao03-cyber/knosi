@@ -1,8 +1,13 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { streamText } from "ai";
+import { z } from "zod/v4";
 import { retrieveContext } from "@/server/ai/rag";
 
 export const maxDuration = 30;
+
+const chatInputSchema = z.object({
+  messages: z.array(z.unknown()),
+});
 
 const SKIP_RAG_KEYWORDS = ["不用搜索", "直接回答", "不需要搜索", "不要搜索"];
 
@@ -37,7 +42,13 @@ ${knowledgeBlock}
 }
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const body = await req.json();
+  const parsed = chatInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json({ error: "Invalid input" }, { status: 400 });
+  }
+  // Use original body for streamText (preserves proper types), zod only validates structure
+  const messages = body.messages;
 
   // Get the latest user message for RAG retrieval
   const lastUserMessage = [...messages]
@@ -46,8 +57,8 @@ export async function POST(req: Request) {
   const userQuery =
     lastUserMessage?.content ??
     lastUserMessage?.parts
-      ?.filter((p: { type: string }) => p.type === "text")
-      .map((p: { text: string }) => p.text)
+      ?.filter((p: { type: string; text?: string }) => p.type === "text" && p.text)
+      .map((p: { text?: string }) => p.text ?? "")
       .join("") ??
     "";
 
