@@ -556,7 +556,7 @@ export function TiptapEditor({
           </div>
         )}
 
-        <div className="bg-transparent px-1">
+        <div className="bg-transparent">
           <EditorContent editor={editor} />
         </div>
       </div>
