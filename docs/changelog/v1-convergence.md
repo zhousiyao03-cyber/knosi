@@ -104,3 +104,18 @@
 **已知遗留**：
 - Tiptap bubble-toolbar 和 slash-command 组件未添加暗色模式（使用频率低，V1 可接受）
 - 冻结模块（todos、explore）未添加暗色模式（按计划不改）
+
+---
+
+### Pass 6：E2E 收尾 + 工程文档收口（2026-03-22）
+
+**变更内容**：
+- 新增 `e2e/v1-core-paths.spec.ts`：覆盖核心路径 A（笔记 → 搜索）、路径 B（收藏 → 搜索）、Ask AI 发送/API 校验、Bookmark 搜索/筛选，共 7 个测试
+- `e2e/phase3.spec.ts`：修复 2 个 Todo 测试（`getByText('工作'/'学习')` 限定到 `main span` 避免匹配隐藏 `<option>`）
+- `README.md`：全面更新反映 V1 状态（功能列表、技术栈、环境变量、项目结构、收敛进度）
+- `docs/changelog/v1-convergence.md`：记录所有 6 个 Pass 的完整变更
+
+**验证结果**：
+- pnpm build：✅
+- pnpm lint：✅
+- E2E（全量）：61 passed, 10 skipped

@@ -30,7 +30,7 @@ test.describe("Phase 3: Todo 模块", () => {
     await expect(
       page.locator("section").filter({ hasText: "即将到来" }).getByText(name)
     ).toBeVisible();
-    await expect(page.getByText("工作").first()).toBeVisible();
+    await expect(page.locator("main span").getByText("工作").first()).toBeVisible();
   });
 
   test("可以在详情面板编辑 Todo", async ({ page }) => {
@@ -61,7 +61,7 @@ test.describe("Phase 3: Todo 模块", () => {
 
     await expect(page.getByText(updatedName).first()).toBeVisible();
     await expect(page.getByText("补充上下文").first()).toBeVisible();
-    await expect(page.getByText("学习").first()).toBeVisible();
+    await expect(page.locator("main span").getByText("学习").first()).toBeVisible();
   });
 
   test("可以清空 Todo 的截止时间", async ({ page }) => {
