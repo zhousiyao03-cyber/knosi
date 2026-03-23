@@ -7,6 +7,20 @@ import { Plus, Search, Trash2, FileText, CalendarDays } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { createJournalTemplate } from "@/lib/note-templates";
+import { NOTE_TYPE_LABELS } from "@/lib/note-appearance";
+
+function parseTags(tags: string | null | undefined) {
+  if (!tags) return [] as string[];
+
+  try {
+    const value = JSON.parse(tags);
+    return Array.isArray(value)
+      ? value.filter((tag): tag is string => typeof tag === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function NotesPage() {
   const router = useRouter();
@@ -51,12 +65,6 @@ export default function NotesPage() {
     if (confirm("确定删除这条笔记吗？")) {
       deleteNote.mutate({ id });
     }
-  };
-
-  const typeLabels: Record<string, string> = {
-    note: "笔记",
-    journal: "日记",
-    summary: "总结",
   };
 
   return (
@@ -116,47 +124,66 @@ export default function NotesPage() {
       ) : (
         <div className="space-y-2">
           {filtered.map((note) => {
-            const tags: string[] = note.tags ? JSON.parse(note.tags) : [];
+            const tags = parseTags(note.tags);
             return (
               <div
                 key={note.id}
                 onClick={() => router.push(`/notes/${note.id}`)}
-                className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors group"
+                data-testid="note-card"
+                className="group flex items-center justify-between rounded-2xl border border-stone-200 bg-white/80 p-4 shadow-sm transition-colors hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950/70 dark:hover:bg-stone-900/80"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {note.title}
-                    </h3>
-                    {note.type && note.type !== "note" && (
-                      <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded">
-                        {typeLabels[note.type] ?? note.type}
-                      </span>
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <div className="mt-0.5 shrink-0">
+                    {note.icon ? (
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 bg-white text-xl shadow-sm dark:border-stone-800 dark:bg-stone-950">
+                        {note.icon}
+                      </div>
+                    ) : (
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50 text-stone-400 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-500">
+                        <FileText size={16} />
+                      </div>
                     )}
                   </div>
-                  {note.plainText && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
-                      {note.plainText.slice(0, 80)}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-400">
-                      {formatDate(note.updatedAt)}
-                    </span>
-                    {tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-1.5 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded"
-                      >
-                        {tag}
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate font-medium text-stone-900 dark:text-stone-100">
+                        {note.title}
+                      </h3>
+                      {note.type && note.type !== "note" && (
+                        <span
+                          data-testid="note-type-badge"
+                          className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300"
+                        >
+                          {NOTE_TYPE_LABELS[note.type] ?? note.type}
+                        </span>
+                      )}
+                    </div>
+                    {note.plainText && (
+                      <p className="mt-1 line-clamp-1 text-xs text-stone-500 dark:text-stone-400">
+                        {note.plainText.slice(0, 80)}
+                      </p>
+                    )}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-stone-400">
+                        {formatDate(note.updatedAt)}
                       </span>
-                    ))}
+                      {tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <button
                   onClick={(e) => handleDelete(e, note.id)}
+                  data-testid="note-delete"
                   className={cn(
-                    "p-2 text-gray-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-all"
+                    "rounded-xl p-2 text-stone-400 opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
                   )}
                   title="删除"
                 >

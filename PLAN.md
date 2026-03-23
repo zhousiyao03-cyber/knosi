@@ -39,6 +39,8 @@ second-brain/
 │   │   │   └── page.tsx
 │   │   ├── ask/                  # Ask AI 模块
 │   │   │   └── page.tsx
+│   │   ├── usage/                # Token usage 模块
+│   │   │   └── page.tsx
 │   │   ├── workflows/            # AI 工作流模块
 │   │   │   ├── page.tsx
 │   │   │   └── [id]/page.tsx
@@ -187,6 +189,22 @@ second-brain/
 | results | TEXT | JSON, 每个节点的执行结果 |
 | started_at | INTEGER | |
 | completed_at | INTEGER | |
+
+### token_usage_entries 表
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | TEXT PK | |
+| provider | TEXT | 'codex' / 'claude-code' / 'openai-api' / 'other' |
+| model | TEXT | 模型名，可选 |
+| total_tokens | INTEGER | 总 token 数 |
+| input_tokens | INTEGER | 输入 token，可选 |
+| output_tokens | INTEGER | 输出 token，可选 |
+| cached_tokens | INTEGER | cache token，可选 |
+| notes | TEXT | 备注 |
+| source | TEXT | 'manual' / 'import' |
+| usage_at | INTEGER | 记录发生时间 |
+| created_at | INTEGER | |
+| updated_at | INTEGER | |
 
 ---
 

@@ -20,8 +20,6 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Highlight from "@tiptap/extension-highlight";
-import Underline from "@tiptap/extension-underline";
-import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Typography from "@tiptap/extension-typography";
@@ -39,6 +37,7 @@ import {
   SlashCommandMenu,
 } from "./slash-command";
 import { BubbleToolbar } from "./bubble-toolbar";
+import { CalloutBlock, createCalloutBlockNode } from "./callout-block";
 import {
   createEditorCommandGroups,
   flattenEditorCommandGroups,
@@ -50,10 +49,12 @@ import {
   focusTopLevelBlock,
   getTopLevelBlockContext,
   insertHorizontalRuleRelativeToBlock,
+  insertNodeRelativeToBlock,
   insertParagraphRelativeToBlock,
   moveTopLevelBlock,
   type BlockInsertDirection,
 } from "./editor-block-ops";
+import { ToggleBlock, createToggleBlockNode } from "./toggle-block";
 
 const lowlight = createLowlight(common);
 
@@ -64,6 +65,8 @@ const ACCEPTED_IMAGE_TYPES = new Set([
   "image/webp",
   "image/gif",
 ]);
+const BLOCK_SELECTOR =
+  "p, h1, h2, h3, ul, ol, blockquote, pre, hr, img, [data-callout-block='true'], [data-toggle-block='true']";
 
 interface TiptapEditorProps {
   content?: string;
@@ -102,6 +105,63 @@ function parseEditorContent(content?: string): JSONContent | undefined {
   } catch {
     return undefined;
   }
+}
+
+function extractPlainTextFromContent(content?: JSONContent) {
+  if (!content) return "";
+
+  const lines: string[] = [];
+
+  const collectInlineText = (node: JSONContent): string => {
+    if (node.type === "text") {
+      return node.text ?? "";
+    }
+
+    if (node.type === "hardBreak") {
+      return "\n";
+    }
+
+    return (node.content ?? []).map(collectInlineText).join("");
+  };
+
+  const visitBlock = (node: JSONContent) => {
+    if (node.type === "toggleBlock") {
+      const summary = String(node.attrs?.summary ?? "").trim();
+      if (summary) lines.push(summary);
+      for (const child of node.content ?? []) {
+        visitBlock(child);
+      }
+      return;
+    }
+
+    if (
+      node.type === "doc" ||
+      node.type === "bulletList" ||
+      node.type === "orderedList" ||
+      node.type === "taskList" ||
+      node.type === "listItem" ||
+      node.type === "calloutBlock"
+    ) {
+      for (const child of node.content ?? []) {
+        visitBlock(child);
+      }
+      return;
+    }
+
+    if (node.type === "horizontalRule") {
+      lines.push("---");
+      return;
+    }
+
+    const text = collectInlineText(node).trim();
+    if (text) {
+      lines.push(text);
+    }
+  };
+
+  visitBlock(content);
+
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function validateImageFile(file: File) {
@@ -299,12 +359,11 @@ export function TiptapEditor({
         return;
       }
 
-      const block = target.closest(
-        "p, h1, h2, h3, ul, ol, blockquote, pre, hr, img"
-      );
+      const block = target.closest(BLOCK_SELECTOR);
 
       if (!(block instanceof HTMLElement) || !currentEditor.view.dom.contains(block)) {
         setHoveredBlock(null);
+        hoveredBlockRef.current = null;
         return;
       }
 
@@ -349,8 +408,10 @@ export function TiptapEditor({
     (event: MouseEvent<HTMLDivElement>) => {
       const surface = editorSurfaceRef.current;
       const previous = hoveredBlockRef.current;
+      const targetElement =
+        event.target instanceof HTMLElement ? event.target : null;
 
-      if (surface && previous) {
+      if (surface && previous && targetElement) {
         const surfaceRect = surface.getBoundingClientRect();
         const relativeX = event.clientX - surfaceRect.left;
         const relativeY = event.clientY - surfaceRect.top;
@@ -358,13 +419,11 @@ export function TiptapEditor({
           relativeY >= previous.top - 6 && relativeY <= previous.bottom + 6;
         const withinGutter =
           relativeX >= -56 && relativeX <= previous.contentLeft + 12;
+        const withinTrackedBlock = Boolean(targetElement.closest(BLOCK_SELECTOR));
 
         if (
-          event.target instanceof HTMLElement &&
-          !event.target.closest(
-            "p, h1, h2, h3, ul, ol, blockquote, pre, hr, img"
-          ) &&
-          !event.target.closest("[data-editor-insert-controls='true']") &&
+          !withinTrackedBlock &&
+          !targetElement.closest("[data-editor-insert-controls='true']") &&
           withinSameBand &&
           withinGutter
         ) {
@@ -377,11 +436,9 @@ export function TiptapEditor({
       if (
         surface &&
         previous &&
-        event.target instanceof HTMLElement &&
-        !event.target.closest(
-          "p, h1, h2, h3, ul, ol, blockquote, pre, hr, img"
-        ) &&
-        !event.target.closest("[data-editor-insert-controls='true']")
+        targetElement &&
+        !targetElement.closest(BLOCK_SELECTOR) &&
+        !targetElement.closest("[data-editor-insert-controls='true']")
       ) {
         const surfaceRect = surface.getBoundingClientRect();
         const relativeY = event.clientY - surfaceRect.top;
@@ -411,6 +468,12 @@ export function TiptapEditor({
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         codeBlock: false,
+        link: {
+          openOnClick: false,
+          HTMLAttributes: {
+            class: "cursor-pointer underline underline-offset-4 decoration-stone-300",
+          },
+        },
       }),
       Placeholder.configure({
         placeholder: ({ node }) => {
@@ -424,13 +487,6 @@ export function TiptapEditor({
       TaskList,
       TaskItem.configure({ nested: true }),
       Highlight.configure({ multicolor: false }),
-      Underline,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: "text-blue-600 underline underline-offset-4 cursor-pointer",
-        },
-      }),
       Image.configure({
         allowBase64: true,
         HTMLAttributes: {
@@ -445,13 +501,15 @@ export function TiptapEditor({
       }),
       CodeBlockLowlight.configure({ lowlight }),
       Typography,
+      CalloutBlock,
+      ToggleBlock,
       slashCommandExtension,
     ],
     content: parseEditorContent(content),
     editable,
     onUpdate: ({ editor: currentEditor }) => {
       const json = JSON.stringify(currentEditor.getJSON());
-      const text = currentEditor.getText({ blockSeparator: "\n" });
+      const text = extractPlainTextFromContent(currentEditor.getJSON());
       onChange?.(json, text);
     },
     editorProps: {
@@ -568,6 +626,34 @@ export function TiptapEditor({
         return;
       }
 
+      if (item.id === "callout-block") {
+        const node = createCalloutBlockNode(currentEditor);
+        if (!node) return;
+
+        insertNodeRelativeToBlock(
+          currentEditor,
+          insertMenuState.targetPos,
+          insertMenuState.direction,
+          node,
+          2
+        );
+        return;
+      }
+
+      if (item.id === "toggle-block") {
+        const node = createToggleBlockNode(currentEditor);
+        if (!node) return;
+
+        insertNodeRelativeToBlock(
+          currentEditor,
+          insertMenuState.targetPos,
+          insertMenuState.direction,
+          node,
+          2
+        );
+        return;
+      }
+
       const insertedPosition = insertParagraphRelativeToBlock(
         currentEditor,
         insertMenuState.targetPos,
@@ -642,13 +728,20 @@ export function TiptapEditor({
       }
     );
 
-    const transformable = !["image", "horizontalRule"].includes(block.node.type.name);
+    const transformable = ![
+      "image",
+      "horizontalRule",
+      "calloutBlock",
+      "toggleBlock",
+    ].includes(block.node.type.name);
 
     if (transformable) {
       const transformItems = flattenEditorCommandGroups(
         commandGroups.filter((group) => group.id !== "media")
       )
-        .filter((item) => item.id !== "horizontal-rule")
+        .filter(
+          (item) => item.id !== "horizontal-rule" && item.transformable !== false
+        )
         .map((item) => ({
           ...item,
           id: `transform-${item.id}`,
@@ -716,37 +809,39 @@ export function TiptapEditor({
         {editable && hoveredBlock && (
           <div
             data-editor-insert-controls="true"
-            className="absolute -left-11 z-20 flex items-center gap-1"
+            className="absolute -left-20 z-20"
             style={{ top: hoveredBlock.buttonTop }}
           >
-            <button
-              type="button"
-              aria-label="插入块"
-              title="在下方插入块（按住 Option 在上方插入）"
-              data-testid="editor-insert-trigger"
-              onClick={(event) => {
-                handleOpenInsertMenu(event.altKey ? "above" : "below");
-              }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 shadow-sm transition-colors hover:border-stone-300 hover:text-stone-900 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-stone-100"
-            >
-              <Plus size={15} />
-            </button>
-            <button
-              type="button"
-              aria-label="块菜单"
-              title="块菜单"
-              data-testid="editor-block-menu-trigger"
-              onClick={() => {
-                handleOpenBlockActionMenu();
-              }}
-              className="flex h-8 w-6 items-center justify-center rounded-md text-stone-300 transition-colors hover:bg-stone-100 hover:text-stone-500 dark:text-stone-700 dark:hover:bg-stone-900 dark:hover:text-stone-300"
-            >
-              <GripVertical size={14} />
-            </button>
+            <div className="flex items-center gap-1 rounded-xl border border-stone-200/80 bg-white/95 p-1 shadow-lg backdrop-blur dark:border-stone-800 dark:bg-stone-950/90">
+              <button
+                type="button"
+                aria-label="插入块"
+                title="在下方插入块（按住 Option 在上方插入）"
+                data-testid="editor-insert-trigger"
+                onClick={(event) => {
+                  handleOpenInsertMenu(event.altKey ? "above" : "below");
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-stone-50 text-stone-600 transition-colors hover:border-stone-300 hover:bg-white hover:text-stone-900 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-700 dark:hover:bg-stone-950 dark:hover:text-stone-100"
+              >
+                <Plus size={15} />
+              </button>
+              <button
+                type="button"
+                aria-label="块菜单"
+                title="块菜单"
+                data-testid="editor-block-menu-trigger"
+                onClick={() => {
+                  handleOpenBlockActionMenu();
+                }}
+                className="flex h-8 w-7 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 dark:text-stone-500 dark:hover:bg-stone-900 dark:hover:text-stone-200"
+              >
+                <GripVertical size={14} />
+              </button>
+            </div>
           </div>
         )}
 
-        <div className="bg-transparent">
+        <div className="relative z-10 bg-transparent">
           <EditorContent editor={editor} />
         </div>
       </div>

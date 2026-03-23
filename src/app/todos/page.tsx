@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import {
-  ArrowUpRight,
   Calendar,
   CheckCheck,
   CheckCircle2,
@@ -15,9 +14,7 @@ import {
   Inbox,
   Plus,
   Search,
-  Sparkles,
   SunMedium,
-  Target,
   Trash2,
   TriangleAlert,
   X,
@@ -26,6 +23,8 @@ import { cn } from "@/lib/utils";
 
 type Priority = "low" | "medium" | "high";
 type Status = "todo" | "in_progress" | "done";
+type ViewMode = "table" | "dashboard";
+type TodoBucket = "overdue" | "today" | "upcoming" | "noDate" | "completed";
 
 interface TodoItem {
   id: string;
@@ -152,6 +151,46 @@ const statusMeta: Record<
   },
 };
 
+const bucketMeta: Record<
+  TodoBucket,
+  {
+    label: string;
+    badge: string;
+    summary: string;
+  }
+> = {
+  overdue: {
+    label: "逾期",
+    badge:
+      "border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/50 dark:text-rose-300",
+    summary: "需要优先处理",
+  },
+  today: {
+    label: "今天",
+    badge:
+      "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/50 dark:text-amber-300",
+    summary: "今天要收口",
+  },
+  upcoming: {
+    label: "之后",
+    badge:
+      "border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/50 dark:text-sky-300",
+    summary: "已经排上时间",
+  },
+  noDate: {
+    label: "待排期",
+    badge:
+      "border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300",
+    summary: "还没放进时间表",
+  },
+  completed: {
+    label: "已完成",
+    badge:
+      "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/50 dark:text-emerald-300",
+    summary: "不再抢占注意力",
+  },
+};
+
 function toLocalDateTimeValue(date: Date | null) {
   if (!date) return "";
 
@@ -253,26 +292,26 @@ function formatRelativeDueDate(date: Date | null) {
 }
 
 function getTodoBucket(todo: TodoItem) {
-  if ((todo.status ?? "todo") === "done") return "completed" as const;
-  if (!todo.dueDate) return "noDate" as const;
+  if ((todo.status ?? "todo") === "done") return "completed";
+  if (!todo.dueDate) return "noDate";
 
-  if (todo.dueDate.getTime() < Date.now()) return "overdue" as const;
+  if (todo.dueDate.getTime() < Date.now()) return "overdue";
   if (startOfDay(todo.dueDate).getTime() === startOfDay(new Date()).getTime()) {
-    return "today" as const;
+    return "today";
   }
 
-  return "upcoming" as const;
+  return "upcoming";
 }
 
 function getBucketFromDueDate(dueDate: Date | null) {
-  if (!dueDate) return "noDate" as const;
+  if (!dueDate) return "noDate";
 
-  if (dueDate.getTime() < Date.now()) return "overdue" as const;
+  if (dueDate.getTime() < Date.now()) return "overdue";
   if (startOfDay(dueDate).getTime() === startOfDay(new Date()).getTime()) {
-    return "today" as const;
+    return "today";
   }
 
-  return "upcoming" as const;
+  return "upcoming";
 }
 
 function comparePriority(a: TodoItem, b: TodoItem) {
@@ -321,13 +360,14 @@ function toEditorDraft(todo: TodoItem): TodoEditorDraft {
 export default function TodosPage() {
   const [draft, setDraft] = useState<TodoDraft>(EMPTY_DRAFT);
   const [showCreateDetails, setShowCreateDetails] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const [editorDraft, setEditorDraft] = useState<TodoEditorDraft | null>(null);
-  const [expandedSections, setExpandedSections] = useState({
+  const [expandedSections, setExpandedSections] = useState<Record<TodoBucket, boolean>>({
     overdue: true,
     today: true,
     upcoming: true,
@@ -385,6 +425,15 @@ export default function TodosPage() {
   const selectedTodo =
     todos.find((todo) => todo.id === selectedTodoId) ?? null;
 
+  const syncSelectedEditorDraft = (
+    todoId: string,
+    patch: Partial<TodoEditorDraft>
+  ) => {
+    if (selectedTodoId === todoId && editorDraft) {
+      setEditorDraft({ ...editorDraft, ...patch });
+    }
+  };
+
   const categories = Array.from(
     new Set([
       ...CATEGORY_OPTIONS,
@@ -428,6 +477,13 @@ export default function TodosPage() {
       filteredTodos.filter((todo) => getTodoBucket(todo) === "completed")
     ),
   };
+  const tableTodos = [
+    ...groupedTodos.overdue,
+    ...groupedTodos.today,
+    ...groupedTodos.upcoming,
+    ...groupedTodos.noDate,
+    ...groupedTodos.completed,
+  ];
 
   const nextDueTodo =
     sortTodos(
@@ -450,22 +506,6 @@ export default function TodosPage() {
     });
   };
 
-  const cycleStatus = (todo: TodoItem) => {
-    const current = (todo.status ?? "todo") as Status;
-    const next =
-      current === "todo"
-        ? "in_progress"
-        : current === "in_progress"
-          ? "done"
-          : "todo";
-
-    updateTodo.mutate({ id: todo.id, status: next });
-
-    if (selectedTodoId === todo.id && editorDraft) {
-      setEditorDraft({ ...editorDraft, status: next });
-    }
-  };
-
   const handleSaveSelectedTodo = () => {
     if (!selectedTodoId || !editorDraft || !editorDraft.title.trim()) return;
 
@@ -484,77 +524,72 @@ export default function TodosPage() {
     {
       key: "overdue",
       title: "逾期",
-      subtitle: "先拆掉会持续拉低节奏的阻塞项",
+      subtitle: "优先处理已经过点的任务",
       items: groupedTodos.overdue,
       empty: "没有逾期任务",
       icon: TriangleAlert,
       panelTone:
-        "border-rose-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,241,242,0.94))] dark:border-rose-900/40 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(69,10,10,0.30))]",
+        "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
       iconTone:
-        "bg-rose-100 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300",
+        "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
       countTone:
-        "bg-rose-100/80 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300",
-      railTone: "bg-rose-400/80 dark:bg-rose-500/60",
+        "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
     },
     {
       key: "today",
       title: "今天",
-      subtitle: "保持当天的目标足够轻，能在晚上前收口",
+      subtitle: "今天要收口的任务",
       items: groupedTodos.today,
       empty: "今天没有到期任务",
       icon: SunMedium,
       panelTone:
-        "border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,251,235,0.94))] dark:border-amber-900/40 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(69,26,3,0.32))]",
+        "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
       iconTone:
-        "bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300",
+        "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
       countTone:
-        "bg-amber-100/80 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300",
-      railTone: "bg-amber-400/80 dark:bg-amber-500/60",
+        "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
     },
     {
       key: "upcoming",
       title: "即将到来",
-      subtitle: "提前看见排期，减少被临时期限追着跑",
+      subtitle: "接下来已经排上时间的任务",
       items: groupedTodos.upcoming,
       empty: "接下来没有排期任务",
       icon: Clock3,
       panelTone:
-        "border-sky-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,249,255,0.94))] dark:border-sky-900/40 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(8,47,73,0.30))]",
+        "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
       iconTone:
-        "bg-sky-100 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
+        "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
       countTone:
-        "bg-sky-100/80 text-sky-700 dark:bg-sky-950/70 dark:text-sky-300",
-      railTone: "bg-sky-400/80 dark:bg-sky-500/60",
+        "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
     },
     {
       key: "noDate",
       title: "无时间",
-      subtitle: "先保留想法，再决定它值不值得排进日程",
+      subtitle: "还没放进时间表的事项",
       items: groupedTodos.noDate,
       empty: "所有任务都安排了时间",
       icon: Inbox,
       panelTone:
-        "border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] dark:border-slate-800/80 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(15,23,42,0.68))]",
+        "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
       iconTone:
         "bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300",
       countTone:
-        "bg-slate-100/90 text-slate-700 dark:bg-slate-900 dark:text-slate-300",
-      railTone: "bg-slate-400/80 dark:bg-slate-500/60",
+        "bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300",
     },
     {
       key: "completed",
       title: "已完成",
-      subtitle: "把完成项留在底部，既有成就感，也不抢焦点",
+      subtitle: "完成后留档，不再抢占注意力",
       items: groupedTodos.completed,
       empty: "还没有完成的任务",
       icon: CheckCheck,
       panelTone:
-        "border-emerald-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.94))] dark:border-emerald-900/40 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(6,78,59,0.28))]",
+        "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
       iconTone:
-        "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300",
+        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
       countTone:
-        "bg-emerald-100/80 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300",
-      railTone: "bg-emerald-400/80 dark:bg-emerald-500/60",
+        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
     },
   ] as const;
 
@@ -563,6 +598,33 @@ export default function TodosPage() {
     groupedTodos.today.length +
     groupedTodos.upcoming.length +
     groupedTodos.noDate.length;
+  const hasOpenEditor = Boolean(selectedTodo && editorDraft);
+  const summaryCards = [
+    {
+      key: "open",
+      label: "待处理",
+      value: openTaskCount,
+      helper: "还有多少件在路上",
+    },
+    {
+      key: "today",
+      label: "今天",
+      value: groupedTodos.today.length,
+      helper: bucketMeta.today.summary,
+    },
+    {
+      key: "overdue",
+      label: "逾期",
+      value: groupedTodos.overdue.length,
+      helper: bucketMeta.overdue.summary,
+    },
+    {
+      key: "done",
+      label: "已完成",
+      value: groupedTodos.completed.length,
+      helper: bucketMeta.completed.summary,
+    },
+  ] as const;
 
   useEffect(() => {
     if (!selectedTodoId) return;
@@ -579,84 +641,117 @@ export default function TodosPage() {
     });
   }, [selectedTodoId, todos.length]);
 
-  return (
-    <div className="relative isolate space-y-6 pb-10 font-[family:var(--font-geist-sans)]">
-      <div className="absolute inset-x-0 top-0 -z-10 h-80 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.30),transparent_34%),radial-gradient(circle_at_top_right,rgba(251,191,36,0.22),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.96),rgba(248,250,252,0))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.22),transparent_34%),radial-gradient(circle_at_top_right,rgba(245,158,11,0.15),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0))]" />
+  const toggleDone = (todo: TodoItem) => {
+    const current = (todo.status ?? "todo") as Status;
+    const next = current === "done" ? "todo" : "done";
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.75fr)_380px]">
+    updateTodo.mutate({ id: todo.id, status: next });
+    syncSelectedEditorDraft(todo.id, { status: next });
+  };
+
+  const toggleInProgress = (todo: TodoItem) => {
+    const current = (todo.status ?? "todo") as Status;
+    if (current === "done") return;
+
+    const next = current === "in_progress" ? "todo" : "in_progress";
+    updateTodo.mutate({ id: todo.id, status: next });
+    syncSelectedEditorDraft(todo.id, { status: next });
+  };
+
+  const handleInlineStatusChange = (todo: TodoItem, next: Status) => {
+    if ((todo.status ?? "todo") === next) return;
+    updateTodo.mutate({ id: todo.id, status: next });
+    syncSelectedEditorDraft(todo.id, { status: next });
+  };
+
+  const handleInlinePriorityChange = (todo: TodoItem, next: Priority) => {
+    if ((todo.priority ?? "medium") === next) return;
+    updateTodo.mutate({ id: todo.id, priority: next });
+    syncSelectedEditorDraft(todo.id, { priority: next });
+  };
+
+  return (
+    <div className="space-y-6 pb-10 font-[family:var(--font-geist-sans)]">
+      <div
+        className={cn(
+          "grid gap-6",
+          hasOpenEditor && "xl:grid-cols-[minmax(0,1.65fr)_360px]"
+        )}
+      >
         <div className="space-y-6">
-          <section className="relative overflow-hidden rounded-[32px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(239,246,255,0.96)_56%,rgba(255,247,237,0.9))] p-6 shadow-[0_24px_70px_-42px_rgba(15,23,42,0.55)] dark:border-slate-800/80 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(15,23,42,0.92)_55%,rgba(30,41,59,0.9))]">
-            <div className="absolute -left-14 top-8 h-32 w-32 rounded-full bg-sky-200/50 blur-3xl dark:bg-sky-500/20" />
-            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-amber-200/50 blur-3xl dark:bg-amber-500/10" />
-            <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
               <div className="max-w-2xl">
-                <div className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-3 py-1 text-xs font-medium tracking-[0.14em] text-white dark:bg-white dark:text-slate-950">
-                  <Sparkles size={14} />
-                  TODAY FLOW
-                </div>
-                <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-slate-950 dark:text-white md:text-[2.9rem]">
+                <h1 className="text-3xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-white">
                   Todo
                 </h1>
-                <p className="mt-3 max-w-xl text-base leading-7 text-slate-600 dark:text-slate-300">
-                  先把任务录进来，再用时间和状态把注意力放在当下。
+                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  先把任务录进来，再决定是像数据库一样逐条管理，还是像执行面板一样盯住今天。
                 </p>
-                <div className="mt-5 flex flex-wrap gap-3 text-sm">
-                  <div className="rounded-full border border-white/70 bg-white/80 px-4 py-2 text-slate-600 shadow-sm backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/80 dark:text-slate-300">
-                    当前未完成 {openTaskCount} 项
-                  </div>
-                  <div className="rounded-full border border-white/70 bg-white/80 px-4 py-2 text-slate-600 shadow-sm backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/80 dark:text-slate-300">
-                    今天要收口 {groupedTodos.today.length} 项
-                  </div>
-                  <div className="rounded-full border border-white/70 bg-white/80 px-4 py-2 text-slate-600 shadow-sm backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/80 dark:text-slate-300">
-                    已完成 {groupedTodos.completed.length} 项
-                  </div>
-                </div>
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                  {nextDueTodo
+                    ? `下一件有明确时间的任务是「${nextDueTodo.title}」。`
+                    : "如果任务还没上时间，先安排今天最重要的一件。"}
+                </p>
               </div>
+              <div className="space-y-3">
+                <div className="inline-flex rounded-[18px] border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900">
+                  <button
+                    type="button"
+                    aria-pressed={viewMode === "table"}
+                    onClick={() => setViewMode("table")}
+                    className={cn(
+                      "rounded-[14px] px-4 py-2 text-sm font-medium transition",
+                      viewMode === "table"
+                        ? "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white"
+                        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                    )}
+                  >
+                    表格
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={viewMode === "dashboard"}
+                    onClick={() => setViewMode("dashboard")}
+                    className={cn(
+                      "rounded-[14px] px-4 py-2 text-sm font-medium transition",
+                      viewMode === "dashboard"
+                        ? "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white"
+                        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                    )}
+                  >
+                    Dashboard
+                  </button>
+                </div>
+                <p className="max-w-sm text-sm text-slate-500 dark:text-slate-400">
+                  表格适合批量改状态和优先级，Dashboard 适合按逾期、今天和之后来收口。
+                </p>
+              </div>
+            </div>
 
-              <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[360px]">
-                <div className="rounded-[24px] border border-slate-200/80 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/80">
-                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
-                    <span>Focus</span>
-                    <Target size={14} />
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {summaryCards.map((card) => (
+                <div
+                  key={card.key}
+                  className="rounded-[22px] border border-slate-200 bg-slate-50/80 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/60"
+                >
+                  <div className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                    {card.label}
                   </div>
-                  <div className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-slate-950 dark:text-white">
-                    {openTaskCount}
+                  <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-white">
+                    {card.value}
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                    当前还在盘子里的任务量
-                  </p>
+                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    {card.helper}
+                  </div>
                 </div>
-                <div className="rounded-[24px] border border-amber-200/80 bg-amber-50/80 p-4 shadow-sm backdrop-blur dark:border-amber-900/40 dark:bg-amber-950/30">
-                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.18em] text-amber-500 dark:text-amber-300">
-                    <span>Today</span>
-                    <SunMedium size={14} />
-                  </div>
-                  <div className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-amber-700 dark:text-amber-300">
-                    {groupedTodos.today.length}
-                  </div>
-                  <p className="mt-2 text-xs leading-5 text-amber-700/80 dark:text-amber-200/80">
-                    当天必须记得回来的事项
-                  </p>
-                </div>
-                <div className="rounded-[24px] border border-emerald-200/80 bg-emerald-50/80 p-4 shadow-sm backdrop-blur dark:border-emerald-900/40 dark:bg-emerald-950/30">
-                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.18em] text-emerald-500 dark:text-emerald-300">
-                    <span>Done</span>
-                    <CheckCheck size={14} />
-                  </div>
-                  <div className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-emerald-700 dark:text-emerald-300">
-                    {groupedTodos.completed.length}
-                  </div>
-                  <p className="mt-2 text-xs leading-5 text-emerald-700/80 dark:text-emerald-200/80">
-                    已经收口，可以放心放下
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
           </section>
 
           <form
             onSubmit={handleCreate}
-            className="rounded-[30px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_18px_50px_-40px_rgba(15,23,42,0.75)] backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/85"
+            className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950"
           >
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -667,18 +762,15 @@ export default function TodosPage() {
                   先把事情扔进系统，再决定它是否值得排进时间表。
                 </p>
               </div>
-              <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-                Quick capture
-              </div>
             </div>
 
             <div className="flex flex-col gap-3 xl:flex-row">
-              <div className="flex-1 rounded-[24px] border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-950/80">
+              <div className="flex-1 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
                 <label
                   htmlFor="todo-title"
-                  className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500"
+                  className="mb-2 block text-xs font-medium text-slate-500 dark:text-slate-400"
                 >
-                  Title
+                  任务标题
                 </label>
                 <input
                   id="todo-title"
@@ -851,11 +943,11 @@ export default function TodosPage() {
           </form>
 
           <div className="space-y-4">
-            <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-[0_18px_50px_-42px_rgba(15,23,42,0.75)] backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/85">
+            <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-                    Focus Filters
+                  <div className="text-sm font-medium text-slate-900 dark:text-white">
+                    筛选
                   </div>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     过滤视图，不改变任务本身。
@@ -916,6 +1008,14 @@ export default function TodosPage() {
               </div>
             </div>
 
+            {!hasOpenEditor && (
+              <div className="rounded-[20px] border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                {viewMode === "table"
+                  ? "表格里可以直接改状态和优先级，点一行再补充详情。"
+                  : "Dashboard 里按分组收任务，点卡片补充详情，点左侧圆圈直接完成。"}
+              </div>
+            )}
+
             {isLoading ? (
               <div className="rounded-[28px] border border-dashed border-slate-200 bg-white/80 px-6 py-16 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
                 加载中...
@@ -927,74 +1027,47 @@ export default function TodosPage() {
                   : "当前筛选条件下没有匹配的任务。"}
               </div>
             ) : (
-              <div className="space-y-4">
-                {sectionConfigs.map((section) => (
-                  <section
-                    key={section.key}
-                    className={cn(
-                      "rounded-[28px] border p-4 shadow-[0_20px_50px_-42px_rgba(15,23,42,0.8)]",
-                      section.panelTone
-                    )}
-                  >
-                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={cn(
-                            "grid size-11 place-items-center rounded-[18px]",
-                            section.iconTone
-                          )}
-                        >
-                          <section.icon size={18} />
-                        </div>
-                        <div>
-                          <h2 className="text-base font-semibold tracking-[-0.03em] text-slate-950 dark:text-white">
-                            {section.title}
-                          </h2>
-                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                            {section.subtitle}
-                          </p>
-                        </div>
-                      </div>
-                      <div
-                        className={cn(
-                          "rounded-full px-3 py-1 text-xs font-medium",
-                          section.countTone
-                        )}
-                      >
-                        {section.items.length} 项
-                      </div>
-                    </div>
-
-                    {section.items.length === 0 ? (
-                      <p className="rounded-[22px] border border-dashed border-slate-200/80 px-4 py-4 text-sm text-slate-400 dark:border-slate-800 dark:text-slate-500">
-                        {section.empty}
+              viewMode === "table" ? (
+                <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+                    <div>
+                      <h2 className="text-base font-semibold tracking-[-0.03em] text-slate-950 dark:text-white">
+                        表格视图
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        像数据库一样逐条管理，常用属性尽量在表格里直接完成。
                       </p>
-                    ) : (
-                      <div className="space-y-3">
-                        {(() => {
-                          const previewCount =
-                            section.key === "noDate"
-                              ? 5
-                              : section.key === "completed"
-                                ? 4
-                                : 6;
-                          const shouldExpand =
-                            expandedSections[section.key] ||
-                            section.items.some((item) => item.id === selectedTodoId);
-                          const visibleItems = shouldExpand
-                            ? section.items
-                            : section.items.slice(0, previewCount);
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      点击一行补充完整详情
+                    </div>
+                  </div>
 
-                          return (
-                            <>
-                              {visibleItems.map((todo) => {
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[980px] w-full text-sm">
+                      <thead className="bg-slate-50/90 dark:bg-slate-900/70">
+                        <tr className="text-left text-xs font-medium text-slate-500 dark:text-slate-400">
+                          <th className="w-16 px-5 py-3">完成</th>
+                          <th className="px-5 py-3">任务</th>
+                          <th className="w-40 px-5 py-3">状态</th>
+                          <th className="w-36 px-5 py-3">优先级</th>
+                          <th className="w-32 px-5 py-3">分类</th>
+                          <th className="w-48 px-5 py-3">截止时间</th>
+                          <th className="w-28 px-5 py-3">分组</th>
+                          <th className="w-16 px-5 py-3 text-right">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tableTodos.map((todo) => {
                           const status = (todo.status ?? "todo") as Status;
                           const priority = (todo.priority ?? "medium") as Priority;
-                          const StatusIcon = statusMeta[status].icon;
                           const dueMeta = formatRelativeDueDate(todo.dueDate);
+                          const bucket = getTodoBucket(todo);
+                          const CompletionIcon =
+                            status === "done" ? CheckCircle2 : Circle;
 
                           return (
-                            <div
+                            <tr
                               key={todo.id}
                               data-todo-id={todo.id}
                               onClick={() => {
@@ -1002,168 +1075,373 @@ export default function TodosPage() {
                                 setEditorDraft(toEditorDraft(todo));
                               }}
                               className={cn(
-                                "group relative flex cursor-pointer items-start gap-4 overflow-hidden rounded-[24px] border bg-white/92 p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.6)] backdrop-blur transition duration-200 dark:bg-slate-950/70",
-                                selectedTodoId === todo.id
-                                  ? "border-sky-300/80 ring-1 ring-sky-200 dark:border-sky-700 dark:ring-sky-900"
-                                  : "border-white/70 hover:-translate-y-0.5 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700"
+                                "cursor-pointer border-t border-slate-100 transition hover:bg-slate-50/80 dark:border-slate-800 dark:hover:bg-slate-900/60",
+                                selectedTodoId === todo.id &&
+                                  "bg-sky-50/70 dark:bg-sky-950/20"
                               )}
                             >
-                              <div
-                                className={cn(
-                                  "absolute inset-y-5 left-0 w-1 rounded-r-full",
-                                  section.railTone
-                                )}
-                              />
-
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  cycleStatus(todo);
-                                }}
-                                title="切换状态"
-                                className={cn(
-                                  "mt-0.5 grid size-10 place-items-center rounded-full border transition",
-                                  statusMeta[status].buttonTone
-                                )}
-                              >
-                                <StatusIcon
-                                  size={18}
-                                  className={cn(status === "done" && "text-emerald-500")}
-                                />
-                              </button>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <h3
-                                        className={cn(
-                                          "truncate text-[15px] font-semibold tracking-[-0.03em] text-slate-950 dark:text-white",
-                                          status === "done" &&
-                                            "text-slate-400 line-through dark:text-slate-500"
-                                        )}
-                                      >
-                                        {todo.title}
-                                      </h3>
-                                      {todo.category && (
-                                        <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 dark:border-violet-900/70 dark:bg-violet-950/50 dark:text-violet-300">
-                                          {todo.category}
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {todo.description && (
-                                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                        {todo.description}
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                                    查看
-                                    <ArrowUpRight size={13} />
-                                  </div>
-                                </div>
-
-                                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                                  <span
-                                    className={cn(
-                                      "rounded-full px-2.5 py-1 font-medium",
-                                      priorityMeta[priority].badge
-                                    )}
-                                  >
-                                    {priorityMeta[priority].label}
-                                  </span>
-                                  <span
-                                    className={cn(
-                                      "rounded-full px-2.5 py-1 font-medium",
-                                      statusMeta[status].badge
-                                    )}
-                                  >
-                                    {statusMeta[status].label}
-                                  </span>
-                                  {todo.dueDate && (
-                                    <span
-                                      className={cn(
-                                        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-medium",
-                                        dueMeta.tone
-                                      )}
-                                    >
-                                      <Calendar size={12} />
-                                      {dueMeta.label}
-                                    </span>
-                                  )}
-                                  <span className="text-slate-400 dark:text-slate-500">
-                                    更新于{" "}
-                                    {todo.updatedAt
-                                      ? formatAbsoluteDate(todo.updatedAt)
-                                      : "刚刚"}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  deleteTodo.mutate({ id: todo.id });
-                                }}
-                                className="rounded-full p-2 text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 dark:hover:bg-rose-950/30"
-                                title="删除"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          );
-                              })}
-
-                              {section.items.length > previewCount && (
+                              <td className="px-5 py-3 align-top">
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    setExpandedSections((current) => ({
-                                      ...current,
-                                      [section.key]: !shouldExpand,
-                                    }))
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleDone(todo);
+                                  }}
+                                  title={status === "done" ? "恢复为待办" : "标记完成"}
+                                  aria-label={
+                                    status === "done"
+                                      ? `恢复为待办 ${todo.title}`
+                                      : `标记完成 ${todo.title}`
                                   }
-                                  className="w-full rounded-[20px] border border-dashed border-slate-200/80 px-4 py-3 text-sm font-medium text-slate-500 transition hover:border-slate-300 hover:bg-white/60 dark:border-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-950/40"
+                                  className={cn(
+                                    "grid size-9 place-items-center rounded-full border transition",
+                                    status === "done"
+                                      ? statusMeta.done.buttonTone
+                                      : "border-slate-200 bg-white text-slate-400 hover:border-emerald-300 hover:text-emerald-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-500 dark:hover:border-emerald-700 dark:hover:text-emerald-300"
+                                  )}
                                 >
-                                  {shouldExpand
-                                    ? `收起 ${section.title}`
-                                    : `展开剩余 ${section.items.length - previewCount} 项`}
+                                  <CompletionIcon
+                                    size={18}
+                                    className={cn(status === "done" && "text-emerald-500")}
+                                  />
                                 </button>
-                              )}
-                            </>
+                              </td>
+                              <td className="px-5 py-3 align-top">
+                                <div className="max-w-[320px] min-w-0">
+                                  <div
+                                    className={cn(
+                                      "font-medium text-slate-950 dark:text-white",
+                                      status === "done" &&
+                                        "text-slate-400 line-through dark:text-slate-500"
+                                    )}
+                                  >
+                                    {todo.title}
+                                  </div>
+                                  {todo.description && (
+                                    <p className="mt-1 line-clamp-1 text-xs text-slate-500 dark:text-slate-400">
+                                      {todo.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-5 py-3 align-top">
+                                <select
+                                  value={status}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(event) =>
+                                    handleInlineStatusChange(
+                                      todo,
+                                      event.target.value as Status
+                                    )
+                                  }
+                                  aria-label={`设置 ${todo.title} 状态`}
+                                  className="w-full rounded-[14px] border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-sky-700 dark:focus:ring-sky-950"
+                                >
+                                  <option value="todo">待办</option>
+                                  <option value="in_progress">进行中</option>
+                                  <option value="done">已完成</option>
+                                </select>
+                              </td>
+                              <td className="px-5 py-3 align-top">
+                                <select
+                                  value={priority}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(event) =>
+                                    handleInlinePriorityChange(
+                                      todo,
+                                      event.target.value as Priority
+                                    )
+                                  }
+                                  aria-label={`设置 ${todo.title} 优先级`}
+                                  className="w-full rounded-[14px] border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-sky-700 dark:focus:ring-sky-950"
+                                >
+                                  <option value="low">低优先级</option>
+                                  <option value="medium">中优先级</option>
+                                  <option value="high">高优先级</option>
+                                </select>
+                              </td>
+                              <td className="px-5 py-3 align-top text-slate-600 dark:text-slate-300">
+                                {todo.category || "未分类"}
+                              </td>
+                              <td className="px-5 py-3 align-top">
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+                                    dueMeta.tone
+                                  )}
+                                >
+                                  <Calendar size={12} />
+                                  {dueMeta.label}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 align-top">
+                                <span
+                                  className={cn(
+                                    "inline-flex rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+                                    bucketMeta[bucket].badge
+                                  )}
+                                >
+                                  {bucketMeta[bucket].label}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 align-top text-right">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteTodo.mutate({ id: todo.id });
+                                  }}
+                                  className="rounded-full p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/30"
+                                  title="删除"
+                                  aria-label={`删除 ${todo.title}`}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </td>
+                            </tr>
                           );
-                        })()}
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : (
+                <div className="grid gap-4 2xl:grid-cols-2">
+                  {sectionConfigs.map((section) => (
+                    <section
+                      key={section.key}
+                      className={cn(
+                        "rounded-[24px] border p-4 shadow-sm",
+                        section.panelTone
+                      )}
+                    >
+                      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={cn(
+                              "grid size-9 place-items-center rounded-xl",
+                              section.iconTone
+                            )}
+                          >
+                            <section.icon size={18} />
+                          </div>
+                          <div>
+                            <h2 className="text-base font-semibold tracking-[-0.03em] text-slate-950 dark:text-white">
+                              {section.title}
+                            </h2>
+                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                              {section.subtitle}
+                            </p>
+                          </div>
+                        </div>
+                        <div
+                          className={cn(
+                            "rounded-full px-3 py-1 text-xs font-medium",
+                            section.countTone
+                          )}
+                        >
+                          {section.items.length} 项
+                        </div>
                       </div>
-                    )}
-                  </section>
-                ))}
-              </div>
+
+                      {section.items.length === 0 ? (
+                        <p className="rounded-[22px] border border-dashed border-slate-200/80 px-4 py-4 text-sm text-slate-400 dark:border-slate-800 dark:text-slate-500">
+                          {section.empty}
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {(() => {
+                            const previewCount =
+                              section.key === "noDate"
+                                ? 5
+                                : section.key === "completed"
+                                  ? 4
+                                  : 6;
+                            const shouldExpand =
+                              expandedSections[section.key] ||
+                              section.items.some((item) => item.id === selectedTodoId);
+                            const visibleItems = shouldExpand
+                              ? section.items
+                              : section.items.slice(0, previewCount);
+
+                            return (
+                              <>
+                                {visibleItems.map((todo) => {
+                                  const status = (todo.status ?? "todo") as Status;
+                                  const priority = (todo.priority ?? "medium") as Priority;
+                                  const dueMeta = formatRelativeDueDate(todo.dueDate);
+                                  const CompletionIcon =
+                                    status === "done" ? CheckCircle2 : Circle;
+
+                                  return (
+                                    <div
+                                      key={todo.id}
+                                      data-todo-id={todo.id}
+                                      onClick={() => {
+                                        setSelectedTodoId(todo.id);
+                                        setEditorDraft(toEditorDraft(todo));
+                                      }}
+                                      className={cn(
+                                        "group flex cursor-pointer items-start gap-4 rounded-[20px] border bg-white p-4 shadow-sm transition dark:bg-slate-950",
+                                        selectedTodoId === todo.id
+                                          ? "border-sky-300/80 ring-1 ring-sky-200 dark:border-sky-700 dark:ring-sky-900"
+                                          : "border-slate-200 hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700"
+                                      )}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          toggleDone(todo);
+                                        }}
+                                        title={status === "done" ? "恢复为待办" : "标记完成"}
+                                        className={cn(
+                                          "mt-0.5 grid size-10 place-items-center rounded-full border transition",
+                                          status === "done"
+                                            ? statusMeta.done.buttonTone
+                                            : "border-slate-200 bg-white text-slate-400 hover:border-emerald-300 hover:text-emerald-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-500 dark:hover:border-emerald-700 dark:hover:text-emerald-300"
+                                        )}
+                                      >
+                                        <CompletionIcon
+                                          size={18}
+                                          className={cn(
+                                            status === "done" && "text-emerald-500"
+                                          )}
+                                        />
+                                      </button>
+
+                                      <div className="min-w-0 flex-1">
+                                        <div className="min-w-0">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <h3
+                                              className={cn(
+                                                "truncate text-[15px] font-semibold tracking-[-0.03em] text-slate-950 dark:text-white",
+                                                status === "done" &&
+                                                  "text-slate-400 line-through dark:text-slate-500"
+                                              )}
+                                            >
+                                              {todo.title}
+                                            </h3>
+                                            {todo.category && (
+                                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                                {todo.category}
+                                              </span>
+                                            )}
+                                          </div>
+                                          {todo.description && (
+                                            <p className="mt-2 line-clamp-1 text-sm text-slate-500 dark:text-slate-400">
+                                              {todo.description}
+                                            </p>
+                                          )}
+                                        </div>
+
+                                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                                          {status !== "done" ? (
+                                            <button
+                                              type="button"
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                toggleInProgress(todo);
+                                              }}
+                                              className={cn(
+                                                "rounded-full px-2.5 py-1 font-medium transition",
+                                                statusMeta[status].badge
+                                              )}
+                                            >
+                                              {statusMeta[status].label}
+                                            </button>
+                                          ) : (
+                                            <span
+                                              className={cn(
+                                                "rounded-full px-2.5 py-1 font-medium",
+                                                statusMeta[status].badge
+                                              )}
+                                            >
+                                              {statusMeta[status].label}
+                                            </span>
+                                          )}
+                                          <span
+                                            className={cn(
+                                              "rounded-full px-2.5 py-1 font-medium",
+                                              priorityMeta[priority].badge
+                                            )}
+                                          >
+                                            {priorityMeta[priority].label}
+                                          </span>
+                                          {todo.dueDate && (
+                                            <span
+                                              className={cn(
+                                                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-medium",
+                                                dueMeta.tone
+                                              )}
+                                            >
+                                              <Calendar size={12} />
+                                              {dueMeta.label}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          deleteTodo.mutate({ id: todo.id });
+                                        }}
+                                        className="rounded-full p-2 text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 dark:hover:bg-rose-950/30"
+                                        title="删除"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+
+                                {section.items.length > previewCount && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedSections((current) => ({
+                                        ...current,
+                                        [section.key]: !shouldExpand,
+                                      }))
+                                    }
+                                    className="w-full rounded-[20px] border border-dashed border-slate-200/80 px-4 py-3 text-sm font-medium text-slate-500 transition hover:border-slate-300 hover:bg-white/60 dark:border-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-950/40"
+                                  >
+                                    {shouldExpand
+                                      ? `收起 ${section.title}`
+                                      : `展开剩余 ${section.items.length - previewCount} 项`}
+                                  </button>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              )
             )}
           </div>
         </div>
 
-        <aside className="xl:sticky xl:top-6 xl:self-start">
-          <div className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-white/92 shadow-[0_24px_60px_-42px_rgba(15,23,42,0.75)] backdrop-blur dark:border-slate-800/80 dark:bg-slate-900/90">
-            {selectedTodo && editorDraft ? (
+        {selectedTodo && editorDraft && (
+          <aside className="xl:sticky xl:top-6 xl:self-start">
+            <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div>
-                <div className="relative overflow-hidden bg-slate-950 px-5 py-5 text-white dark:bg-slate-900">
-                  <div className="absolute -right-10 top-0 h-28 w-28 rounded-full bg-sky-500/20 blur-3xl" />
-                  <div className="absolute bottom-0 left-0 h-24 w-24 rounded-full bg-amber-400/20 blur-3xl" />
-                  <div className="relative flex items-start justify-between gap-3">
+                <div className="border-b border-slate-200 px-5 py-5 dark:border-slate-800">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-xs font-medium uppercase tracking-[0.2em] text-white/50">
+                      <div className="text-sm font-semibold text-slate-950 dark:text-white">
                         任务详情
                       </div>
-                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        表格里先快改属性，补充上下文和时间安排再来这里。
+                      </p>
+                      <h2 className="mt-4 text-xl font-semibold tracking-[-0.03em] text-slate-950 dark:text-white">
                         {selectedTodo.title}
                       </h2>
-                      <p className="mt-2 text-sm leading-6 text-white/70">
-                        在这里补齐上下文、安排时间，再决定它是推进、延后还是完成。
-                      </p>
                     </div>
                     <button
                       type="button"
@@ -1171,14 +1449,14 @@ export default function TodosPage() {
                         setSelectedTodoId(null);
                         setEditorDraft(null);
                       }}
-                      className="rounded-full border border-white/10 p-2 text-white/60 transition hover:bg-white/10 hover:text-white"
+                      className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                       title="关闭"
                     >
                       <X size={16} />
                     </button>
                   </div>
 
-                  <div className="relative mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <span
                       className={cn(
                         "rounded-full px-3 py-1 text-xs font-medium",
@@ -1196,7 +1474,7 @@ export default function TodosPage() {
                       {priorityMeta[editorDraft.priority].label}
                     </span>
                     {selectedTodo.category && (
-                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                         {selectedTodo.category}
                       </span>
                     )}
@@ -1427,33 +1705,9 @@ export default function TodosPage() {
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="p-5">
-                <div className="rounded-[26px] bg-[linear-gradient(135deg,rgba(15,23,42,1),rgba(30,41,59,0.96))] p-5 text-white">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium tracking-[0.18em] text-white/70">
-                    <Target size={14} />
-                    INSPECTOR
-                  </div>
-                  <h2 className="mt-4 text-2xl font-semibold tracking-[-0.04em]">
-                    任务详情
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-white/70">
-                    选中左侧任务后，可以在这里补时间、分类、描述，或者直接改状态。
-                  </p>
-                </div>
-
-                <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50/80 p-4 text-sm leading-7 text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-                  <p>如果只是快速记一下，用上面的标题输入框就够了。</p>
-                  <p className="mt-2">
-                    {nextDueTodo
-                      ? `下一件有明确时间的任务是「${nextDueTodo.title}」，记得先把它安排好。`
-                      : "你还没有安排任何截止时间，适合先给最重要的事上时间。"}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </aside>
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

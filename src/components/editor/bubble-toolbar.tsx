@@ -11,10 +11,6 @@ import {
   Code,
   Highlighter,
   Link as LinkIcon,
-  Heading1,
-  Heading2,
-  Heading3,
-  Type,
 } from "lucide-react";
 
 function BubbleButton({
@@ -108,6 +104,11 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
   const iconSize = 15;
 
   const setLink = () => {
+    if (editor.isActive("link")) {
+      editor.chain().focus().unsetLink().run();
+      return;
+    }
+
     const url = window.prompt("输入链接地址：");
     if (url) {
       editor.chain().focus().setLink({ href: url }).run();
@@ -118,50 +119,11 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
     <div
       ref={toolbarRef}
       className={cn(
-        "fixed z-50 flex items-center gap-0.5 px-1.5 py-1 bg-gray-900 rounded-lg shadow-xl transition-opacity duration-150",
+        "fixed z-50 flex items-center gap-0.5 rounded-xl border border-stone-800/80 bg-stone-950/95 px-1.5 py-1 shadow-xl backdrop-blur transition-opacity duration-150",
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
       style={{ top: position.top, left: position.left }}
     >
-      <BubbleButton
-        onClick={() => editor.chain().focus().setParagraph().run()}
-        isActive={
-          editor.isActive("paragraph") && !editor.isActive("heading")
-        }
-        title="正文"
-      >
-        <Type size={iconSize} className="text-gray-300" />
-      </BubbleButton>
-      <BubbleButton
-        onClick={() =>
-          editor.chain().focus().toggleHeading({ level: 1 }).run()
-        }
-        isActive={editor.isActive("heading", { level: 1 })}
-        title="标题 1"
-      >
-        <Heading1 size={iconSize} className="text-gray-300" />
-      </BubbleButton>
-      <BubbleButton
-        onClick={() =>
-          editor.chain().focus().toggleHeading({ level: 2 }).run()
-        }
-        isActive={editor.isActive("heading", { level: 2 })}
-        title="标题 2"
-      >
-        <Heading2 size={iconSize} className="text-gray-300" />
-      </BubbleButton>
-      <BubbleButton
-        onClick={() =>
-          editor.chain().focus().toggleHeading({ level: 3 }).run()
-        }
-        isActive={editor.isActive("heading", { level: 3 })}
-        title="标题 3"
-      >
-        <Heading3 size={iconSize} className="text-gray-300" />
-      </BubbleButton>
-
-      <div className="w-px h-4 bg-gray-600 mx-0.5" />
-
       <BubbleButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         isActive={editor.isActive("bold")}
@@ -207,7 +169,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
       <BubbleButton
         onClick={setLink}
         isActive={editor.isActive("link")}
-        title="链接"
+        title={editor.isActive("link") ? "移除链接" : "链接"}
       >
         <LinkIcon size={iconSize} className="text-gray-300" />
       </BubbleButton>

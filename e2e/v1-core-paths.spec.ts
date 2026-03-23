@@ -29,6 +29,7 @@ test.describe("V1 核心路径 A：笔记 → 搜索", () => {
 
     // Go home and search
     await page.goto("/");
+    await expect(page.getByRole("button", { name: /搜索/ })).toBeVisible();
     await page.keyboard.press("Meta+k");
     const searchInput = page.locator(
       "input[placeholder='搜索笔记、收藏、待办...']"
@@ -110,5 +111,35 @@ test.describe("V1 核心路径：Bookmark 搜索/筛选", () => {
     await expect(
       page.locator("input[placeholder='搜索收藏...']")
     ).toBeVisible();
+  });
+});
+
+test.describe("V1 核心路径：Token Usage", () => {
+  test("录入 token usage 后会同步出现在 Dashboard", async ({ page }) => {
+    const sessionNote = `usage-${uid()}`;
+
+    await page.goto("/usage");
+    await expect(page.getByRole("heading", { name: "Token Usage" })).toBeVisible();
+
+    await page.getByRole("button", { name: "添加记录" }).click();
+    const usageForm = page.locator("form").first();
+    await usageForm.getByLabel("Provider").selectOption("openai-api");
+    await usageForm.getByLabel("Model").fill("gpt-5.4-mini");
+    await usageForm.getByLabel("Total tokens").fill("12345");
+    await usageForm.getByLabel("Notes").fill(sessionNote);
+    await page.getByRole("button", { name: "保存记录" }).click();
+
+    await expect(page.getByText("已记录 12,345 tokens")).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(usageForm).not.toBeVisible();
+    await expect(page.getByText(sessionNote)).toBeVisible({ timeout: 5000 });
+
+    await page.goto("/");
+    await expect(page.getByText("本月 Token")).toBeVisible();
+    await expect(page.getByText("Token Usage")).toBeVisible();
+    await expect(page.locator("main")).toContainText("OpenAI API", {
+      timeout: 5000,
+    });
   });
 });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
+  Activity,
   Bookmark,
   CheckSquare,
   Compass,
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/", label: "首页", icon: LayoutDashboard },
   { href: "/notes", label: "笔记", icon: FileText },
   { href: "/bookmarks", label: "收藏", icon: Bookmark },
+  { href: "/usage", label: "Token 用量", icon: Activity },
   { href: "/todos", label: "Todo", icon: CheckSquare },
   { href: "/explore", label: "AI 探索", icon: Compass },
   { href: "/ask", label: "Ask AI", icon: MessageCircle },

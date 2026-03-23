@@ -100,6 +100,69 @@ export function insertParagraphRelativeToBlock(
   return insertPos;
 }
 
+export function insertNodeAtSelection(
+  editor: Editor,
+  node: ProseMirrorNode,
+  selectionOffset = 1
+) {
+  const insertPos = editor.state.selection.from;
+  let transaction = editor.state.tr.replaceSelectionWith(node);
+
+  if (!node.isLeaf && selectionOffset > 0) {
+    const textPos = Math.min(
+      insertPos + selectionOffset,
+      transaction.doc.content.size
+    );
+    transaction = transaction.setSelection(
+      TextSelection.near(transaction.doc.resolve(textPos))
+    );
+  } else {
+    transaction = transaction.setSelection(
+      NodeSelection.create(transaction.doc, insertPos)
+    );
+  }
+
+  editor.view.dispatch(transaction.scrollIntoView());
+  editor.view.focus();
+
+  return insertPos;
+}
+
+export function insertNodeRelativeToBlock(
+  editor: Editor,
+  position: number,
+  direction: BlockInsertDirection,
+  node: ProseMirrorNode,
+  selectionOffset = 1
+) {
+  const block = getTopLevelBlockContext(editor, position);
+  if (!block) return null;
+
+  const insertPos =
+    direction === "above" ? block.pos : block.pos + block.node.nodeSize;
+
+  let transaction = editor.state.tr.insert(insertPos, node);
+
+  if (!node.isLeaf && selectionOffset > 0) {
+    const textPos = Math.min(
+      insertPos + selectionOffset,
+      transaction.doc.content.size
+    );
+    transaction = transaction.setSelection(
+      TextSelection.near(transaction.doc.resolve(textPos))
+    );
+  } else {
+    transaction = transaction.setSelection(
+      NodeSelection.create(transaction.doc, insertPos)
+    );
+  }
+
+  editor.view.dispatch(transaction.scrollIntoView());
+  editor.view.focus();
+
+  return insertPos;
+}
+
 export function insertHorizontalRuleRelativeToBlock(
   editor: Editor,
   position: number,

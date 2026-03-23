@@ -4,11 +4,12 @@
 
 ## 功能（V1）
 
-- **笔记** — Notion 风格块编辑器，支持行级悬浮插入、块菜单（上移/下移/复制/删除/转为）、Slash 命令、Todo/列表、图片上传/拖拽/粘贴、自动保存、类型/标签管理，以及一键新建带日期标题与 Todo 模版的日记
+- **笔记** — Notion 风格块编辑器，支持 hover 可见的 header 封面插入/移除、轻量类型/标签 metadata 行、行级悬浮插入、块菜单（上移/下移/复制/删除/转为）、Slash 命令、Todo/列表、Callout / Toggle、图片上传/拖拽/粘贴、自动保存，以及一键新建带日期标题与 Todo 模版的日记
 - **收藏** — URL 收藏自动抓取正文（Readability），AI 生成摘要和标签
 - **搜索** — Cmd+K 全局搜索笔记、收藏、待办，关键词高亮
 - **Ask AI** — 基于知识库的 chunk 级 hybrid RAG 问答，支持语义检索、关键词召回、邻近段落扩展和可点击引用来源
-- **Dashboard** — 统计概览 + 最近条目
+- **Token Usage** — 自动读取当前工作区里的 Codex / Claude Code 本地 session，用于展示真实 token 用量；也支持手动补录 OpenAI API / 其他来源，统一在 Dashboard 和独立页面聚合
+- **Dashboard** — 统计概览 + 最近条目 + token usage 聚合概览
 - **暗色模式** — 全局可切换
 
 冻结模块（保留但不活跃开发）：Todo、AI 探索
@@ -26,6 +27,7 @@
 ## 快速开始
 
 ```bash
+nvm use          # 使用 .nvmrc 中固定的 Node 版本（首次可先 nvm install）
 pnpm install
 pnpm db:push       # 初始化数据库
 pnpm dev            # 启动开发服务器 http://localhost:3000
@@ -104,6 +106,12 @@ ollama pull qwen2.5:14b
 ```
 
 聊天模型配置统一通过 `src/server/ai/provider.ts` 读取这些环境变量。现在支持三种模式：`codex`、`openai`、`local`。如果你没有显式设置 `AI_PROVIDER`，运行时会优先尝试复用本机已有的 OpenClaw Codex 登录态。embedding 配置则由 `src/server/ai/embeddings.ts` 独立解析，支持 `EMBEDDING_PROVIDER=openai|local|none`。
+
+`/usage` 页面还会尝试直接读取当前工作区对应的本地 usage 数据：
+- Codex：`~/.codex/state*.sqlite` 里的当前工作区 thread token 统计
+- Claude Code：`~/.claude/projects/<当前工作区>.jsonl` 里的 session usage 聚合
+
+如果这两个目录不存在，页面会显示“未发现”，但手动录入仍然可用。
 
 ## 常用命令
 

@@ -7,6 +7,8 @@ test.describe("Phase 3: Todo 模块", () => {
     await page.goto("/todos");
     await expect(page.locator("main h1")).toContainText("Todo");
     await expect(page.getByText("先把任务录进来")).toBeVisible();
+    await expect(page.getByRole("button", { name: "表格" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Dashboard" })).toBeVisible();
   });
 
   test("创建带时间和分类的 Todo", async ({ page }) => {
@@ -26,11 +28,14 @@ test.describe("Phase 3: Todo 模块", () => {
     await page.getByLabel("Todo 截止时间").fill(dueInput);
     await page.getByRole("button", { name: "添加" }).click();
 
-    await expect(page.getByText(name).first()).toBeVisible();
+    const row = page.locator("tbody tr").filter({ hasText: name }).first();
+    await expect(row).toBeVisible();
+    await expect(row).toContainText("工作");
+
+    await page.getByRole("button", { name: "Dashboard" }).click();
     await expect(
       page.locator("section").filter({ hasText: "即将到来" }).getByText(name)
     ).toBeVisible();
-    await expect(page.locator("main span").getByText("工作").first()).toBeVisible();
   });
 
   test("可以在详情面板编辑 Todo", async ({ page }) => {
@@ -61,7 +66,8 @@ test.describe("Phase 3: Todo 模块", () => {
 
     await expect(page.getByText(updatedName).first()).toBeVisible();
     await expect(page.getByText("补充上下文").first()).toBeVisible();
-    await expect(page.locator("main span").getByText("学习").first()).toBeVisible();
+    const row = page.locator("tbody tr").filter({ hasText: updatedName }).first();
+    await expect(row).toContainText("学习");
   });
 
   test("可以清空 Todo 的截止时间", async ({ page }) => {
@@ -85,6 +91,10 @@ test.describe("Phase 3: Todo 模块", () => {
     await page.getByRole("button", { name: "清空时间" }).click();
     await page.getByRole("button", { name: "保存修改" }).click();
 
+    const row = page.locator("tbody tr").filter({ hasText: name }).first();
+    await expect(row).toContainText("未设置时间");
+
+    await page.getByRole("button", { name: "Dashboard" }).click();
     await expect(
       page.locator("section").filter({ hasText: "无时间" }).getByText(name)
     ).toBeVisible();
@@ -98,15 +108,13 @@ test.describe("Phase 3: Todo 模块", () => {
     await page.getByRole("button", { name: "添加" }).click();
     await expect(page.getByText(name).first()).toBeVisible();
 
-    const row = page.locator("div.group").filter({ hasText: name }).first();
-    const toggle = row.locator("button[title='切换状态']");
-    await toggle.click();
-    await page.waitForTimeout(300);
+    const row = page.locator("tbody tr").filter({ hasText: name }).first();
+    const toggle = row.locator("button[title='标记完成']");
     await toggle.click();
     await page.waitForTimeout(300);
 
     await page.getByLabel("按状态筛选").selectOption("done");
-    await expect(page.getByText(name).first()).toBeVisible();
+    await expect(page.locator("tbody tr").filter({ hasText: name }).first()).toBeVisible();
   });
 
   test("按分类筛选 Todo", async ({ page }) => {
@@ -131,8 +139,7 @@ test.describe("Phase 3: Todo 模块", () => {
     await page.getByRole("button", { name: "添加" }).click();
     await expect(page.getByText(name).first()).toBeVisible();
 
-    const row = page.locator("div.group").filter({ hasText: name }).first();
-    await row.hover();
+    const row = page.locator("tbody tr").filter({ hasText: name }).first();
     await row.locator("button[title='删除']").click();
 
     await expect(row).not.toBeVisible({ timeout: 5000 });

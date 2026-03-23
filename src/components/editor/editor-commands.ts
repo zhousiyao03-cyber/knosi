@@ -8,12 +8,21 @@ import {
   Heading3,
   ImagePlus,
   ImageUp,
+  Lightbulb,
   List,
+  ListTree,
   ListOrdered,
   Minus,
   Quote,
   Type,
 } from "lucide-react";
+import {
+  createCalloutBlockNode,
+} from "./callout-block";
+import {
+  createToggleBlockNode,
+} from "./toggle-block";
+import { insertNodeAtSelection } from "./editor-block-ops";
 
 export interface EditorCommandItem {
   id: string;
@@ -24,6 +33,7 @@ export interface EditorCommandItem {
   run: (editor: Editor) => void;
   isActive?: (editor: Editor) => boolean;
   tone?: "default" | "danger";
+  transformable?: boolean;
 }
 
 export interface EditorCommandGroup {
@@ -145,6 +155,32 @@ export function createEditorCommandGroups(
             editor.chain().focus().toggleBlockquote().run();
           },
           isActive: (editor) => editor.isActive("blockquote"),
+        },
+        {
+          id: "callout-block",
+          title: "Callout",
+          description: "带强调语气的提示块",
+          keywords: ["callout", "tip", "提示", "强调"],
+          icon: Lightbulb,
+          run: (editor) => {
+            const node = createCalloutBlockNode(editor);
+            if (!node) return;
+            insertNodeAtSelection(editor, node, 2);
+          },
+          transformable: false,
+        },
+        {
+          id: "toggle-block",
+          title: "折叠列表",
+          description: "可展开/折叠的内容块",
+          keywords: ["toggle", "collapse", "折叠", "展开"],
+          icon: ListTree,
+          run: (editor) => {
+            const node = createToggleBlockNode(editor);
+            if (!node) return;
+            insertNodeAtSelection(editor, node, 2);
+          },
+          transformable: false,
         },
         {
           id: "code-block",

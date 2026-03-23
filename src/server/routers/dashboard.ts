@@ -1,35 +1,27 @@
 import { z } from "zod/v4";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
-import { notes, bookmarks, todos, learningPaths } from "../db/schema";
-import { eq, desc, count, like, or } from "drizzle-orm";
+import { notes, bookmarks, todos } from "../db/schema";
+import { and, asc, count, desc, eq, gte, like, lt, or } from "drizzle-orm";
 
 export const dashboardRouter = router({
   stats: publicProcedure.query(async () => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
     const [noteCount] = await db.select({ count: count() }).from(notes);
-    const [bookmarkCount] = await db.select({ count: count() }).from(bookmarks);
     const [todoCount] = await db.select({ count: count() }).from(todos);
     const [doneCount] = await db
       .select({ count: count() })
       .from(todos)
       .where(eq(todos.status, "done"));
-    const [pathCount] = await db.select({ count: count() }).from(learningPaths);
 
     const recentNotes = await db
       .select({ id: notes.id, title: notes.title, updatedAt: notes.updatedAt })
       .from(notes)
       .orderBy(desc(notes.updatedAt))
-      .limit(5);
-
-    const recentBookmarks = await db
-      .select({
-        id: bookmarks.id,
-        title: bookmarks.title,
-        url: bookmarks.url,
-        createdAt: bookmarks.createdAt,
-      })
-      .from(bookmarks)
-      .orderBy(desc(bookmarks.createdAt))
       .limit(5);
 
     const pendingTodos = await db
@@ -39,17 +31,34 @@ export const dashboardRouter = router({
       .orderBy(desc(todos.createdAt))
       .limit(5);
 
+    const todayTodos = await db
+      .select({
+        id: todos.id,
+        title: todos.title,
+        priority: todos.priority,
+        status: todos.status,
+        dueDate: todos.dueDate,
+      })
+      .from(todos)
+      .where(
+        and(
+          gte(todos.dueDate, startOfToday),
+          lt(todos.dueDate, startOfTomorrow),
+          or(eq(todos.status, "todo"), eq(todos.status, "in_progress"))
+        )
+      )
+      .orderBy(asc(todos.dueDate), desc(todos.updatedAt))
+      .limit(5);
+
     return {
       counts: {
         notes: noteCount.count,
-        bookmarks: bookmarkCount.count,
         todos: todoCount.count,
         todosDone: doneCount.count,
-        learningPaths: pathCount.count,
       },
       recentNotes,
-      recentBookmarks,
       pendingTodos,
+      todayTodos,
     };
   }),
 

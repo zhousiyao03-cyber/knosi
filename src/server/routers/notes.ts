@@ -9,6 +9,9 @@ import {
   syncNoteKnowledgeIndex,
 } from "../ai/indexer";
 
+const noteCoverSchema = z.string().trim().nullable().optional();
+const noteIconSchema = z.string().trim().max(8).nullable().optional();
+
 export const notesRouter = router({
   list: publicProcedure.query(async () => {
     return db.select().from(notes).orderBy(desc(notes.updatedAt));
@@ -28,6 +31,8 @@ export const notesRouter = router({
         content: z.string().optional(),
         plainText: z.string().optional(),
         type: z.enum(["note", "journal", "summary"]).default("note"),
+        icon: noteIconSchema,
+        cover: noteCoverSchema,
         tags: z.string().optional(),
       })
     )
@@ -51,6 +56,8 @@ export const notesRouter = router({
         content: z.string().optional(),
         plainText: z.string().optional(),
         type: z.enum(["note", "journal", "summary"]).optional(),
+        icon: noteIconSchema,
+        cover: noteCoverSchema,
         tags: z.string().optional(),
       })
     )

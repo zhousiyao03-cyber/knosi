@@ -43,7 +43,7 @@ test.describe("Phase 2: 笔记本模块", () => {
       page.locator(".ProseMirror ul[data-type='taskList'] li")
     ).toHaveCount(3);
 
-    await page.getByText("返回").click();
+    await page.getByTestId("note-editor-back").click();
     await expect(page).toHaveURL("/notes");
     await expect(page.getByText(todayTitle).first()).toBeVisible();
     await expect(page.getByText("日记").first()).toBeVisible();
@@ -59,7 +59,7 @@ test.describe("Phase 2: 笔记本模块", () => {
     await titleInput.fill(name);
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
 
-    await page.getByText("返回").click();
+    await page.getByTestId("note-editor-back").click();
     await expect(page).toHaveURL("/notes");
     await expect(page.getByText(name).first()).toBeVisible();
   });
@@ -288,42 +288,70 @@ test.describe("Phase 2: 笔记本模块", () => {
   });
 
   test("切换笔记类型", async ({ page }) => {
+    const name = `type-${uid()}`;
     await page.goto("/notes");
     await page.getByText("新建笔记").click();
     await expect(page).toHaveURL(/\/notes\/.+/);
 
-    // Open metadata panel
-    await page.locator("button[title='笔记属性']").click();
+    await page.locator("textarea[placeholder='无标题']").fill(name);
+    await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId("page-properties")).toBeVisible();
 
-    // Click "日记" type button
     await page.getByRole("button", { name: "日记" }).click();
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
 
-    await page.getByText("返回").click();
-    // Verify the type badge "日记" appears in the note list
-    await expect(
-      page.locator(".bg-gray-100", { hasText: "日记" }).first()
-    ).toBeVisible();
+    await page.getByTestId("note-editor-back").click();
+    const noteCard = page.getByTestId("note-card").filter({ hasText: name }).first();
+    await expect(noteCard).toBeVisible();
+    await expect(noteCard.getByTestId("note-type-badge")).toContainText("日记");
   });
 
   test("添加和删除标签", async ({ page }) => {
+    const name = `tag-note-${uid()}`;
     const tagName = `tag-${uid()}`;
     await page.goto("/notes");
     await page.getByText("新建笔记").click();
     await expect(page).toHaveURL(/\/notes\/.+/);
 
-    // Open metadata panel
-    await page.locator("button[title='笔记属性']").click();
+    await page.locator("textarea[placeholder='无标题']").fill(name);
+    await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
 
-    const tagInput = page.locator("input[placeholder='添加标签...']");
+    const tagInput = page.getByTestId("note-tag-input");
     await tagInput.fill(tagName);
     await tagInput.press("Enter");
 
     await expect(page.getByText(tagName).first()).toBeVisible();
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
 
-    await page.getByText("返回").click();
-    await expect(page.getByText(tagName).first()).toBeVisible();
+    await page.getByTestId("note-editor-back").click();
+    const noteCard = page.getByTestId("note-card").filter({ hasText: name }).first();
+    await expect(noteCard).toContainText(tagName);
+  });
+
+  test("页面头部 hover 后支持插入和移除封面图", async ({ page }) => {
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    await expect(page.getByTestId("page-properties")).toBeVisible();
+    const coverHeader = page.getByTestId("note-cover-header");
+    await coverHeader.hover();
+    await expect(page.getByTestId("note-add-cover")).toBeVisible();
+    await page.getByTestId("note-cover-input").setInputFiles({
+      name: "cover.png",
+      mimeType: "image/png",
+      buffer: tinyPng,
+    });
+
+    await expect(coverHeader.locator("img")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
+
+    await coverHeader.hover();
+    await expect(page.getByTestId("note-remove-cover")).toBeVisible();
+    await page.getByTestId("note-remove-cover").click();
+
+    await expect(coverHeader.locator("img")).toHaveCount(0);
+    await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
   });
 
   test("删除笔记", async ({ page }) => {
@@ -336,19 +364,16 @@ test.describe("Phase 2: 笔记本模块", () => {
     await titleInput.fill(name);
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
 
-    await page.getByText("返回").click();
+    await page.getByTestId("note-editor-back").click();
     await expect(page.getByText(name).first()).toBeVisible();
 
     // Accept confirm dialog before clicking delete
     page.on("dialog", (dialog) => dialog.accept());
 
     // Find the specific note row and its delete button
-    const noteRow = page
-      .locator("[class*='cursor-pointer']")
-      .filter({ hasText: name })
-      .first();
+    const noteRow = page.getByTestId("note-card").filter({ hasText: name }).first();
     await noteRow.hover();
-    await noteRow.locator("button[title='删除']").click({ force: true });
+    await noteRow.getByTestId("note-delete").click({ force: true });
 
     // Wait for the deletion to take effect
     await page.waitForTimeout(500);
@@ -367,13 +392,13 @@ test.describe("Phase 2: 笔记本模块", () => {
     const t1 = page.locator("textarea[placeholder='无标题']");
     await t1.fill(apple);
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
-    await page.getByText("返回").click();
+    await page.getByTestId("note-editor-back").click();
 
     await page.getByText("新建笔记").click();
     const t2 = page.locator("textarea[placeholder='无标题']");
     await t2.fill(banana);
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
-    await page.getByText("返回").click();
+    await page.getByTestId("note-editor-back").click();
 
     // Search
     await page.locator("input[placeholder='搜索笔记...']").fill(apple);
@@ -391,5 +416,57 @@ test.describe("Phase 2: 笔记本模块", () => {
 
     // Auto-save triggers after 1.5s
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("悬浮插入按钮支持 Callout", async ({ page }) => {
+    const text = `callout-${uid()}`;
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    const firstBlock = page.locator(".ProseMirror p").first();
+    await firstBlock.hover();
+    await page.getByTestId("editor-insert-trigger").click();
+    await page
+      .getByTestId("editor-insert-menu")
+      .getByRole("button", { name: "Callout" })
+      .click();
+
+    const calloutParagraph = page.locator(".notion-callout p").first();
+    await calloutParagraph.click();
+    await page.keyboard.type(text, { delay: 30 });
+
+    await expect(page.locator(".notion-callout").first()).toContainText(text);
+    await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("悬浮插入按钮支持折叠列表", async ({ page }) => {
+    const summary = `toggle-${uid()}`;
+    const body = `body-${uid()}`;
+    await page.goto("/notes");
+    await page.getByText("新建笔记").click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+
+    const firstBlock = page.locator(".ProseMirror p").first();
+    await firstBlock.hover();
+    await page.getByTestId("editor-insert-trigger").click();
+    await page
+      .getByTestId("editor-insert-menu")
+      .getByRole("button", { name: "折叠列表" })
+      .click();
+
+    const toggleSummary = page.locator(".notion-toggle-summary").first();
+    await toggleSummary.fill(summary);
+    await expect(toggleSummary).toHaveValue(summary);
+
+    const toggleParagraph = page.locator(".notion-toggle p").first();
+    await toggleParagraph.click();
+    await page.keyboard.type(body, { delay: 30 });
+
+    const toggleBlock = page.locator(".notion-toggle").first();
+    await expect(toggleBlock).toContainText(body);
+
+    await page.locator(".notion-toggle-chevron").first().click();
+    await expect(page.locator(".notion-toggle-body").first()).toBeHidden();
   });
 });

@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, real, blob } from "drizzle-orm/sqlite-core";
+import { TOKEN_USAGE_PROVIDERS } from "@/lib/token-usage";
 
 export const notes = sqliteTable("notes", {
   id: text("id").primaryKey(),
@@ -6,6 +7,8 @@ export const notes = sqliteTable("notes", {
   content: text("content"), // JSON, Tiptap format
   plainText: text("plain_text"), // for search & vectorization
   type: text("type", { enum: ["note", "journal", "summary"] }).default("note"),
+  icon: text("icon"),
+  cover: text("cover"),
   tags: text("tags"), // JSON array
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
@@ -127,4 +130,19 @@ export const workflowRuns = sqliteTable("workflow_runs", {
   results: text("results"), // JSON, per-node results
   startedAt: integer("started_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   completedAt: integer("completed_at", { mode: "timestamp" }),
+});
+
+export const tokenUsageEntries = sqliteTable("token_usage_entries", {
+  id: text("id").primaryKey(),
+  provider: text("provider", { enum: TOKEN_USAGE_PROVIDERS }).notNull(),
+  model: text("model"),
+  totalTokens: integer("total_tokens").notNull(),
+  inputTokens: integer("input_tokens").default(0),
+  outputTokens: integer("output_tokens").default(0),
+  cachedTokens: integer("cached_tokens").default(0),
+  notes: text("notes"),
+  source: text("source", { enum: ["manual", "import"] }).notNull().default("manual"),
+  usageAt: integer("usage_at", { mode: "timestamp" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });

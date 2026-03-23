@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+const uid = () => Math.random().toString(36).slice(2, 8);
+
 test.describe("Phase 6: 首页仪表盘", () => {
   test("仪表盘加载成功", async ({ page }) => {
     await page.goto("/");
@@ -10,16 +12,35 @@ test.describe("Phase 6: 首页仪表盘", () => {
     await page.goto("/");
     // Check stat cards exist in main area
     await expect(page.locator("main").getByText("笔记").first()).toBeVisible();
-    await expect(page.locator("main").getByText("收藏").first()).toBeVisible();
     await expect(page.locator("main").getByText("待办").first()).toBeVisible();
-    await expect(page.locator("main").getByText("学习路径").first()).toBeVisible();
+    await expect(page.locator("main").getByText("本月 Token").first()).toBeVisible();
   });
 
-  test("显示最近笔记/收藏/待办区块", async ({ page }) => {
+  test("显示最近笔记和今日任务区块", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("最近笔记")).toBeVisible();
-    await expect(page.getByText("最近收藏")).toBeVisible();
-    await expect(page.getByText("待办事项")).toBeVisible();
+    await expect(page.getByText("今日任务")).toBeVisible();
+  });
+
+  test("首页可以看到当天任务列表", async ({ page }) => {
+    const name = `home-today-${uid()}`;
+    const today = new Date();
+    const todayInput = new Date(
+      today.getTime() - today.getTimezoneOffset() * 60_000
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    await page.goto("/todos");
+    await page.getByLabel("Todo 标题").fill(name);
+    await page.getByRole("button", { name: "更多字段" }).click();
+    await page.getByLabel("Todo 截止时间").fill(todayInput);
+    await page.getByRole("button", { name: "添加" }).click();
+    await expect(page.getByText(name).first()).toBeVisible();
+
+    await page.goto("/");
+    await expect(page.getByText("今日任务")).toBeVisible();
+    await expect(page.locator("main").getByText(name).first()).toBeVisible();
   });
 
   test("统计卡片链接跳转", async ({ page }) => {
