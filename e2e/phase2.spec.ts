@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { formatJournalTitle } from "../src/lib/note-templates";
 
 // Use unique names per test run to avoid cross-test collisions
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -12,6 +13,7 @@ test.describe("Phase 2: 笔记本模块", () => {
     await page.goto("/notes");
     await expect(page.locator("main h1")).toContainText("笔记");
     await expect(page.getByText("新建笔记")).toBeVisible();
+    await expect(page.getByText("新建日记")).toBeVisible();
   });
 
   test("创建新笔记并跳转到编辑页", async ({ page }) => {
@@ -23,6 +25,28 @@ test.describe("Phase 2: 笔记本模块", () => {
     const titleInput = page.locator("textarea[placeholder='无标题']");
     await expect(titleInput).toBeVisible();
     await expect(titleInput).toHaveValue("无标题笔记");
+  });
+
+  test("创建新日记会带入当天标题和默认模版", async ({ page }) => {
+    const todayTitle = formatJournalTitle();
+
+    await page.goto("/notes");
+    await page.getByText("新建日记").click();
+
+    await expect(page).toHaveURL(/\/notes\/.+/);
+    await expect(page.locator("textarea[placeholder='无标题']")).toHaveValue(
+      todayTitle
+    );
+    await expect(page.locator(".ProseMirror")).toContainText("今日日记");
+    await expect(page.locator(".ProseMirror")).toContainText("Todo List");
+    await expect(
+      page.locator(".ProseMirror ul[data-type='taskList'] li")
+    ).toHaveCount(3);
+
+    await page.getByText("返回").click();
+    await expect(page).toHaveURL("/notes");
+    await expect(page.getByText(todayTitle).first()).toBeVisible();
+    await expect(page.getByText("日记").first()).toBeVisible();
   });
 
   test("编辑笔记标题", async ({ page }) => {

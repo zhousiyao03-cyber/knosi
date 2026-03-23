@@ -139,6 +139,9 @@ devDependencies:
   '@types/react-dom':
     specifier: ^19
     version: 19.2.3(@types/react@19.2.14)
+  agent-browser:
+    specifier: 0.21.2
+    version: 0.21.2
   drizzle-kit:
     specifier: ^0.31.10
     version: 0.31.10
@@ -3666,6 +3669,12 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
     dev: false
+
+  /agent-browser@0.21.2:
+    resolution: {integrity: sha512-05TgoluWYRPAwUruJqFGsZVoZfoUVMpT8AT3HcA4sxSHbYsIsLkQTZmNvsmMGS3DL2I/7tu27RiqYDOPswAeMg==}
+    hasBin: true
+    requiresBuild: true
+    dev: true
 
   /ai@6.0.134(zod@4.3.6):
     resolution: {integrity: sha512-YalNEaavld/kE444gOcsMKXdVVRGEe0SK77fAFcWYcqLg+a7xKnEet8bdfrEAJTfnMjj01rhgrIL10903w1a5Q==}

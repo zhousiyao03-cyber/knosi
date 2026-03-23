@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Trash2, FileText } from "lucide-react";
+import { Plus, Search, Trash2, FileText, CalendarDays } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
+import { createJournalTemplate } from "@/lib/note-templates";
 
 export default function NotesPage() {
   const router = useRouter();
@@ -41,6 +42,10 @@ export default function NotesPage() {
     createNote.mutate({ title: "无标题笔记" });
   };
 
+  const handleCreateJournal = () => {
+    createNote.mutate(createJournalTemplate());
+  };
+
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (confirm("确定删除这条笔记吗？")) {
@@ -58,14 +63,24 @@ export default function NotesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">笔记</h1>
-        <button
-          onClick={handleCreate}
-          disabled={createNote.isPending}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          <Plus size={16} />
-          新建笔记
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCreateJournal}
+            disabled={createNote.isPending}
+            className="flex items-center gap-2 px-4 py-2 border border-amber-200 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
+          >
+            <CalendarDays size={16} />
+            新建日记
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={createNote.isPending}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            <Plus size={16} />
+            新建笔记
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3 mb-4">

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, blob } from "drizzle-orm/sqlite-core";
 
 export const notes = sqliteTable("notes", {
   id: text("id").primaryKey(),
@@ -42,6 +42,46 @@ export const chatMessages = sqliteTable("chat_messages", {
   content: text("content").notNull(),
   sources: text("sources"), // JSON, referenced doc IDs
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+export const knowledgeChunks = sqliteTable("knowledge_chunks", {
+  id: text("id").primaryKey(),
+  sourceType: text("source_type", { enum: ["note", "bookmark"] }).notNull(),
+  sourceId: text("source_id").notNull(),
+  sourceTitle: text("source_title").notNull(),
+  sourceUpdatedAt: integer("source_updated_at", { mode: "timestamp" }),
+  chunkIndex: integer("chunk_index").notNull(),
+  sectionPath: text("section_path"), // JSON array
+  blockType: text("block_type"),
+  text: text("text").notNull(),
+  textHash: text("text_hash").notNull(),
+  tokenCount: integer("token_count"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+export const knowledgeChunkEmbeddings = sqliteTable("knowledge_chunk_embeddings", {
+  chunkId: text("chunk_id")
+    .primaryKey()
+    .references(() => knowledgeChunks.id),
+  model: text("model").notNull(),
+  dims: integer("dims").notNull(),
+  vector: blob("vector", { mode: "buffer" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+export const knowledgeIndexJobs = sqliteTable("knowledge_index_jobs", {
+  id: text("id").primaryKey(),
+  sourceType: text("source_type", { enum: ["note", "bookmark"] }).notNull(),
+  sourceId: text("source_id").notNull(),
+  reason: text("reason"),
+  status: text("status", { enum: ["pending", "running", "done", "failed"] })
+    .notNull()
+    .default("pending"),
+  error: text("error"),
+  attempts: integer("attempts").notNull().default(1),
+  queuedAt: integer("queued_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  finishedAt: integer("finished_at", { mode: "timestamp" }),
 });
 
 export const workflows = sqliteTable("workflows", {

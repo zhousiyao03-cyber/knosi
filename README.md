@@ -4,10 +4,10 @@
 
 ## 功能（V1）
 
-- **笔记** — Notion 风格块编辑器，支持行级悬浮插入、块菜单（上移/下移/复制/删除/转为）、Slash 命令、Todo/列表、图片上传/拖拽/粘贴、自动保存、类型/标签管理
+- **笔记** — Notion 风格块编辑器，支持行级悬浮插入、块菜单（上移/下移/复制/删除/转为）、Slash 命令、Todo/列表、图片上传/拖拽/粘贴、自动保存、类型/标签管理，以及一键新建带日期标题与 Todo 模版的日记
 - **收藏** — URL 收藏自动抓取正文（Readability），AI 生成摘要和标签
 - **搜索** — Cmd+K 全局搜索笔记、收藏、待办，关键词高亮
-- **Ask AI** — 基于知识库的 RAG 问答，引用来源可点击跳转
+- **Ask AI** — 基于知识库的 chunk 级 hybrid RAG 问答，支持语义检索、关键词召回、邻近段落扩展和可点击引用来源
 - **Dashboard** — 统计概览 + 最近条目
 - **暗色模式** — 全局可切换
 
@@ -47,6 +47,27 @@ AI_PROVIDER=codex
 
 这条路线不会使用 `OPENAI_API_KEY`。运行时会直接读取 `~/.openclaw/openclaw.json` 和 `~/.openclaw/agents/main/agent/auth-profiles.json`，按 OpenClaw 当前默认的 `openai-codex/gpt-5.4` 配置去请求 `chatgpt.com/backend-api`。为了让 Next.js 服务端运行更稳定，仓库内部固定走 SSE transport，而不是 OpenClaw 里的 `auto` WebSocket/SSE 策略。
 
+如果你想让 Ask AI 的新 chunk 级 RAG 同时开启语义检索，需要额外配置 embedding provider。最简单的两条路是：
+
+```bash
+# 方案 A：继续用 Codex 聊天，但 embedding 走 OpenAI API
+AI_PROVIDER=codex
+EMBEDDING_PROVIDER=openai
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+```bash
+# 方案 B：继续用 Codex 聊天，但 embedding 走本地 OpenAI-compatible 服务
+AI_PROVIDER=codex
+EMBEDDING_PROVIDER=local
+AI_BASE_URL=http://127.0.0.1:11434/v1
+AI_EMBEDDING_MODEL=nomic-embed-text
+AI_API_KEY=local
+```
+
+如果你不配置 embedding provider，Ask AI 仍然能工作，但会退化成 chunk 级关键词检索，而不会启用语义召回。
+
 如果你之后想切回标准 OpenAI API，也可以：
 
 ```bash
@@ -82,7 +103,7 @@ AI_MODEL=qwen2.5:14b
 ollama pull qwen2.5:14b
 ```
 
-AI 路由统一通过 `src/server/ai/provider.ts` 读取这些环境变量。现在支持三种模式：`codex`、`openai`、`local`。如果你没有显式设置 `AI_PROVIDER`，运行时会优先尝试复用本机已有的 OpenClaw Codex 登录态。
+聊天模型配置统一通过 `src/server/ai/provider.ts` 读取这些环境变量。现在支持三种模式：`codex`、`openai`、`local`。如果你没有显式设置 `AI_PROVIDER`，运行时会优先尝试复用本机已有的 OpenClaw Codex 登录态。embedding 配置则由 `src/server/ai/embeddings.ts` 独立解析，支持 `EMBEDDING_PROVIDER=openai|local|none`。
 
 ## 常用命令
 
@@ -90,10 +111,25 @@ AI 路由统一通过 `src/server/ai/provider.ts` 读取这些环境变量。现
 pnpm dev            # 开发服务器
 pnpm build          # 生产构建（含 TypeScript 检查）
 pnpm lint           # ESLint 检查
-pnpm test:e2e       # E2E 测试
+pnpm test:e2e       # E2E 测试（使用独立测试库，不污染 data/second-brain.db）
+pnpm run browser:install  # 可选：下载 Chrome for Testing，供 agent-browser 使用
 pnpm db:generate    # 生成数据库迁移
 pnpm db:push        # 应用迁移到数据库
 pnpm db:studio      # Drizzle Studio
+```
+
+## Browser 验证
+
+仓库现在内置了 `agent-browser` 作为本地开发依赖，我后续可以直接用 `pnpm exec agent-browser ...` 做页面级验证。
+
+- 如果你的机器已经装了 Chrome，`agent-browser` 通常会直接复用它。
+- 如果你想固定使用 Chrome for Testing，先执行一次 `pnpm run browser:install`。
+- 一个最小例子：
+
+```bash
+pnpm exec agent-browser open http://127.0.0.1:3000/notes
+pnpm exec agent-browser snapshot -i
+pnpm exec agent-browser close
 ```
 
 ## 项目结构
@@ -106,7 +142,7 @@ src/
   server/
     db/             数据库连接和 schema
     routers/        tRPC routers
-    ai/             AI 相关逻辑（RAG、本地/云端 provider、URL 内容抓取）
+    ai/             AI 相关逻辑（chunking、indexer、hybrid RAG、本地/云端 provider、URL 内容抓取）
 e2e/                Playwright E2E 测试
 docs/
   v1-plan.md        V1 收敛执行计划

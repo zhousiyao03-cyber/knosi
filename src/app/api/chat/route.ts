@@ -10,6 +10,7 @@ import {
   type AskAiSourceScope,
   stripAssistantSourceMetadata,
 } from "@/lib/ask-ai";
+import { retrieveAgenticContext } from "@/server/ai/agentic-rag";
 import { retrieveContext } from "@/server/ai/rag";
 import {
   getAIErrorMessage,
@@ -35,8 +36,18 @@ const uiMessageSchema = z
 
 const SKIP_RAG_KEYWORDS = ["不用搜索", "直接回答", "不需要搜索", "不要搜索"];
 
+interface RetrievedKnowledgeItem {
+  chunkId?: string;
+  chunkIndex?: number;
+  content: string;
+  id: string;
+  sectionPath?: string[];
+  title: string;
+  type: "note" | "bookmark";
+}
+
 function buildSystemPrompt(
-  context: Awaited<ReturnType<typeof retrieveContext>>,
+  context: RetrievedKnowledgeItem[],
   sourceScope: AskAiSourceScope
 ): string {
   const identityLine = getChatAssistantIdentity();
@@ -58,8 +69,23 @@ function buildSystemPrompt(
 
   const knowledgeBlock = context
     .map(
-      (item) =>
-        `<source id="${item.id}" type="${item.type}" title="${item.title}">\n${item.content}\n</source>`
+      (item) => {
+        const extraAttributes = [
+          item.chunkId ? `chunk_id="${item.chunkId}"` : null,
+          typeof item.chunkIndex === "number"
+            ? `chunk_index="${item.chunkIndex}"`
+            : null,
+          item.sectionPath?.length
+            ? `section="${item.sectionPath.join(" > ")}"`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        return `<source id="${item.id}" type="${item.type}" title="${
+          item.title
+        }"${extraAttributes ? ` ${extraAttributes}` : ""}>\n${item.content}\n</source>`;
+      }
     )
     .join("\n\n");
 
@@ -162,9 +188,33 @@ export async function POST(req: Request) {
     const skipRag =
       sourceScope === "direct" ||
       SKIP_RAG_KEYWORDS.some((kw) => userQuery.includes(kw));
-    const context = skipRag
-      ? []
-      : await retrieveContext(userQuery, { scope: sourceScope });
+    let context: RetrievedKnowledgeItem[] = [];
+
+    if (!skipRag) {
+      const agenticContext = await retrieveAgenticContext(userQuery, {
+        scope: sourceScope,
+      });
+
+      context =
+        agenticContext.length > 0
+          ? agenticContext.map((item) => ({
+              chunkId: item.chunkId,
+              chunkIndex: item.chunkIndex,
+              content: item.content,
+              id: item.sourceId,
+              sectionPath: item.sectionPath,
+              title: item.sourceTitle,
+              type: item.sourceType,
+            }))
+          : (await retrieveContext(userQuery, { scope: sourceScope })).map(
+              (item) => ({
+                content: item.content,
+                id: item.id,
+                title: item.title,
+                type: item.type,
+              })
+            );
+    }
 
     return await streamChatResponse({
       messages,

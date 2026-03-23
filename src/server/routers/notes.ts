@@ -4,6 +4,10 @@ import { notes } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import crypto from "crypto";
+import {
+  removeKnowledgeSourceIndex,
+  syncNoteKnowledgeIndex,
+} from "../ai/indexer";
 
 export const notesRouter = router({
   list: publicProcedure.query(async () => {
@@ -30,6 +34,12 @@ export const notesRouter = router({
     .mutation(async ({ input }) => {
       const id = crypto.randomUUID();
       await db.insert(notes).values({ id, ...input });
+      const [createdNote] = await db.select().from(notes).where(eq(notes.id, id));
+      if (createdNote) {
+        void syncNoteKnowledgeIndex(createdNote, "note-create").catch(
+          () => undefined
+        );
+      }
       return { id };
     }),
 
@@ -50,6 +60,14 @@ export const notesRouter = router({
         .update(notes)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(notes.id, id));
+
+      const [updatedNote] = await db.select().from(notes).where(eq(notes.id, id));
+      if (updatedNote) {
+        void syncNoteKnowledgeIndex(updatedNote, "note-update").catch(
+          () => undefined
+        );
+      }
+
       return { id };
     }),
 
@@ -57,6 +75,7 @@ export const notesRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       await db.delete(notes).where(eq(notes.id, input.id));
+      void removeKnowledgeSourceIndex("note", input.id).catch(() => undefined);
       return { success: true };
     }),
 });

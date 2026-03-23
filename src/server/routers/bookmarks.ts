@@ -5,6 +5,10 @@ import { eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import crypto from "crypto";
 import { fetchContent } from "../ai/fetch-content";
+import {
+  removeKnowledgeSourceIndex,
+  syncBookmarkKnowledgeIndex,
+} from "../ai/indexer";
 
 export const bookmarksRouter = router({
   list: publicProcedure.query(async () => {
@@ -53,6 +57,16 @@ export const bookmarksRouter = router({
         }
       }
 
+      const [bookmark] = await db
+        .select()
+        .from(bookmarks)
+        .where(eq(bookmarks.id, id));
+      if (bookmark) {
+        void syncBookmarkKnowledgeIndex(bookmark, "bookmark-create").catch(
+          () => undefined
+        );
+      }
+
       return { id };
     }),
 
@@ -70,6 +84,17 @@ export const bookmarksRouter = router({
         .update(bookmarks)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(bookmarks.id, id));
+
+      const [updatedBookmark] = await db
+        .select()
+        .from(bookmarks)
+        .where(eq(bookmarks.id, id));
+      if (updatedBookmark) {
+        void syncBookmarkKnowledgeIndex(updatedBookmark, "bookmark-update").catch(
+          () => undefined
+        );
+      }
+
       return { success: true };
     }),
 
@@ -97,20 +122,34 @@ export const bookmarksRouter = router({
             updatedAt: new Date(),
           })
           .where(eq(bookmarks.id, input.id));
-        return { success: true };
       } else {
         await db
           .update(bookmarks)
           .set({ status: "failed", updatedAt: new Date() })
           .where(eq(bookmarks.id, input.id));
-        return { success: false };
       }
+
+      const [updatedBookmark] = await db
+        .select()
+        .from(bookmarks)
+        .where(eq(bookmarks.id, input.id));
+      if (updatedBookmark) {
+        void syncBookmarkKnowledgeIndex(updatedBookmark, "bookmark-refetch").catch(
+          () => undefined
+        );
+        return { success: updatedBookmark.status === "processed" };
+      }
+
+      return { success: false };
     }),
 
   delete: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       await db.delete(bookmarks).where(eq(bookmarks.id, input.id));
+      void removeKnowledgeSourceIndex("bookmark", input.id).catch(
+        () => undefined
+      );
       return { success: true };
     }),
 });
