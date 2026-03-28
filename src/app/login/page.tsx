@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth, signIn } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { AppBrand } from "@/components/layout/app-brand";
 import { loginWithCredentials } from "./actions";
 
 const errorMessages: Record<string, string> = {
@@ -26,8 +27,8 @@ export default async function LoginPage({
     <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4 py-10 dark:bg-stone-950">
       <div className="w-full max-w-sm space-y-6 rounded-2xl border border-stone-200 bg-white p-8 shadow-lg dark:border-stone-800 dark:bg-stone-900">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-stone-200 text-lg font-semibold text-stone-700 dark:bg-stone-800 dark:text-stone-200">
-            S
+          <div className="mb-4 flex justify-center">
+            <AppBrand compact />
           </div>
           <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
             Second Brain
