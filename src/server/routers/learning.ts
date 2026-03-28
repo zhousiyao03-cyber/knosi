@@ -1,23 +1,24 @@
 import { z } from "zod/v4";
-import { router, publicProcedure } from "../trpc";
+import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
 import { learningPaths, learningLessons } from "../db/schema";
-import { eq, asc } from "drizzle-orm";
+import { and, eq, asc } from "drizzle-orm";
+import crypto from "crypto";
 
 export const learningRouter = router({
   // List all learning paths
-  listPaths: publicProcedure.query(async () => {
-    return db.select().from(learningPaths).orderBy(asc(learningPaths.createdAt));
+  listPaths: protectedProcedure.query(async ({ ctx }) => {
+    return db.select().from(learningPaths).where(eq(learningPaths.userId, ctx.userId)).orderBy(asc(learningPaths.createdAt));
   }),
 
   // Get a single path with its lessons
-  getPath: publicProcedure
+  getPath: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const [path] = await db
         .select()
         .from(learningPaths)
-        .where(eq(learningPaths.id, input.id));
+        .where(and(eq(learningPaths.id, input.id), eq(learningPaths.userId, ctx.userId)));
       if (!path) return null;
 
       const lessons = await db
@@ -30,7 +31,7 @@ export const learningRouter = router({
     }),
 
   // Create a learning path
-  createPath: publicProcedure
+  createPath: protectedProcedure
     .input(
       z.object({
         title: z.string(),
@@ -38,16 +39,14 @@ export const learningRouter = router({
         category: z.enum(["backend", "database", "devops", "ai", "system-design"]),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const id = crypto.randomUUID();
-      // TODO(task-5): replace with real userId from session
-      const userId = "local-dev";
-      await db.insert(learningPaths).values({ id, userId, ...input });
+      await db.insert(learningPaths).values({ id, userId: ctx.userId, ...input });
       return { id };
     }),
 
   // Seed preset learning paths
-  seedPresets: publicProcedure.mutation(async () => {
+  seedPresets: protectedProcedure.mutation(async ({ ctx }) => {
     const presets = [
       {
         title: "数据库设计与优化",
@@ -76,20 +75,18 @@ export const learningRouter = router({
       },
     ];
 
-    const existing = await db.select().from(learningPaths);
+    const existing = await db.select().from(learningPaths).where(eq(learningPaths.userId, ctx.userId));
     if (existing.length > 0) return { seeded: false, message: "已有学习路径" };
 
-    // TODO(task-5): replace with real userId from session
-    const userId = "local-dev";
     for (const preset of presets) {
       const id = crypto.randomUUID();
-      await db.insert(learningPaths).values({ id, userId, ...preset });
+      await db.insert(learningPaths).values({ id, userId: ctx.userId, ...preset });
     }
     return { seeded: true, count: presets.length };
   }),
 
   // Get a single lesson
-  getLesson: publicProcedure
+  getLesson: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
       const [lesson] = await db
@@ -100,7 +97,7 @@ export const learningRouter = router({
     }),
 
   // Update lesson status
-  completeLesson: publicProcedure
+  completeLesson: protectedProcedure
     .input(z.object({ id: z.string(), pathId: z.string() }))
     .mutation(async ({ input }) => {
       await db
@@ -129,7 +126,7 @@ export const learningRouter = router({
     }),
 
   // Save lesson notes
-  saveLessonNotes: publicProcedure
+  saveLessonNotes: protectedProcedure
     .input(z.object({ id: z.string(), notes: z.string() }))
     .mutation(async ({ input }) => {
       await db

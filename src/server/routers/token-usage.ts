@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   calculateTotalTokens,
@@ -10,7 +10,7 @@ import {
 import { readWorkspaceLocalTokenUsage } from "@/server/token-usage-local";
 import { db } from "../db";
 import { tokenUsageEntries } from "../db/schema";
-import { publicProcedure, router } from "../trpc";
+import { protectedProcedure, router } from "../trpc";
 
 const tokenUsageCreateInput = z
   .object({
@@ -34,10 +34,11 @@ const tokenUsageCreateInput = z
     }
   });
 
-async function getCombinedTokenUsageData() {
+async function getCombinedTokenUsageData(userId: string) {
   const persistedEntries = await db
     .select()
     .from(tokenUsageEntries)
+    .where(eq(tokenUsageEntries.userId, userId))
     .orderBy(desc(tokenUsageEntries.usageAt), desc(tokenUsageEntries.createdAt));
 
   const persistedListEntries: TokenUsageListEntry[] = persistedEntries.map((entry) => ({
@@ -66,12 +67,12 @@ async function getCombinedTokenUsageData() {
 }
 
 export const tokenUsageRouter = router({
-  list: publicProcedure.query(async () => {
-    return getCombinedTokenUsageData();
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return getCombinedTokenUsageData(ctx.userId);
   }),
 
-  overview: publicProcedure.query(async () => {
-    const { entries, localSources } = await getCombinedTokenUsageData();
+  overview: protectedProcedure.query(async ({ ctx }) => {
+    const { entries, localSources } = await getCombinedTokenUsageData(ctx.userId);
 
     return {
       ...summarizeTokenUsageEntries(entries),
@@ -79,9 +80,9 @@ export const tokenUsageRouter = router({
     };
   }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(tokenUsageCreateInput)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const id = crypto.randomUUID();
       const usageAt = input.usageAt ?? new Date();
       const inputTokens = input.inputTokens ?? 0;
@@ -94,11 +95,9 @@ export const tokenUsageRouter = router({
         cachedTokens,
       });
 
-      // TODO(task-5): replace with real userId from session
-      const userId = "local-dev";
       await db.insert(tokenUsageEntries).values({
         id,
-        userId,
+        userId: ctx.userId,
         provider: input.provider,
         model: input.model?.trim() || null,
         totalTokens,
@@ -114,10 +113,10 @@ export const tokenUsageRouter = router({
       return { id, totalTokens };
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
-      await db.delete(tokenUsageEntries).where(eq(tokenUsageEntries.id, input.id));
+    .mutation(async ({ input, ctx }) => {
+      await db.delete(tokenUsageEntries).where(and(eq(tokenUsageEntries.id, input.id), eq(tokenUsageEntries.userId, ctx.userId)));
       return { success: true };
     }),
 });

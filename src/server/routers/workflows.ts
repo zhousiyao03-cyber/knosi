@@ -1,25 +1,26 @@
 import { z } from "zod/v4";
-import { router, publicProcedure } from "../trpc";
+import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
 import { workflows, workflowRuns } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
+import crypto from "crypto";
 
 export const workflowsRouter = router({
-  list: publicProcedure.query(async () => {
-    return db.select().from(workflows).orderBy(desc(workflows.createdAt));
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return db.select().from(workflows).where(eq(workflows.userId, ctx.userId)).orderBy(desc(workflows.createdAt));
   }),
 
-  get: publicProcedure
+  get: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const [workflow] = await db
         .select()
         .from(workflows)
-        .where(eq(workflows.id, input.id));
+        .where(and(eq(workflows.id, input.id), eq(workflows.userId, ctx.userId)));
       return workflow ?? null;
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
         name: z.string(),
@@ -28,15 +29,13 @@ export const workflowsRouter = router({
         edges: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const id = crypto.randomUUID();
-      // TODO(task-5): replace with real userId from session
-      const userId = "local-dev";
-      await db.insert(workflows).values({ id, userId, ...input });
+      await db.insert(workflows).values({ id, userId: ctx.userId, ...input });
       return { id };
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -47,25 +46,25 @@ export const workflowsRouter = router({
         status: z.enum(["draft", "active"]).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
       await db
         .update(workflows)
         .set({ ...data, updatedAt: new Date() })
-        .where(eq(workflows.id, id));
+        .where(and(eq(workflows.id, id), eq(workflows.userId, ctx.userId)));
       return { success: true };
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       await db.delete(workflowRuns).where(eq(workflowRuns.workflowId, input.id));
-      await db.delete(workflows).where(eq(workflows.id, input.id));
+      await db.delete(workflows).where(and(eq(workflows.id, input.id), eq(workflows.userId, ctx.userId)));
       return { success: true };
     }),
 
   // List runs for a workflow
-  listRuns: publicProcedure
+  listRuns: protectedProcedure
     .input(z.object({ workflowId: z.string() }))
     .query(async ({ input }) => {
       return db
@@ -76,8 +75,8 @@ export const workflowsRouter = router({
     }),
 
   // Seed preset workflow templates
-  seedPresets: publicProcedure.mutation(async () => {
-    const existing = await db.select().from(workflows);
+  seedPresets: protectedProcedure.mutation(async ({ ctx }) => {
+    const existing = await db.select().from(workflows).where(eq(workflows.userId, ctx.userId));
     if (existing.length > 0) return { seeded: false, message: "已有工作流" };
 
     const presets = [
@@ -128,11 +127,9 @@ export const workflowsRouter = router({
       },
     ];
 
-    // TODO(task-5): replace with real userId from session
-    const userId = "local-dev";
     for (const preset of presets) {
       const id = crypto.randomUUID();
-      await db.insert(workflows).values({ id, userId, ...preset });
+      await db.insert(workflows).values({ id, userId: ctx.userId, ...preset });
     }
     return { seeded: true, count: presets.length };
   }),
