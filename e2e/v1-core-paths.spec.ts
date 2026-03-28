@@ -7,9 +7,7 @@ test.describe("V1 核心路径 A：笔记 → 搜索", () => {
     await page.goto("/");
     await page.getByRole("button", { name: /搜索/ }).click();
 
-    await expect(
-      page.locator("input[placeholder='搜索笔记、收藏、待办...']")
-    ).toBeVisible();
+    await expect(page.locator("input[placeholder='搜索笔记...']")).toBeVisible();
   });
 
   test("创建笔记并通过 Cmd+K 搜索到", async ({ page }) => {
@@ -31,9 +29,7 @@ test.describe("V1 核心路径 A：笔记 → 搜索", () => {
     await page.goto("/");
     await expect(page.getByRole("button", { name: /搜索/ })).toBeVisible();
     await page.keyboard.press("Meta+k");
-    const searchInput = page.locator(
-      "input[placeholder='搜索笔记、收藏、待办...']"
-    );
+    const searchInput = page.locator("input[placeholder='搜索笔记...']");
     await expect(searchInput).toBeVisible();
     await searchInput.fill(noteTitle);
 
@@ -44,8 +40,8 @@ test.describe("V1 核心路径 A：笔记 → 搜索", () => {
   });
 });
 
-test.describe("V1 核心路径 B：收藏 → 搜索", () => {
-  test("创建收藏并通过 Cmd+K 搜索到", async ({ page }) => {
+test.describe("V1 核心路径 B：收藏页仍可直达使用", () => {
+  test("创建收藏后不会再从 Cmd+K 全局搜索暴露", async ({ page }) => {
     const bmTitle = `v1-bm-${uid()}`;
 
     // Create a bookmark
@@ -57,16 +53,11 @@ test.describe("V1 核心路径 B：收藏 → 搜索", () => {
 
     // Search via Cmd+K
     await page.keyboard.press("Meta+k");
-    const searchInput = page.locator(
-      "input[placeholder='搜索笔记、收藏、待办...']"
-    );
+    const searchInput = page.locator("input[placeholder='搜索笔记...']");
     await expect(searchInput).toBeVisible();
     await searchInput.fill(bmTitle);
 
-    // Should find the bookmark
-    await expect(page.getByText(bmTitle).last()).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByText("没有找到结果")).toBeVisible({ timeout: 5000 });
   });
 });
 

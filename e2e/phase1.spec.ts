@@ -6,25 +6,43 @@ test.describe("Phase 1: 项目骨架 + 基础布局", () => {
     await expect(page.locator("main h1")).toContainText("首页");
   });
 
-  test("侧边栏包含所有导航项", async ({ page }) => {
+  test("未开放的导航项默认隐藏", async ({ page }) => {
     await page.goto("/");
     const sidebar = page.locator("aside");
 
     await expect(sidebar.getByText("Second Brain")).toBeVisible();
     await expect(sidebar.getByText("首页")).toBeVisible();
     await expect(sidebar.getByText("笔记")).toBeVisible();
-    await expect(sidebar.getByText("收藏")).toBeVisible();
-    await expect(sidebar.getByText("Todo")).toBeVisible();
-    await expect(sidebar.getByText("AI 探索")).toBeVisible();
     await expect(sidebar.getByText("Ask AI")).toBeVisible();
+    await expect(sidebar.getByText("收藏")).toHaveCount(0);
+    await expect(sidebar.getByText("Todo")).toHaveCount(0);
+    await expect(sidebar.getByText("AI 探索")).toHaveCount(0);
+  });
+
+  test("移动端菜单里也不会显示未开放的导航项", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "打开菜单" }).click();
+
+    const mobileNav = page.locator("nav").filter({ hasText: "首页" }).last();
+    await expect(mobileNav.getByText("首页")).toBeVisible();
+    await expect(mobileNav.getByText("笔记")).toBeVisible();
+    await expect(mobileNav.getByText("Ask AI")).toBeVisible();
+    await expect(mobileNav.getByText("收藏")).toHaveCount(0);
+    await expect(mobileNav.getByText("Todo")).toHaveCount(0);
+    await expect(mobileNav.getByText("AI 探索")).toHaveCount(0);
+  });
+
+  test("首页不显示未开放模块的入口卡片或快捷链接", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.locator("a[href='/todos']")).toHaveCount(0);
+    await expect(page.locator("main")).not.toContainText("今日任务");
   });
 
   test.describe("侧边栏导航跳转", () => {
     const routes = [
       { label: "笔记", path: "/notes", heading: "笔记" },
-      { label: "收藏", path: "/bookmarks", heading: "收藏" },
-      { label: "Todo", path: "/todos", heading: "Todo" },
-      { label: "AI 探索", path: "/explore", heading: "AI 探索" },
       { label: "Ask AI", path: "/ask", heading: "Ask AI" },
     ];
 

@@ -1,12 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Activity,
-  ArrowRight,
-  CheckSquare,
-  FileText,
-} from "lucide-react";
+import { Activity, ArrowRight, FileText } from "lucide-react";
 import {
   formatCompactTokenCount,
   formatTokenCount,
@@ -24,13 +19,6 @@ const statCardMeta = [
     icon: FileText,
     color: "text-blue-600 bg-blue-50 dark:text-blue-300 dark:bg-blue-950/50",
   },
-  {
-    id: "todos" as const,
-    label: "待办",
-    href: "/todos",
-    icon: CheckSquare,
-    color: "text-green-600 bg-green-50 dark:text-green-300 dark:bg-green-950/50",
-  },
 ];
 
 const enableTokenUsage = process.env.NEXT_PUBLIC_ENABLE_TOKEN_USAGE === "true";
@@ -47,20 +35,12 @@ export default function DashboardPage() {
     }
   );
 
-  const formatTodayTime = (date: Date | null) => {
-    if (!date) return "";
-    return new Date(date).toLocaleTimeString("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">首页</h1>
         <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
-          知识库、任务和 AI token 消耗都会汇总在这里，方便快速扫一眼当前工作状态。
+          知识库和 AI token 消耗会汇总在这里，方便快速扫一眼当前工作状态。
         </p>
       </div>
 
@@ -141,71 +121,6 @@ export default function DashboardPage() {
                       : ""}
                   </div>
                 </Link>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              今日任务
-              {data && data.todayTodos.length > 0 && (
-                <span className="ml-1 text-amber-600">({data.todayTodos.length} 项)</span>
-              )}
-            </h2>
-            <Link
-              href="/todos"
-              className="flex items-center gap-0.5 text-xs text-blue-600 hover:text-blue-700"
-            >
-              查看全部 <ArrowRight size={12} />
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {isLoading ? (
-              <p className="text-xs text-gray-400">加载中...</p>
-            ) : data?.todayTodos.length === 0 ? (
-              <div className="rounded-[18px] border border-dashed border-stone-200 px-3 py-4 text-xs text-stone-400 dark:border-stone-800">
-                今天还没有安排任务
-                {data && data.pendingTodos.length > 0 ? `，当前还有 ${data.pendingTodos.length} 个待办可安排。` : "。"}
-              </div>
-            ) : (
-              data?.todayTodos.map((todo) => (
-                <div
-                  key={todo.id}
-                  className="flex items-center gap-2 rounded-[18px] border border-stone-200 bg-white/80 p-3 dark:border-stone-800 dark:bg-stone-950/55"
-                >
-                  <CheckSquare
-                    size={14}
-                    className={
-                      todo.status === "in_progress"
-                        ? "shrink-0 text-blue-500"
-                        : "shrink-0 text-gray-300"
-                    }
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm text-gray-900 dark:text-gray-100">
-                      {todo.title}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                      {todo.dueDate && (
-                        <span className="text-amber-600 dark:text-amber-300">
-                          {formatTodayTime(todo.dueDate)}
-                        </span>
-                      )}
-                      {todo.status === "in_progress" && (
-                        <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
-                          进行中
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {todo.priority === "high" && (
-                    <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-600 dark:bg-red-950/50 dark:text-red-300">
-                      高
-                    </span>
-                  )}
-                </div>
               ))
             )}
           </div>

@@ -1,45 +1,21 @@
 import { test, expect } from "@playwright/test";
 
-const uid = () => Math.random().toString(36).slice(2, 8);
-
 test.describe("Phase 6: 首页仪表盘", () => {
   test("仪表盘加载成功", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("main h1")).toContainText("首页");
   });
 
-  test("显示统计卡片", async ({ page }) => {
+  test("显示仍开放模块的统计卡片", async ({ page }) => {
     await page.goto("/");
-    // Check stat cards exist in main area
     await expect(page.locator("main").getByText("笔记").first()).toBeVisible();
-    await expect(page.locator("main").getByText("待办").first()).toBeVisible();
+    await expect(page.locator("a[href='/todos']")).toHaveCount(0);
   });
 
-  test("显示最近笔记和今日任务区块", async ({ page }) => {
+  test("首页只显示最近笔记，不显示今日任务区块", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("最近笔记")).toBeVisible();
-    await expect(page.getByText("今日任务")).toBeVisible();
-  });
-
-  test("首页可以看到当天任务列表", async ({ page }) => {
-    const name = `home-today-${uid()}`;
-    const today = new Date();
-    const todayInput = new Date(
-      today.getTime() - today.getTimezoneOffset() * 60_000
-    )
-      .toISOString()
-      .slice(0, 10);
-
-    await page.goto("/todos");
-    await page.getByLabel("Todo 标题").fill(name);
-    await page.getByRole("button", { name: "更多字段" }).click();
-    await page.getByLabel("Todo 截止时间").fill(todayInput);
-    await page.getByRole("button", { name: "添加" }).click();
-    await expect(page.getByText(name).first()).toBeVisible();
-
-    await page.goto("/");
-    await expect(page.getByText("今日任务")).toBeVisible();
-    await expect(page.locator("main").getByText(name).first()).toBeVisible();
+    await expect(page.getByText("今日任务")).toHaveCount(0);
   });
 
   test("统计卡片链接跳转", async ({ page }) => {
@@ -54,21 +30,15 @@ test.describe("Phase 6: 全局搜索", () => {
   test("Cmd+K 打开搜索面板", async ({ page }) => {
     await page.goto("/");
     await page.keyboard.press("Meta+k");
-    await expect(
-      page.locator("input[placeholder='搜索笔记、收藏、待办...']")
-    ).toBeVisible();
+    await expect(page.locator("input[placeholder='搜索笔记...']")).toBeVisible();
   });
 
   test("ESC 关闭搜索面板", async ({ page }) => {
     await page.goto("/");
     await page.keyboard.press("Meta+k");
-    await expect(
-      page.locator("input[placeholder='搜索笔记、收藏、待办...']")
-    ).toBeVisible();
+    await expect(page.locator("input[placeholder='搜索笔记...']")).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(
-      page.locator("input[placeholder='搜索笔记、收藏、待办...']")
-    ).not.toBeVisible();
+    await expect(page.locator("input[placeholder='搜索笔记...']")).not.toBeVisible();
   });
 
   test("搜索空状态提示", async ({ page }) => {
@@ -80,7 +50,7 @@ test.describe("Phase 6: 全局搜索", () => {
   test("搜索无结果提示", async ({ page }) => {
     await page.goto("/");
     await page.keyboard.press("Meta+k");
-    const input = page.locator("input[placeholder='搜索笔记、收藏、待办...']");
+    const input = page.locator("input[placeholder='搜索笔记...']");
     await input.fill("zzzznonexistent999");
     await expect(page.getByText("没有找到结果")).toBeVisible({ timeout: 5000 });
   });

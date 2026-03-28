@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { LogOut, Menu, Moon, Search, Settings, Sun, X } from "lucide-react";
 import { logout } from "@/app/(app)/actions";
 import { cn } from "@/lib/utils";
+import { AppBrand } from "./app-brand";
 import { navigationItems } from "./navigation";
 
 function useDarkModeState() {
@@ -49,9 +50,7 @@ export function MobileNav() {
           <Menu className="h-5 w-5" />
         </button>
 
-        <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
-          Second Brain
-        </div>
+        <AppBrand compact className="gap-2" />
 
         <button
           type="button"
@@ -74,14 +73,7 @@ export function MobileNav() {
 
           <div className="absolute inset-y-0 left-0 flex w-[84vw] max-w-sm flex-col border-r border-stone-200 bg-stone-50 px-4 py-4 shadow-2xl dark:border-stone-800 dark:bg-stone-950">
             <div className="mb-4 flex items-center justify-between">
-              <div>
-                <div className="text-base font-semibold text-stone-900 dark:text-stone-100">
-                  Second Brain
-                </div>
-                <div className="text-xs text-stone-500 dark:text-stone-400">
-                  Personal workspace
-                </div>
-              </div>
+              <AppBrand />
 
               <button
                 type="button"

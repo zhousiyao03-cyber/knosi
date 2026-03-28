@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { LogOut, Moon, Search, Settings, Sun } from "lucide-react";
 import { logout } from "@/app/(app)/actions";
+import { AppBrand } from "./app-brand";
 import { navigationItems } from "./navigation";
 
 export function Sidebar() {
@@ -34,18 +35,8 @@ export function Sidebar() {
   return (
     <aside className="hidden h-full w-64 shrink-0 border-r border-stone-200/80 bg-stone-50/92 px-3 py-3 md:flex md:flex-col dark:border-stone-800 dark:bg-stone-950/88">
       <div className="rounded-[20px] px-2 pb-4">
-        <div className="flex items-center gap-3 rounded-[18px] px-2 py-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-200 text-sm font-semibold text-stone-700 dark:bg-stone-800 dark:text-stone-200">
-            S
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-stone-900 dark:text-stone-100">
-              Second Brain
-            </div>
-            <div className="truncate text-xs text-stone-500 dark:text-stone-400">
-              Personal workspace
-            </div>
-          </div>
+        <div className="rounded-[18px] px-2 py-2">
+          <AppBrand />
         </div>
       </div>
 

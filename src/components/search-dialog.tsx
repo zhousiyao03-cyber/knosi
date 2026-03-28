@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc";
-import { Search, FileText, Bookmark, CheckSquare, X } from "lucide-react";
+import { Search, FileText, X } from "lucide-react";
 
 function HighlightText({ text, query }: { text: string; query: string }) {
   if (!query.trim()) return <>{text}</>;
@@ -84,20 +84,6 @@ export function SearchDialog() {
       href: `/notes/${n.id}`,
       icon: FileText,
     })) ?? []),
-    ...(data?.bookmarks.map((b) => ({
-      id: b.id,
-      title: b.title ?? b.url ?? "无标题",
-      type: "bookmark" as const,
-      href: "/bookmarks",
-      icon: Bookmark,
-    })) ?? []),
-    ...(data?.todos.map((t) => ({
-      id: t.id,
-      title: t.title,
-      type: "todo" as const,
-      href: "/todos",
-      icon: CheckSquare,
-    })) ?? []),
   ];
 
   if (!open) return null;
@@ -120,7 +106,7 @@ export function SearchDialog() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索笔记、收藏、待办..."
+              placeholder="搜索笔记..."
               className="flex-1 bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400 dark:text-stone-100 dark:placeholder:text-stone-500"
               autoFocus
             />
@@ -155,11 +141,7 @@ export function SearchDialog() {
                       <HighlightText text={item.title} query={query} />
                     </span>
                     <span className="text-xs text-stone-400">
-                      {item.type === "note"
-                        ? "笔记"
-                        : item.type === "bookmark"
-                          ? "收藏"
-                          : "待办"}
+                      笔记
                     </span>
                   </button>
                 ))}

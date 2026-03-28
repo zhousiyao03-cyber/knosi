@@ -6,14 +6,13 @@
 
 - **认证** — Auth.js v5 + GitHub / Google OAuth + 邮箱密码注册 / 登录，支持在账号设置页修改昵称、邮箱和本地密码，多用户数据完全隔离
 - **笔记** — Notion 风格块编辑器，支持通栏 280px 头图与内置背景图库、轻量类型/标签 metadata 行、行级悬浮插入、324 × 385 分区插入面板、块菜单（上移/下移/复制/删除/转为）、Slash 命令、Todo/列表、Callout / Toggle、图片上传/拖拽/粘贴、自动保存，以及一键新建带日期标题与 Todo 模版的日记
-- **收藏** — URL 收藏自动抓取正文（Readability），AI 生成摘要和标签
-- **搜索** — Cmd+K 全局搜索笔记、收藏、待办，关键词高亮
+- **搜索** — Cmd+K 全局搜索笔记，关键词高亮
 - **Ask AI** — 基于知识库的 chunk 级 hybrid RAG 问答，支持语义检索、关键词召回、邻近段落扩展和可点击引用来源
 - **Token Usage** — 自动读取本机里的 Codex / Claude Code 本地 session（含 Claude subagents，跨工作区聚合），用于展示真实 token 用量；也支持手动补录 OpenAI API / 其他来源，统一在 Dashboard 和独立页面聚合（线上环境默认禁用，本地开发可开启）
 - **Dashboard** — 统计概览 + 最近条目 + token usage 聚合概览
 - **暗色模式** — 全局可切换
 
-冻结模块（保留但不活跃开发）：Todo、AI 探索
+冻结模块（保留代码但默认隐藏入口）：收藏、Todo、AI 探索
 
 ## 技术栈
 
