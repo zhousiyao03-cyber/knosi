@@ -6,5 +6,6 @@ export default defineConfig({
   dialect: "sqlite",
   dbCredentials: {
     url: process.env.TURSO_DATABASE_URL ?? "file:data/second-brain.db",
+    authToken: process.env.TURSO_AUTH_TOKEN,
   },
 });
