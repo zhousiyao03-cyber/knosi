@@ -11,11 +11,13 @@ import {
   Compass,
   FileText,
   LayoutDashboard,
+  LogOut,
   MessageCircle,
   Moon,
   Search,
   Sun,
 } from "lucide-react";
+import { signOut } from "next-auth/react";
 
 const navItems = [
   { href: "/", label: "首页", icon: LayoutDashboard },
@@ -117,6 +119,13 @@ export function Sidebar() {
         >
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           {dark ? "浅色模式" : "深色模式"}
+        </button>
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-stone-600 transition-colors hover:bg-white/80 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+        >
+          <LogOut className="h-4 w-4" />
+          登出
         </button>
       </div>
     </aside>
