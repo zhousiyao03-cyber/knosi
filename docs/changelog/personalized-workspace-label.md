@@ -1,0 +1,22 @@
+# 2026-03-28 Personalized Workspace Label
+
+- date: 2026-03-28
+- task / goal: 提升账号参与感，让导航里的 Workspace 文案带上当前用户身份。
+- key changes:
+  - 桌面侧栏的 `Workspace` 标题改为基于当前登录用户生成的个性化文案。
+  - 移动端菜单顶部在品牌下方补充同样的个性化 `Workspace` 标签。
+  - 文案优先使用用户昵称；若没有昵称，则退回邮箱前缀；都没有时再显示默认 `工作区`。
+  - 个性化格式统一为中文：`X 的工作区`。
+  - 左上角品牌副标题从英文 `Personal workspace` 改为中文 `你的工作区`。
+- files touched:
+  - `src/components/layout/sidebar.tsx`
+  - `src/components/layout/mobile-nav.tsx`
+  - `src/components/layout/app-brand.tsx`
+  - `src/components/layout/workspace-label.ts`
+  - `src/app/(app)/layout.tsx`
+  - `docs/changelog/personalized-workspace-label.md`
+- verification commands and results:
+  - `pnpm lint` -> 通过。
+  - 无头浏览器真实登录本地 TEST 账号后检查桌面 / 移动端导航文案 -> 通过，桌面和移动端菜单都显示个性化 `TEST 的工作区` 标签，品牌副标题不再出现 `Personal workspace`。
+- remaining risks or follow-up items:
+  - 当前只在导航层增加参与感；如果后续还想增强个性化，可以再补首页欢迎语或空状态文案。

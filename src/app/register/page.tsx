@@ -5,9 +5,9 @@ import { AppBrand } from "@/components/layout/app-brand";
 import { registerWithCredentials } from "./actions";
 
 const errorMessages: Record<string, string> = {
-  invalid: "请检查输入项后重试",
-  "password-mismatch": "两次输入的密码不一致",
-  "email-exists": "该邮箱已注册，请直接登录",
+  invalid: "Check your inputs and try again.",
+  "password-mismatch": "Passwords do not match.",
+  "email-exists": "This email is already registered. Sign in instead.",
 };
 
 export default async function RegisterPage({
@@ -32,10 +32,10 @@ export default async function RegisterPage({
             <AppBrand compact />
           </div>
           <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
-            创建 Second Brain 账号
+            Create your Second Brain account
           </h1>
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-            先注册，再直接进入你的知识库
+            Create an account and jump straight into your workspace
           </p>
         </div>
 
@@ -45,7 +45,7 @@ export default async function RegisterPage({
               htmlFor="name"
               className="text-sm font-medium text-stone-700 dark:text-stone-200"
             >
-              昵称
+              Name
             </label>
             <input
               id="name"
@@ -60,7 +60,7 @@ export default async function RegisterPage({
               htmlFor="email"
               className="text-sm font-medium text-stone-700 dark:text-stone-200"
             >
-              邮箱
+              Email
             </label>
             <input
               id="email"
@@ -76,7 +76,7 @@ export default async function RegisterPage({
               htmlFor="password"
               className="text-sm font-medium text-stone-700 dark:text-stone-200"
             >
-              密码
+              Password
             </label>
             <input
               id="password"
@@ -93,7 +93,7 @@ export default async function RegisterPage({
               htmlFor="confirmPassword"
               className="text-sm font-medium text-stone-700 dark:text-stone-200"
             >
-              确认密码
+              Confirm password
             </label>
             <input
               id="confirmPassword"
@@ -118,14 +118,14 @@ export default async function RegisterPage({
             type="submit"
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:border-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
           >
-            创建账号
+            Create account
           </button>
         </form>
 
         <div className="space-y-3">
           <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500">
             <div className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
-            或者
+            Or
             <div className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
           </div>
 
@@ -139,7 +139,7 @@ export default async function RegisterPage({
               type="submit"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-stone-900"
             >
-              使用 GitHub 继续
+              Continue with GitHub
             </button>
           </form>
 
@@ -153,18 +153,18 @@ export default async function RegisterPage({
               type="submit"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-stone-900"
             >
-              使用 Google 继续
+              Continue with Google
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-stone-500 dark:text-stone-400">
-          已有账号？
+          Already have an account?
           <Link
             href="/login"
             className="ml-1 font-medium text-stone-900 underline-offset-4 hover:underline dark:text-stone-100"
           >
-            去登录
+            Sign in
           </Link>
         </p>
       </div>

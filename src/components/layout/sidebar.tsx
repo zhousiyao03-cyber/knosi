@@ -9,7 +9,7 @@ import { logout } from "@/app/(app)/actions";
 import { AppBrand } from "./app-brand";
 import { navigationItems } from "./navigation";
 
-export function Sidebar() {
+export function Sidebar({ workspaceLabel = "Workspace" }: { workspaceLabel?: string }) {
   const pathname = usePathname();
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -46,14 +46,14 @@ export function Sidebar() {
         className="mb-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-stone-500 transition-colors hover:bg-white/80 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
       >
         <Search className="h-4 w-4" />
-        搜索
+        Search
         <span className="ml-auto rounded-md border border-stone-200 px-1.5 py-0.5 text-[11px] text-stone-400 dark:border-stone-700 dark:text-stone-500">
           Cmd K
         </span>
       </button>
 
       <div className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-stone-400 dark:text-stone-500">
-        Workspace
+        {workspaceLabel}
       </div>
 
       <nav className="flex-1 space-y-1">
@@ -88,14 +88,14 @@ export function Sidebar() {
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-stone-600 transition-colors hover:bg-white/80 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
         >
           <Settings className="h-4 w-4" />
-          账号设置
+          Account settings
         </Link>
         <button
           onClick={toggleDark}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-stone-600 transition-colors hover:bg-white/80 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
         >
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          {dark ? "浅色模式" : "深色模式"}
+          {dark ? "Light mode" : "Dark mode"}
         </button>
         <form action={logout}>
           <button
@@ -103,7 +103,7 @@ export function Sidebar() {
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-stone-600 transition-colors hover:bg-white/80 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
           >
             <LogOut className="h-4 w-4" />
-            登出
+            Sign out
           </button>
         </form>
       </div>

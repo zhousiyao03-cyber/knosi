@@ -68,7 +68,7 @@ function CoverPicker({
       )}
     >
       <div className="mb-3 px-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-400 dark:text-stone-500">
-        内置背景
+        Built-in covers
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
@@ -289,22 +289,22 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
           className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
         >
           <ArrowLeft size={16} />
-          返回笔记
+          Back to notes
         </button>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
           {lastEditedAt && (
             <span className="rounded-full border border-stone-200 bg-white/80 px-3 py-1 text-xs text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400">
-              编辑于 {formatDate(lastEditedAt)}
+              Edited {formatDate(lastEditedAt)}
             </span>
           )}
           <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white/80 px-3 py-1 text-xs text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400">
             <span className={cn("h-2 w-2 rounded-full", statusDot[saveStatus])} />
             {saveStatus === "saved"
-              ? "已保存"
+              ? "Saved"
               : saveStatus === "saving"
-                ? "保存中..."
-                : "正在编辑"}
+                ? "Saving..."
+                : "Editing"}
           </span>
         </div>
       </div>
@@ -316,7 +316,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
         >
           <Image
             src={coverSource ?? coverOption?.src ?? ""}
-            alt={coverOption?.label ?? "笔记封面"}
+            alt={coverOption?.label ?? "Note cover"}
             fill
             unoptimized
             priority
@@ -345,7 +345,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
                   className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/92 px-3.5 py-1.5 text-sm font-medium text-stone-700 shadow-sm backdrop-blur transition-colors hover:bg-white dark:border-stone-700 dark:bg-stone-950/88 dark:text-stone-200 dark:hover:bg-stone-950"
                 >
                   <ImagePlus size={14} />
-                  更改封面
+                  Change cover
                 </button>
 
                 <button
@@ -358,7 +358,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
                   className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/92 px-3.5 py-1.5 text-sm font-medium text-stone-700 shadow-sm backdrop-blur transition-colors hover:bg-white dark:border-stone-700 dark:bg-stone-950/88 dark:text-stone-200 dark:hover:bg-stone-950"
                 >
                   <X size={14} />
-                  移除封面
+                  Remove cover
                 </button>
               </div>
 
@@ -393,7 +393,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
                 className="inline-flex items-center gap-2 rounded-full px-2 py-1 text-sm text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 dark:text-stone-500 dark:hover:bg-stone-900 dark:hover:text-stone-200"
               >
                 <ImagePlus size={14} />
-                添加封面
+                Add cover
               </button>
 
               {isCoverPickerOpen && (
@@ -445,7 +445,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
                   type="button"
                   onClick={() => handleRemoveTag(tag)}
                   className="rounded-full px-1 text-blue-500 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/70 dark:hover:text-blue-100"
-                  aria-label={`移除标签 ${tag}`}
+                  aria-label={`Remove tag ${tag}`}
                 >
                   ×
                 </button>
@@ -465,7 +465,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
               onBlur={() => {
                 if (tagInput.trim()) handleAddTag();
               }}
-              placeholder="添加标签..."
+              placeholder="Add tag..."
               className="min-w-28 rounded-full border border-dashed border-stone-200 bg-transparent px-3 py-1 text-sm text-stone-600 outline-none transition-colors placeholder:text-stone-400 focus:border-stone-300 dark:border-stone-700 dark:text-stone-300 dark:placeholder:text-stone-500 dark:focus:border-stone-600"
             />
           </div>
@@ -484,7 +484,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
             value={title}
             onChange={(event) => handleTitleChange(event.target.value)}
             onKeyDown={handleTitleKeyDown}
-            placeholder="新页面"
+            placeholder="New page"
             rows={1}
             className="w-full resize-none border-none bg-transparent text-[3.15rem] font-semibold leading-[1.04] text-stone-900 outline-none placeholder:text-stone-300 dark:text-stone-100 dark:placeholder:text-stone-600 md:text-[3.5rem]"
             style={{ overflow: "hidden" }}
@@ -528,12 +528,12 @@ export default function NoteEditPage({
   if (!note) {
     return (
       <div className="py-12 text-center">
-        <p className="text-stone-500 dark:text-stone-400">笔记不存在</p>
+        <p className="text-stone-500 dark:text-stone-400">Note not found</p>
         <button
           onClick={() => router.push("/notes")}
           className="mt-4 text-blue-600 hover:underline"
         >
-          返回笔记列表
+          Back to notes
         </button>
       </div>
     );

@@ -6,9 +6,9 @@ export function formatJournalTitle(date = new Date()) {
   }).format(date);
 }
 
-const TODAY_TODO_HEADING = "今天的 todo";
-const REVIEW_HEADING = "今日的复盘";
-const TOMORROW_PLAN_HEADING = "明日计划";
+const TODAY_TODO_HEADING = "Today's todo";
+const REVIEW_HEADING = "Today's review";
+const TOMORROW_PLAN_HEADING = "Tomorrow's plan";
 
 type JournalDocNode = {
   type?: string;

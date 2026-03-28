@@ -20,9 +20,9 @@ export const NOTE_ICON_OPTIONS = [
 ] as const;
 
 export const NOTE_TYPE_LABELS = {
-  note: "笔记",
-  journal: "日报",
-  summary: "总结",
+  note: "Note",
+  journal: "Daily note",
+  summary: "Summary",
 } as const;
 
 export interface NoteCoverOption {
@@ -34,27 +34,27 @@ export interface NoteCoverOption {
 export const NOTE_COVER_OPTIONS: NoteCoverOption[] = [
   {
     id: "amber",
-    label: "暖厅",
+    label: "Sunroom",
     src: "/covers/amber-window.svg",
   },
   {
     id: "sage",
-    label: "庭院",
+    label: "Courtyard",
     src: "/covers/sage-garden.svg",
   },
   {
     id: "sky",
-    label: "潮汐",
+    label: "Tide",
     src: "/covers/sky-tide.svg",
   },
   {
     id: "plum",
-    label: "幕间",
+    label: "Interlude",
     src: "/covers/plum-stage.svg",
   },
   {
     id: "graphite",
-    label: "画室",
+    label: "Studio",
     src: "/covers/graphite-paper.svg",
   },
 ];

@@ -9,8 +9,8 @@ import {
 import { loginWithCredentials } from "./actions";
 
 const errorMessages: Record<string, string> = {
-  invalid: "请输入正确的邮箱和密码",
-  credentials: "邮箱或密码错误",
+  invalid: "Enter a valid email and password.",
+  credentials: "Incorrect email or password.",
 };
 
 export default async function LoginPage({
@@ -41,15 +41,15 @@ export default async function LoginPage({
             Second Brain
           </h1>
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-            登录以访问你的知识库
+            Sign in to access your knowledge base
           </p>
         </div>
 
         {showDevTestAccount ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/80 dark:bg-amber-950/40 dark:text-amber-100">
-            <div className="font-medium">开发环境 TEST 账号</div>
-            <div className="mt-1">邮箱：{DEV_TEST_ACCOUNT.email}</div>
-            <div>密码：{DEV_TEST_ACCOUNT.password}</div>
+            <div className="font-medium">Development TEST account</div>
+            <div className="mt-1">Email: {DEV_TEST_ACCOUNT.email}</div>
+            <div>Password: {DEV_TEST_ACCOUNT.password}</div>
           </div>
         ) : null}
 
@@ -59,7 +59,7 @@ export default async function LoginPage({
               htmlFor="email"
               className="text-sm font-medium text-stone-700 dark:text-stone-200"
             >
-              邮箱
+              Email
             </label>
             <input
               id="email"
@@ -75,7 +75,7 @@ export default async function LoginPage({
               htmlFor="password"
               className="text-sm font-medium text-stone-700 dark:text-stone-200"
             >
-              密码
+              Password
             </label>
             <input
               id="password"
@@ -100,13 +100,13 @@ export default async function LoginPage({
             type="submit"
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:border-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
           >
-            使用邮箱登录
+            Sign in with email
           </button>
         </form>
 
         <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500">
           <div className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
-          或者
+          Or
           <div className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
         </div>
 
@@ -121,7 +121,7 @@ export default async function LoginPage({
               type="submit"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:border-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
             >
-              使用 GitHub 登录
+              Continue with GitHub
             </button>
           </form>
 
@@ -135,18 +135,18 @@ export default async function LoginPage({
               type="submit"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-200 dark:hover:bg-stone-700"
             >
-              使用 Google 登录
+              Continue with Google
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-stone-500 dark:text-stone-400">
-          没有账号？
+          No account?
           <Link
             href="/register"
             className="ml-1 font-medium text-stone-900 underline-offset-4 hover:underline dark:text-stone-100"
           >
-            去注册
+            Create one
           </Link>
         </p>
       </div>

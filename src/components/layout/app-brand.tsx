@@ -21,7 +21,7 @@ export function AppBrand({ compact = false, className }: AppBrandProps) {
             Second Brain
           </div>
           <div className="truncate text-xs text-stone-500 dark:text-stone-400">
-            Personal workspace
+            Your workspace
           </div>
         </div>
       )}

@@ -106,7 +106,7 @@ export function SearchDialog() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索笔记..."
+              placeholder="Search notes..."
               className="flex-1 bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400 dark:text-stone-100 dark:placeholder:text-stone-500"
               autoFocus
             />
@@ -122,11 +122,11 @@ export function SearchDialog() {
           <div className="max-h-80 overflow-auto">
             {query.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-stone-400">
-                输入关键词搜索
+                Start typing to search
               </div>
             ) : allResults.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-stone-400">
-                没有找到结果
+                No results found
               </div>
             ) : (
               <div className="py-2">
@@ -141,7 +141,7 @@ export function SearchDialog() {
                       <HighlightText text={item.title} query={query} />
                     </span>
                     <span className="text-xs text-stone-400">
-                      笔记
+                      Note
                     </span>
                   </button>
                 ))}
@@ -155,13 +155,13 @@ export function SearchDialog() {
               <kbd className="rounded bg-stone-100 px-1.5 py-0.5 text-stone-500 dark:bg-stone-900 dark:text-stone-400">
                 ⌘K
               </kbd>{" "}
-              打开搜索
+              Open search
             </span>
             <span>
               <kbd className="rounded bg-stone-100 px-1.5 py-0.5 text-stone-500 dark:bg-stone-900 dark:text-stone-400">
                 ESC
               </kbd>{" "}
-              关闭
+              Close
             </span>
           </div>
         </div>

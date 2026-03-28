@@ -20,23 +20,18 @@ export const ASK_AI_SCOPE_OPTIONS: Array<{
 }> = [
   {
     value: "all",
-    label: "全部来源",
-    description: "同时搜索笔记和收藏，适合开放式提问。",
+    label: "All sources",
+    description: "Search notes and bookmarks together for broader questions.",
   },
   {
     value: "notes",
-    label: "只看笔记",
-    description: "更适合总结思考、会议记录和长文笔记。",
-  },
-  {
-    value: "bookmarks",
-    label: "只看收藏",
-    description: "更适合回顾链接、资料和摘录内容。",
+    label: "Notes only",
+    description: "Best for summaries, meeting notes, and longer writing.",
   },
   {
     value: "direct",
-    label: "直接回答",
-    description: "不搜索知识库，像普通聊天助手一样回答。",
+    label: "Direct answer",
+    description: "Skip the knowledge base and answer like a standard assistant.",
   },
 ];
 

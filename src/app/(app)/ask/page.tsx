@@ -33,21 +33,21 @@ const QUICK_PROMPTS: Array<{
   scope: AskAiSourceScope;
 }> = [
   {
-    title: "总结最近笔记",
-    hint: "把最近写下来的内容压缩成重点。",
-    prompt: "帮我总结一下最近的笔记",
+    title: "Summarize recent notes",
+    hint: "Compress what you wrote recently into the key takeaways.",
+    prompt: "Summarize my recent notes",
     scope: "notes",
   },
   {
-    title: "回顾最近收藏",
-    hint: "看看这段时间收进来的资料有什么价值。",
-    prompt: "最近收藏里有什么值得回顾的内容？",
+    title: "Review recent bookmarks",
+    hint: "See what is worth revisiting from the materials you saved.",
+    prompt: "What is worth revisiting from my recent bookmarks?",
     scope: "bookmarks",
   },
   {
-    title: "梳理当前项目",
-    hint: "从现有知识库里提炼项目共识。",
-    prompt: "这个项目目前的技术栈是什么？",
+    title: "Map the current project",
+    hint: "Pull out the current project consensus from your knowledge base.",
+    prompt: "What is the current tech stack of this project?",
     scope: "all",
   },
 ];
@@ -89,7 +89,7 @@ function buildNoteDocument(
     {
       type: "heading",
       attrs: { level: 2 },
-      content: [{ type: "text", text: "问题" }],
+      content: [{ type: "text", text: "Question" }],
     },
     {
       type: "paragraph",
@@ -98,7 +98,7 @@ function buildNoteDocument(
     {
       type: "heading",
       attrs: { level: 2 },
-      content: [{ type: "text", text: "回答" }],
+      content: [{ type: "text", text: "Answer" }],
     },
     ...answer
       .split(/\n+/)
@@ -114,7 +114,7 @@ function buildNoteDocument(
     blocks.push({
       type: "heading",
       attrs: { level: 3 },
-      content: [{ type: "text", text: "引用来源" }],
+      content: [{ type: "text", text: "Sources" }],
     });
 
     for (const source of sources) {
@@ -129,7 +129,7 @@ function buildNoteDocument(
                 content: [
                   {
                     type: "text",
-                    text: `${source.type === "note" ? "笔记" : "收藏"}：${
+                    text: `${source.type === "note" ? "Note" : "Bookmark"}: ${
                       source.title
                     }`,
                   },
@@ -155,15 +155,15 @@ function buildSavedPlainText(
 ) {
   const sourceLines =
     sources.length > 0
-      ? `\n\n引用来源：\n${sources
+      ? `\n\nSources:\n${sources
           .map(
             (source) =>
-              `- ${source.type === "note" ? "笔记" : "收藏"}：${source.title}`
+              `- ${source.type === "note" ? "Note" : "Bookmark"}: ${source.title}`
           )
           .join("\n")}`
       : "";
 
-  return `问题：${question}\n\n回答：\n${answer}${sourceLines}`;
+  return `Question: ${question}\n\nAnswer:\n${answer}${sourceLines}`;
 }
 
 function ScopeChip({
@@ -284,11 +284,11 @@ export default function AskPage() {
   const createNote = trpc.notes.create.useMutation({
     onSuccess: (data) => {
       utils.notes.list.invalidate();
-      toast("已保存为笔记", "success");
+      toast("Saved as note", "success");
       router.push(`/notes/${data.id}`);
     },
     onError: () => {
-      toast("保存笔记失败", "error");
+      toast("Failed to save note", "error");
     },
   });
 
@@ -360,7 +360,7 @@ export default function AskPage() {
   const handleSaveAnswer = () => {
     if (!lastQuestion || !latestAnswer.cleanText.trim()) return;
 
-    const title = `AI 问答：${truncateText(lastQuestion, 24)}`;
+    const title = `AI Q&A: ${truncateText(lastQuestion, 24)}`;
     createNote.mutate({
       title,
       content: buildNoteDocument(
@@ -395,10 +395,10 @@ export default function AskPage() {
               </div>
 
               <h2 className="mt-8 text-[clamp(2rem,4vw,3.25rem)] font-semibold tracking-tight text-stone-900 dark:text-stone-100">
-                今天想处理什么？
+                What do you want to work on today?
               </h2>
               <p className="mt-4 max-w-2xl text-base leading-8 text-stone-500 dark:text-stone-400">
-                先决定从哪里找，再让回答、来源和沉淀动作自然接起来。
+                Choose where to look first, then let answers, sources, and follow-up actions connect naturally.
               </p>
             </section>
           ) : (
@@ -433,7 +433,7 @@ export default function AskPage() {
                       </div>
 
                       <div className="mt-4 whitespace-pre-wrap text-[15px] leading-8 text-stone-800 dark:text-stone-100">
-                        {cleanText || (isLoading ? "正在整理回答..." : "")}
+                        {cleanText || (isLoading ? "Preparing the answer..." : "")}
                       </div>
 
                       {isLatestAssistant && (
@@ -442,8 +442,8 @@ export default function AskPage() {
                             {sources.length === 0 ? (
                               <div className="text-sm text-stone-500 dark:text-stone-400">
                                 {scope === "direct"
-                                  ? "当前是直接回答模式，不展示来源。"
-                                  : "这一轮回答没有附带可展示的来源。"}
+                                  ? "Direct answer mode is on, so no sources are shown."
+                                  : "No displayable sources were attached to this answer."}
                               </div>
                             ) : (
                               <div className="flex flex-wrap gap-2">
@@ -455,7 +455,7 @@ export default function AskPage() {
                                 ))}
                                 {sources.length > 3 ? (
                                   <div className="inline-flex items-center rounded-full bg-stone-100 px-3 py-2 text-sm text-stone-500 dark:bg-stone-900 dark:text-stone-400">
-                                    +{sources.length - 3} 个来源
+                                    +{sources.length - 3} more
                                   </div>
                                 ) : null}
                               </div>
@@ -465,7 +465,7 @@ export default function AskPage() {
                           <div className="flex items-center gap-2">
                             <IconActionButton
                               icon={Save}
-                              label="保存为笔记"
+                              label="Save as note"
                               onClick={handleSaveAnswer}
                               disabled={
                                 !latestAnswer.cleanText.trim() ||
@@ -474,7 +474,7 @@ export default function AskPage() {
                             />
                             <IconActionButton
                               icon={RefreshCcw}
-                              label={`重新回答（${currentScope.label}）`}
+                              label={`Regenerate (${currentScope.label})`}
                               onClick={() => handleRegenerateWithScope(scope)}
                               disabled={!lastUserMessage || isLoading}
                             />
@@ -489,13 +489,13 @@ export default function AskPage() {
               {isLoading && messages[messages.length - 1]?.role === "user" && (
                 <div className="flex items-center gap-3 text-sm text-stone-500 dark:text-stone-400">
                   <Loader2 size={16} className="animate-spin" />
-                  正在从 {currentScope.label} 里整理答案...
+                  Pulling together an answer from {currentScope.label}...
                 </div>
               )}
 
               {errorMessage && (
                 <div className="rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-                  出错了：{errorMessage}
+                  Something went wrong: {errorMessage}
                 </div>
               )}
             </section>
@@ -544,7 +544,7 @@ export default function AskPage() {
                   onCompositionEnd={() => {
                     isComposingRef.current = false;
                   }}
-                  placeholder="使用 AI 处理各种任务..."
+                  placeholder="Use AI to work through anything..."
                   rows={2}
                   className="min-h-[56px] w-full resize-none border-none bg-transparent text-[18px] leading-7 text-stone-900 outline-none placeholder:text-stone-400 dark:text-stone-100 dark:placeholder:text-stone-500"
                   disabled={isLoading}
@@ -556,7 +556,7 @@ export default function AskPage() {
                   <span>{currentScope.description}</span>
                   <span className="hidden md:inline">
                     {" "}
-                    · Enter 发送，Shift+Enter 换行
+                    · Enter to send, Shift+Enter for a new line
                   </span>
                 </div>
 
@@ -572,7 +572,7 @@ export default function AskPage() {
                       className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-stone-900"
                     >
                       <Trash2 size={14} />
-                      清空对话
+                      Clear chat
                     </button>
                   )}
 
@@ -583,7 +583,7 @@ export default function AskPage() {
                       className="inline-flex items-center gap-2 rounded-full border border-stone-200 px-3 py-2 text-sm text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-900"
                     >
                       <Square size={14} />
-                      停止
+                      Stop
                     </button>
                   )}
 
@@ -591,7 +591,7 @@ export default function AskPage() {
                     type="submit"
                     disabled={isLoading || !input.trim()}
                     className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300 dark:disabled:bg-stone-800 dark:disabled:text-stone-500"
-                    aria-label="发送消息"
+                    aria-label="Send message"
                   >
                     <Send size={16} />
                   </button>
@@ -601,7 +601,7 @@ export default function AskPage() {
 
             {messages.length > 0 ? (
               <div className="mt-2 text-center text-xs text-stone-400 dark:text-stone-500">
-                AI 可能会犯错，请核对关键信息。
+                AI can make mistakes. Verify important details.
               </div>
             ) : null}
 

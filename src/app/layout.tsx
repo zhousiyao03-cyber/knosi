@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Second Brain",
-  description: "个人知识管理平台",
+  description: "A personal knowledge management workspace",
   applicationName: "Second Brain",
   manifest: "/manifest.webmanifest",
   appleWebApp: {

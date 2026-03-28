@@ -7,24 +7,24 @@ import { userCredentials, users } from "@/server/db/schema";
 import { updateAccountPassword, updateAccountProfile } from "./actions";
 
 const profileErrorMessages: Record<string, string> = {
-  invalid: "请检查昵称和邮箱后重试",
-  "email-exists": "这个邮箱已经被其他账号使用",
+  invalid: "Check your name and email, then try again.",
+  "email-exists": "This email is already being used by another account.",
 };
 
 const profileStatusMessages: Record<string, string> = {
-  updated: "账号信息已更新",
+  updated: "Account details updated.",
 };
 
 const passwordErrorMessages: Record<string, string> = {
-  invalid: "请检查密码输入后重试",
-  "password-mismatch": "两次输入的新密码不一致",
-  "current-password": "当前密码不正确",
-  "email-missing": "当前账号缺少邮箱，暂时无法设置本地密码",
-  unavailable: "当前环境暂未启用本地密码管理",
+  invalid: "Check your password inputs and try again.",
+  "password-mismatch": "The new passwords do not match.",
+  "current-password": "Your current password is incorrect.",
+  "email-missing": "This account has no email, so local password setup is unavailable.",
+  unavailable: "Local password management is not enabled in this environment.",
 };
 
 const passwordStatusMessages: Record<string, string> = {
-  updated: "密码已更新",
+  updated: "Password updated.",
 };
 
 export default async function SettingsPage({
@@ -80,27 +80,27 @@ export default async function SettingsPage({
     null;
   const hasPassword = credentialsTableAvailable && Boolean(userRecord.passwordHash);
   const passwordDescription = !credentialsTableAvailable
-    ? "当前环境暂未启用本地密码管理，账号信息仍可正常维护。"
+    ? "Local password management is not enabled here, but you can still update your account details."
     : hasPassword
-      ? "修改本地登录密码时，需要先验证当前密码。"
-      : "当前账号还没有设置本地密码，保存后即可用邮箱 + 密码登录。";
+      ? "Enter your current password before setting a new local password."
+      : "This account does not have a local password yet. Save one to sign in with email and password.";
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">账号设置</h1>
+        <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Account settings</h1>
         <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
-          在这里维护你的昵称、登录邮箱和本地密码。
+          Update your name, sign-in email, and local password here.
         </p>
       </div>
 
       <section className="rounded-[28px] border border-stone-200 bg-white/92 p-6 shadow-[0_22px_80px_-58px_rgba(15,23,42,0.55)] dark:border-stone-800 dark:bg-stone-950/88">
         <div className="mb-5">
           <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">
-            账号信息
+            Profile
           </h2>
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-            昵称主要用于个性化展示；邮箱会作为本地登录账号。
+            Your name is used for personalization, and your email is used for local sign-in.
           </p>
         </div>
 
@@ -110,7 +110,7 @@ export default async function SettingsPage({
               htmlFor="name"
               className="text-sm font-medium text-stone-700 dark:text-stone-200"
             >
-              昵称
+              Name
             </label>
             <input
               id="name"
@@ -126,7 +126,7 @@ export default async function SettingsPage({
               htmlFor="email"
               className="text-sm font-medium text-stone-700 dark:text-stone-200"
             >
-              邮箱
+              Email
             </label>
             <input
               id="email"
@@ -151,14 +151,14 @@ export default async function SettingsPage({
             type="submit"
             className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:border-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
           >
-            保存账号信息
+            Save profile
           </button>
         </form>
       </section>
 
       <section className="rounded-[28px] border border-stone-200 bg-white/92 p-6 shadow-[0_22px_80px_-58px_rgba(15,23,42,0.55)] dark:border-stone-800 dark:bg-stone-950/88">
         <div className="mb-5">
-          <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">密码</h2>
+          <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">Password</h2>
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
             {passwordDescription}
           </p>
@@ -172,7 +172,7 @@ export default async function SettingsPage({
                   htmlFor="currentPassword"
                   className="text-sm font-medium text-stone-700 dark:text-stone-200"
                 >
-                  当前密码
+                  Current password
                 </label>
                 <input
                   id="currentPassword"
@@ -190,7 +190,7 @@ export default async function SettingsPage({
                 htmlFor="newPassword"
                 className="text-sm font-medium text-stone-700 dark:text-stone-200"
               >
-                新密码
+                New password
               </label>
               <input
                 id="newPassword"
@@ -207,7 +207,7 @@ export default async function SettingsPage({
                 htmlFor="confirmPassword"
                 className="text-sm font-medium text-stone-700 dark:text-stone-200"
               >
-                确认新密码
+                Confirm new password
               </label>
               <input
                 id="confirmPassword"
@@ -232,12 +232,12 @@ export default async function SettingsPage({
               type="submit"
               className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:border-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
             >
-              更新密码
+              Update password
             </button>
           </form>
         ) : (
           <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200">
-            当前环境暂未启用本地密码管理；如果这是生产环境，请同步最新数据库 schema 后再开启。
+            Local password management is not enabled in this environment. If this is production, sync the latest database schema first.
           </div>
         )}
       </section>

@@ -37,7 +37,7 @@ export default function BookmarksPage() {
   const deleteBookmark = trpc.bookmarks.delete.useMutation({
     onSuccess: () => {
       utils.bookmarks.list.invalidate();
-      toast("已删除收藏", "success");
+      toast("Bookmark deleted", "success");
     },
   });
   const refetchBookmark = trpc.bookmarks.refetch.useMutation({
@@ -74,13 +74,13 @@ export default function BookmarksPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">收藏</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Bookmarks</h1>
         <button
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           <Plus size={16} />
-          添加收藏
+          Add bookmark
         </button>
       </div>
 
@@ -91,14 +91,14 @@ export default function BookmarksPage() {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="标题"
+              placeholder="Title"
               className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <input
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="URL（可选）"
+              placeholder="URL (optional)"
               className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex gap-2">
@@ -107,14 +107,14 @@ export default function BookmarksPage() {
                 disabled={(!url.trim() && !title.trim()) || createBookmark.isPending}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
               >
-                {createBookmark.isPending ? "保存中..." : "保存"}
+                {createBookmark.isPending ? "Saving..." : "Save"}
               </button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
                 className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-100"
               >
-                取消
+                Cancel
               </button>
             </div>
           </div>
@@ -129,7 +129,7 @@ export default function BookmarksPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索收藏..."
+            placeholder="Search bookmarks..."
             className="w-full pl-9 pr-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -137,20 +137,20 @@ export default function BookmarksPage() {
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value as "all" | "url" | "text")}
           className="px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          aria-label="按来源筛选"
+          aria-label="Filter by source"
         >
-          <option value="all">全部</option>
+          <option value="all">All</option>
           <option value="url">URL</option>
-          <option value="text">文本</option>
+          <option value="text">Text</option>
         </select>
       </div>
 
       {isLoading ? (
-        <p className="text-gray-500 text-sm">加载中...</p>
+        <p className="text-gray-500 text-sm">Loading...</p>
       ) : filteredBookmarks.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <Bookmark size={48} className="mx-auto mb-3 opacity-50" />
-          <p>{bookmarks.length === 0 ? "还没有收藏，点击添加开始吧" : "没有匹配的收藏"}</p>
+          <p>{bookmarks.length === 0 ? "No bookmarks yet. Add your first one." : "No matching bookmarks."}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -163,7 +163,7 @@ export default function BookmarksPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm">
-                    {bm.title ?? bm.url ?? "无标题"}
+                    {bm.title ?? bm.url ?? "Untitled"}
                   </h3>
                   {bm.url && (
                     <a
@@ -188,12 +188,12 @@ export default function BookmarksPage() {
                   )}
                   {bm.status === "pending" && (
                     <span className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 rounded">
-                      抓取中
+                      Fetching
                     </span>
                   )}
                   {bm.status === "failed" && (
                     <span className="px-1.5 py-0.5 text-xs bg-orange-100 text-orange-600 rounded">
-                      抓取失败
+                      Fetch failed
                     </span>
                   )}
                 </div>
@@ -224,7 +224,7 @@ export default function BookmarksPage() {
                   onClick={() => refetchBookmark.mutate({ id: bm.id })}
                   disabled={refetchBookmark.isPending}
                   className="p-1 text-orange-400 hover:text-orange-600 transition-all"
-                  title="重新抓取"
+                  title="Retry fetch"
                 >
                   {refetchBookmark.isPending ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -246,19 +246,19 @@ export default function BookmarksPage() {
                       });
                       utils.bookmarks.list.invalidate();
                       if (res.ok) {
-                        toast("摘要生成成功", "success");
+                        toast("Summary generated", "success");
                       } else {
-                        toast("摘要生成失败", "error");
+                        toast("Summary generation failed", "error");
                       }
                     } catch {
-                      toast("摘要生成失败", "error");
+                      toast("Summary generation failed", "error");
                     } finally {
                       setSummarizing(null);
                     }
                   }}
                   disabled={summarizing === bm.id}
                   className="p-1 text-gray-400 hover:text-purple-500 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-100"
-                  title="AI 生成摘要"
+                  title="Generate AI summary"
                 >
                   {summarizing === bm.id ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -270,7 +270,7 @@ export default function BookmarksPage() {
               <button
                 onClick={() => deleteBookmark.mutate({ id: bm.id })}
                 className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                title="删除"
+                title="Delete"
               >
                 <Trash2 size={16} />
               </button>

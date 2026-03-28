@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Second Brain",
     short_name: "Second Brain",
-    description: "个人知识管理平台",
+    description: "A personal knowledge management workspace",
     start_url: "/",
     scope: "/",
     display: "standalone",
