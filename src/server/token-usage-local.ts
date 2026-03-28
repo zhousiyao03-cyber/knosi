@@ -17,8 +17,19 @@ type CodexThreadRow = {
   updatedAt: number;
 };
 
-const workspaceRoot = process.cwd();
 const homeDirectory = homedir();
+const claudeProjectsRoot = path.join(homeDirectory, ".claude", "projects");
+const LOCAL_USAGE_CACHE_TTL_MS = 10_000;
+
+let cachedLocalTokenUsage:
+  | {
+      expiresAt: number;
+      value: {
+        entries: TokenUsageListEntry[];
+        localSources: TokenUsageLocalSourceStatus[];
+      };
+    }
+  | null = null;
 
 function normalizeTokenValue(value: unknown) {
   const parsed = Number(value);
@@ -32,12 +43,34 @@ function sortEntriesByUsageDate(entries: TokenUsageListEntry[]) {
   });
 }
 
-function toWorkspacePrefix(value: string) {
-  return `${value}${value.endsWith(path.sep) ? "" : path.sep}%`;
+function formatCodexEntryNotes(title: string, cwd: string) {
+  const normalizedTitle = title.trim();
+
+  if (!normalizedTitle) {
+    return cwd;
+  }
+
+  if (!cwd.trim()) {
+    return normalizedTitle;
+  }
+
+  return `${normalizedTitle} · ${cwd}`;
 }
 
-function encodeClaudeProjectDirectoryName(value: string) {
-  return value.replaceAll(/[\\/]+/g, "-");
+function listClaudeSessionFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolutePath = path.join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      return listClaudeSessionFiles(absolutePath);
+    }
+
+    if (!entry.isFile() || !entry.name.endsWith(".jsonl") || entry.name === "sessions-index.json") {
+      return [];
+    }
+
+    return [absolutePath];
+  });
 }
 
 function resolveCodexStateDatabasePath() {
@@ -93,11 +126,10 @@ function readCodexWorkspaceEntries() {
             updated_at as updatedAt
           from threads
           where tokens_used > 0
-            and (cwd = ? or cwd like ?)
           order by updated_at desc
         `
       )
-      .all(workspaceRoot, toWorkspacePrefix(workspaceRoot)) as CodexThreadRow[];
+      .all() as CodexThreadRow[];
 
     const entries = rows.map((row) => ({
       id: `local:codex:${row.id}`,
@@ -107,7 +139,7 @@ function readCodexWorkspaceEntries() {
       inputTokens: 0,
       outputTokens: 0,
       cachedTokens: 0,
-      notes: row.title || row.cwd,
+      notes: formatCodexEntryNotes(row.title, row.cwd),
       source: "local-codex" as const,
       usageAt: new Date(normalizeTokenValue(row.updatedAt) * 1000),
       canDelete: false,
@@ -124,8 +156,8 @@ function readCodexWorkspaceEntries() {
         entryCount: entries.length,
         detail:
           entries.length > 0
-            ? `已读取当前工作区的 ${entries.length} 条 Codex session。`
-            : "当前工作区还没有读到 Codex session。",
+            ? `已读取本机的 ${entries.length} 条 Codex session。`
+            : "本机还没有读到 Codex session。",
       } satisfies TokenUsageLocalSourceStatus,
     };
   } catch (error) {
@@ -148,13 +180,16 @@ function readCodexWorkspaceEntries() {
   }
 }
 
-function readClaudeSessionEntry(filePath: string): TokenUsageListEntry | null {
+function readClaudeSessionEntry(
+  filePath: string,
+  projectRoot: string
+): TokenUsageListEntry | null {
   const rawContent = readFileSync(filePath, "utf8");
   const lines = rawContent.split(/\r?\n/);
   const fileName = path.basename(filePath, ".jsonl");
+  const relativeFilePath = path.relative(projectRoot, filePath).split(path.sep).join("/");
   const fallbackTimestamp = statSync(filePath).mtimeMs;
 
-  let belongsToWorkspace = false;
   let latestTimestamp = fallbackTimestamp;
   let cwd: string | null = null;
   let model: string | null = null;
@@ -182,9 +217,6 @@ function readClaudeSessionEntry(filePath: string): TokenUsageListEntry | null {
 
       if (typeof item.cwd === "string" && item.cwd.length > 0) {
         cwd = item.cwd;
-        if (item.cwd === workspaceRoot || item.cwd.startsWith(`${workspaceRoot}${path.sep}`)) {
-          belongsToWorkspace = true;
-        }
       }
 
       if (typeof item.timestamp === "string") {
@@ -211,10 +243,6 @@ function readClaudeSessionEntry(filePath: string): TokenUsageListEntry | null {
     }
   }
 
-  if (!belongsToWorkspace) {
-    return null;
-  }
-
   const totalTokens = calculateTotalTokens({
     inputTokens,
     outputTokens,
@@ -226,14 +254,20 @@ function readClaudeSessionEntry(filePath: string): TokenUsageListEntry | null {
   }
 
   return {
-    id: `local:claude-code:${fileName}`,
+    id: `local:claude-code:${relativeFilePath}`,
     provider: "claude-code",
     model,
     totalTokens,
     inputTokens,
     outputTokens,
     cachedTokens,
-    notes: cwd ? `Workspace: ${cwd}` : `Claude Code session ${fileName.slice(0, 8)}`,
+    notes: relativeFilePath.includes("/subagents/")
+      ? cwd
+        ? `Subagent session · ${cwd}`
+        : `Subagent session · ${relativeFilePath}`
+      : cwd
+        ? `Workspace: ${cwd}`
+        : `Claude Code session · ${relativeFilePath || fileName.slice(0, 8)}`,
     source: "local-claude-code",
     usageAt: new Date(latestTimestamp),
     canDelete: false,
@@ -241,12 +275,7 @@ function readClaudeSessionEntry(filePath: string): TokenUsageListEntry | null {
 }
 
 function readClaudeWorkspaceEntries() {
-  const claudeProjectDirectory = path.join(
-    homeDirectory,
-    ".claude",
-    "projects",
-    encodeClaudeProjectDirectoryName(workspaceRoot)
-  );
+  const claudeProjectDirectory = claudeProjectsRoot;
 
   if (!existsSync(claudeProjectDirectory)) {
     return {
@@ -258,15 +287,14 @@ function readClaudeWorkspaceEntries() {
         status: "missing",
         location: claudeProjectDirectory,
         entryCount: 0,
-        detail: "没有找到当前工作区的 Claude Code session 目录。",
+        detail: "没有找到 Claude Code 本地 session 目录。",
       } satisfies TokenUsageLocalSourceStatus,
     };
   }
 
   try {
-    const entries = readdirSync(claudeProjectDirectory)
-      .filter((name) => name.endsWith(".jsonl") && name !== "sessions-index.json")
-      .map((name) => readClaudeSessionEntry(path.join(claudeProjectDirectory, name)))
+    const entries = listClaudeSessionFiles(claudeProjectDirectory)
+      .map((filePath) => readClaudeSessionEntry(filePath, claudeProjectDirectory))
       .filter((entry): entry is TokenUsageListEntry => entry != null);
 
     return {
@@ -280,8 +308,8 @@ function readClaudeWorkspaceEntries() {
         entryCount: entries.length,
         detail:
           entries.length > 0
-            ? `已聚合当前工作区的 ${entries.length} 个 Claude Code session。`
-            : "当前工作区还没有读到 Claude Code session。",
+            ? `已聚合本机的 ${entries.length} 个 Claude Code session（含 subagents）。`
+            : "本机还没有读到 Claude Code session。",
       } satisfies TokenUsageLocalSourceStatus,
     };
   } catch (error) {
@@ -303,11 +331,22 @@ function readClaudeWorkspaceEntries() {
 }
 
 export function readWorkspaceLocalTokenUsage() {
+  if (cachedLocalTokenUsage != null && cachedLocalTokenUsage.expiresAt > Date.now()) {
+    return cachedLocalTokenUsage.value;
+  }
+
   const codex = readCodexWorkspaceEntries();
   const claude = readClaudeWorkspaceEntries();
 
-  return {
+  const value = {
     entries: sortEntriesByUsageDate([...codex.entries, ...claude.entries]),
     localSources: [codex.source, claude.source],
   };
+
+  cachedLocalTokenUsage = {
+    expiresAt: Date.now() + LOCAL_USAGE_CACHE_TTL_MS,
+    value,
+  };
+
+  return value;
 }

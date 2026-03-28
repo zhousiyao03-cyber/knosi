@@ -1,0 +1,19 @@
+<svg width="1600" height="420" viewBox="0 0 1600 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="420" fill="url(#skyBg)"/>
+  <circle cx="1226" cy="94" r="162" fill="#FFF8E7" fill-opacity="0.42"/>
+  <path d="M0 239C128 208 248 198 360 208C509 221 607 282 749 280C913 277 1038 168 1196 165C1322 163 1457 214 1600 248V420H0V239Z" fill="#F8C58A" fill-opacity="0.42"/>
+  <path d="M0 284C95 258 183 251 264 259C372 271 454 324 550 330C684 339 783 260 896 253C1009 245 1094 293 1202 301C1324 310 1441 280 1600 226V420H0V284Z" fill="#31758D" fill-opacity="0.48"/>
+  <path d="M0 338C134 298 255 285 363 292C502 301 596 358 710 361C856 365 944 305 1098 305C1235 305 1363 352 1600 420H0V338Z" fill="#123B54" fill-opacity="0.72"/>
+  <path d="M164 314C224 279 282 262 338 262C413 262 482 294 544 314" stroke="#EADBB0" stroke-width="10" stroke-linecap="round" stroke-opacity="0.48"/>
+  <path d="M914 251C982 223 1048 209 1112 209C1198 209 1279 234 1354 251" stroke="#FFF4D8" stroke-width="12" stroke-linecap="round" stroke-opacity="0.28"/>
+  <rect y="360" width="1600" height="60" fill="#102C41" fill-opacity="0.52"/>
+  <defs>
+    <linearGradient id="skyBg" x1="1600" y1="36" x2="164" y2="412" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F1D8AB"/>
+      <stop offset="0.18" stop-color="#D49B6A"/>
+      <stop offset="0.46" stop-color="#6AA8C0"/>
+      <stop offset="0.72" stop-color="#2E738F"/>
+      <stop offset="1" stop-color="#17344C"/>
+    </linearGradient>
+  </defs>
+</svg>

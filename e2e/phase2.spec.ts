@@ -131,6 +131,51 @@ test.describe("Phase 2: 笔记本模块", () => {
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
   });
 
+  test("从正文移到左侧悬浮区时不会丢失 hover", async ({ page }) => {
+    await page.goto("/notes");
+    await page.getByRole("button", { name: "新建笔记" }).click();
+    await page.waitForURL(/\/notes\/.+/, { timeout: 10000 });
+
+    const firstBlock = page.locator(".ProseMirror p").first();
+    const trigger = page.getByTestId("editor-insert-trigger");
+
+    const blockBox = await firstBlock.boundingBox();
+    if (!blockBox) throw new Error("未找到首个正文块");
+
+    await page.mouse.move(blockBox.x + 24, blockBox.y + blockBox.height / 2);
+    await expect(trigger).toBeVisible();
+
+    const triggerBox = await trigger.boundingBox();
+    if (!triggerBox) throw new Error("未找到悬浮插入按钮");
+
+    await page.mouse.move(
+      triggerBox.x + triggerBox.width / 2,
+      triggerBox.y + triggerBox.height / 2,
+      { steps: 12 }
+    );
+
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+    await expect(page.getByTestId("editor-insert-menu")).toBeVisible();
+  });
+
+  test("插入菜单采用 Notion 风格分区结构", async ({ page }) => {
+    await page.goto("/notes");
+    await page.getByRole("button", { name: "新建笔记" }).click();
+    await page.waitForURL(/\/notes\/.+/, { timeout: 10000 });
+
+    const firstBlock = page.locator(".ProseMirror p").first();
+    await firstBlock.hover();
+    await page.getByTestId("editor-insert-trigger").click();
+
+    const menu = page.getByTestId("editor-insert-menu");
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText("建议")).toBeVisible();
+    await expect(menu.getByText("基本区块")).toBeVisible();
+    await expect(menu.getByText("关闭菜单")).toBeVisible();
+    await expect(menu.getByText("esc")).toBeVisible();
+  });
+
   test("悬浮插入按钮支持有序列表", async ({ page }) => {
     const orderedText = `ordered-${uid()}`;
     await page.goto("/notes");
@@ -328,29 +373,31 @@ test.describe("Phase 2: 笔记本模块", () => {
     await expect(noteCard).toContainText(tagName);
   });
 
-  test("页面头部 hover 后支持插入和移除封面图", async ({ page }) => {
+  test("页面头部支持从内置背景图库选择和移除封面", async ({ page }) => {
     await page.goto("/notes");
     await page.getByText("新建笔记").click();
     await expect(page).toHaveURL(/\/notes\/.+/);
 
     await expect(page.getByTestId("page-properties")).toBeVisible();
-    const coverHeader = page.getByTestId("note-cover-header");
-    await coverHeader.hover();
+    await page.getByTestId("page-properties").hover();
     await expect(page.getByTestId("note-add-cover")).toBeVisible();
-    await page.getByTestId("note-cover-input").setInputFiles({
-      name: "cover.png",
-      mimeType: "image/png",
-      buffer: tinyPng,
-    });
+    await page.getByTestId("note-add-cover").click();
+    await expect(page.getByTestId("note-cover-picker")).toBeVisible();
+    await page.getByTestId("note-cover-option-amber").click();
 
+    const coverHeader = page.getByTestId("note-cover-header");
+    await expect(coverHeader).toBeVisible({ timeout: 5000 });
     await expect(coverHeader.locator("img")).toBeVisible({ timeout: 5000 });
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
+    const headerBox = await coverHeader.boundingBox();
+    expect(headerBox?.height ?? 0).toBeGreaterThanOrEqual(279);
+    expect(headerBox?.height ?? 0).toBeLessThanOrEqual(281);
 
     await coverHeader.hover();
     await expect(page.getByTestId("note-remove-cover")).toBeVisible();
     await page.getByTestId("note-remove-cover").click();
 
-    await expect(coverHeader.locator("img")).toHaveCount(0);
+    await expect(page.getByTestId("note-cover-header")).toHaveCount(0);
     await expect(page.getByText("已保存")).toBeVisible({ timeout: 5000 });
   });
 

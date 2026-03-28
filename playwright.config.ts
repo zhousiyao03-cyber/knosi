@@ -22,6 +22,7 @@ export default defineConfig({
     env: {
       ...process.env,
       PATH: PLAYWRIGHT_RUNTIME_PATH,
+      NEXT_PUBLIC_TOKEN_USAGE_REFRESH_INTERVAL_MS: "1000",
       SQLITE_DB_PATH: PLAYWRIGHT_DB_PATH,
     },
     url: "http://localhost:3100/api/trpc/notes.list?input=%7B%7D",

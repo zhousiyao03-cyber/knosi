@@ -99,11 +99,26 @@ export interface TokenUsageSummary<T extends TokenUsageEntryMetrics> {
   recentEntries: T[];
 }
 
+const DEFAULT_TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS = 15_000;
 const tokenFormatter = new Intl.NumberFormat("en-US");
 const compactTokenFormatter = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
+
+function resolveTokenUsageAutoRefreshIntervalMs() {
+  const rawValue = process.env.NEXT_PUBLIC_TOKEN_USAGE_REFRESH_INTERVAL_MS;
+  const parsed = Number(rawValue);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS;
+  }
+
+  return Math.trunc(parsed);
+}
+
+export const TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS =
+  resolveTokenUsageAutoRefreshIntervalMs();
 
 function normalizeTokenValue(value: number | null | undefined) {
   if (!Number.isFinite(value)) return 0;

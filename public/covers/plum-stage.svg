@@ -1,0 +1,34 @@
+<svg width="1600" height="420" viewBox="0 0 1600 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="420" fill="url(#plumBg)"/>
+  <circle cx="1322" cy="92" r="174" fill="#F7D8C5" fill-opacity="0.22"/>
+  <path d="M0 420V0H204L329 175L454 0H1600V420H0Z" fill="url(#plumCurtain)" fill-opacity="0.78"/>
+  <path d="M463 0L592 166L716 0H1600V420H463V0Z" fill="url(#plumStage)" fill-opacity="0.88"/>
+  <rect x="712" y="36" width="190" height="330" rx="94" fill="#F2B680" fill-opacity="0.22"/>
+  <rect x="793" y="-24" width="122" height="476" rx="60" fill="#D9764D" fill-opacity="0.88"/>
+  <rect x="968" y="0" width="166" height="420" rx="82" fill="#B95E43" fill-opacity="0.42"/>
+  <rect x="112" y="68" width="228" height="230" rx="108" fill="#222233" fill-opacity="0.68"/>
+  <circle cx="234" cy="173" r="58" fill="#EFE3D1" fill-opacity="0.82"/>
+  <circle cx="234" cy="173" r="16" fill="#D3A155"/>
+  <rect x="386" y="102" width="180" height="198" rx="84" fill="#342C39" fill-opacity="0.48"/>
+  <rect x="429" y="138" width="112" height="138" rx="56" fill="#786C7A" fill-opacity="0.4"/>
+  <path d="M1194 176C1218 118 1270 83 1351 83C1424 83 1480 126 1524 176H1194Z" fill="#83906C" fill-opacity="0.28"/>
+  <path d="M1182 228C1230 178 1285 153 1349 153C1417 153 1479 180 1535 228" stroke="#A7B17C" stroke-width="10" stroke-linecap="round" stroke-opacity="0.5"/>
+  <rect x="0" y="350" width="1600" height="70" fill="#EEE0D5" fill-opacity="0.2"/>
+  <defs>
+    <linearGradient id="plumBg" x1="0" y1="0" x2="1524" y2="383" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#41333D"/>
+      <stop offset="0.35" stop-color="#7A4744"/>
+      <stop offset="0.68" stop-color="#8D4B37"/>
+      <stop offset="1" stop-color="#4E5A4D"/>
+    </linearGradient>
+    <linearGradient id="plumCurtain" x1="62" y1="-12" x2="431" y2="315" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#221F2B"/>
+      <stop offset="1" stop-color="#4B3846"/>
+    </linearGradient>
+    <linearGradient id="plumStage" x1="463" y1="0" x2="1600" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8F4237"/>
+      <stop offset="0.6" stop-color="#A95A3F"/>
+      <stop offset="1" stop-color="#4A584A"/>
+    </linearGradient>
+  </defs>
+</svg>

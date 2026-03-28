@@ -65,6 +65,10 @@ const ACCEPTED_IMAGE_TYPES = new Set([
   "image/webp",
   "image/gif",
 ]);
+const BLOCK_CONTROL_GUTTER_WIDTH = 96;
+const BLOCK_CONTROL_GUTTER_RIGHT_PADDING = 12;
+const BLOCK_CONTROL_BUTTON_SIZE = 24;
+const BLOCK_CONTROL_LEFT_OFFSET = 60;
 const BLOCK_SELECTOR =
   "p, h1, h2, h3, ul, ol, blockquote, pre, hr, img, [data-callout-block='true'], [data-toggle-block='true']";
 
@@ -374,7 +378,10 @@ export function TiptapEditor({
         const nextState = {
           pos,
           buttonTop:
-            blockRect.top - surfaceRect.top + blockRect.height / 2 - 16,
+            blockRect.top -
+            surfaceRect.top +
+            blockRect.height / 2 -
+            BLOCK_CONTROL_BUTTON_SIZE / 2,
           menuTop: blockRect.top + blockRect.height / 2 - 12,
           menuLeft: blockRect.left + 12,
           top: blockRect.top - surfaceRect.top,
@@ -418,7 +425,8 @@ export function TiptapEditor({
         const withinSameBand =
           relativeY >= previous.top - 6 && relativeY <= previous.bottom + 6;
         const withinGutter =
-          relativeX >= -56 && relativeX <= previous.contentLeft + 12;
+          relativeX >= -BLOCK_CONTROL_GUTTER_WIDTH &&
+          relativeX <= previous.contentLeft + BLOCK_CONTROL_GUTTER_RIGHT_PADDING;
         const withinTrackedBlock = Boolean(targetElement.closest(BLOCK_SELECTOR));
 
         if (
@@ -446,7 +454,8 @@ export function TiptapEditor({
         const withinSameBand =
           relativeY >= previous.top - 6 && relativeY <= previous.bottom + 6;
         const withinGutter =
-          relativeX >= -56 && relativeX <= previous.contentLeft + 12;
+          relativeX >= -BLOCK_CONTROL_GUTTER_WIDTH &&
+          relativeX <= previous.contentLeft + BLOCK_CONTROL_GUTTER_RIGHT_PADDING;
 
         if (!withinSameBand || !withinGutter) {
           hoveredBlockRef.current = null;
@@ -806,13 +815,28 @@ export function TiptapEditor({
         onMouseMove={editable ? handleSurfaceMouseMove : undefined}
         onMouseLeave={editable ? handleSurfaceMouseLeave : undefined}
       >
+        {editable && (
+          <div
+            aria-hidden="true"
+            data-editor-hover-gutter="true"
+            className="absolute inset-y-0 z-0"
+            style={{
+              left: -BLOCK_CONTROL_GUTTER_WIDTH,
+              width: BLOCK_CONTROL_GUTTER_WIDTH,
+            }}
+          />
+        )}
+
         {editable && hoveredBlock && (
           <div
             data-editor-insert-controls="true"
-            className="absolute -left-20 z-20"
-            style={{ top: hoveredBlock.buttonTop }}
+            className="absolute z-20"
+            style={{
+              top: hoveredBlock.buttonTop,
+              left: -BLOCK_CONTROL_LEFT_OFFSET,
+            }}
           >
-            <div className="flex items-center gap-1 rounded-xl border border-stone-200/80 bg-white/95 p-1 shadow-lg backdrop-blur dark:border-stone-800 dark:bg-stone-950/90">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 aria-label="插入块"
@@ -821,9 +845,9 @@ export function TiptapEditor({
                 onClick={(event) => {
                   handleOpenInsertMenu(event.altKey ? "above" : "below");
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-stone-50 text-stone-600 transition-colors hover:border-stone-300 hover:bg-white hover:text-stone-900 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-700 dark:hover:bg-stone-950 dark:hover:text-stone-100"
+                className="flex h-6 w-6 items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-stone-100/80 hover:text-stone-700 dark:text-stone-500 dark:hover:bg-stone-900/80 dark:hover:text-stone-200"
               >
-                <Plus size={15} />
+                <Plus size={18} strokeWidth={1.75} />
               </button>
               <button
                 type="button"
@@ -833,9 +857,9 @@ export function TiptapEditor({
                 onClick={() => {
                   handleOpenBlockActionMenu();
                 }}
-                className="flex h-8 w-7 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 dark:text-stone-500 dark:hover:bg-stone-900 dark:hover:text-stone-200"
+                className="flex h-6 w-6 items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-stone-100/80 hover:text-stone-700 dark:text-stone-500 dark:hover:bg-stone-900/80 dark:hover:text-stone-200"
               >
-                <GripVertical size={14} />
+                <GripVertical size={16} strokeWidth={1.75} />
               </button>
             </div>
           </div>
@@ -865,6 +889,8 @@ export function TiptapEditor({
           coords={insertMenuState.coords}
           query=""
           items={slashItems}
+          groups={commandGroups}
+          variant="insert"
           testId="editor-insert-menu"
           onSelectItem={handleInsertMenuSelection}
           onClose={() => setInsertMenuState(null)}

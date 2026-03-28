@@ -11,6 +11,7 @@ import {
   formatCompactTokenCount,
   formatTokenCount,
   getTokenUsageProviderLabel,
+  TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS,
 } from "@/lib/token-usage";
 import { trpc } from "@/lib/trpc";
 import { formatDate } from "@/lib/utils";
@@ -34,7 +35,14 @@ const statCardMeta = [
 
 export default function DashboardPage() {
   const { data, isLoading } = trpc.dashboard.stats.useQuery();
-  const { data: tokenOverview, isLoading: tokenLoading } = trpc.tokenUsage.overview.useQuery();
+  const { data: tokenOverview, isLoading: tokenLoading } = trpc.tokenUsage.overview.useQuery(
+    undefined,
+    {
+      refetchInterval: TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS,
+      refetchIntervalInBackground: true,
+      refetchOnWindowFocus: true,
+    }
+  );
 
   const formatTodayTime = (date: Date | null) => {
     if (!date) return "";
@@ -80,15 +88,15 @@ export default function DashboardPage() {
           <div className="mt-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
             {tokenLoading
               ? "-"
-              : formatCompactTokenCount(tokenOverview?.totals.thisMonthTokens ?? 0)}
+              : formatCompactTokenCount(tokenOverview?.totals.last7DaysTokens ?? 0)}
           </div>
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">本月 Token</div>
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">最近7天 Token</div>
           <div className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
             {tokenLoading
               ? "统计中..."
               : tokenOverview && tokenOverview.totals.entryCount > 0
                 ? `${tokenOverview.totals.providerCount} 个 provider`
-                : "支持当前工作区本地自动读取"}
+                : "支持本机本地自动读取"}
           </div>
         </Link>
       </div>
@@ -206,7 +214,7 @@ export default function DashboardPage() {
               Token Usage
             </h2>
             <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-              统一查看当前工作区的 Codex / Claude Code 本地 session，以及手动补录的 API token 消耗趋势。
+              统一查看本机里的 Codex / Claude Code 本地 session，以及手动补录的 API token 消耗趋势。
             </p>
           </div>
           <Link
@@ -226,7 +234,7 @@ export default function DashboardPage() {
                 还没有 token 使用记录
               </div>
               <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
-                去单独页面看看本地自动读取状态，或者手动补一条 OpenAI API 记录，Dashboard 会自动同步聚合结果。
+                去单独页面看看本机本地读取状态，或者手动补一条 OpenAI API 记录，Dashboard 会自动同步聚合结果。
               </p>
             </div>
           </div>
@@ -241,9 +249,9 @@ export default function DashboardPage() {
                     hint: `${formatTokenCount(tokenOverview.totals.inputTokens)} input`,
                   },
                   {
-                    label: "本月",
-                    value: formatCompactTokenCount(tokenOverview.totals.thisMonthTokens),
-                    hint: `${formatTokenCount(tokenOverview.totals.last7DaysTokens)} in 7d`,
+                    label: "最近7天",
+                    value: formatCompactTokenCount(tokenOverview.totals.last7DaysTokens),
+                    hint: `本月累计 ${formatCompactTokenCount(tokenOverview.totals.thisMonthTokens)}`,
                   },
                   {
                     label: "Cached",

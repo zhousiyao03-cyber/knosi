@@ -1,0 +1,22 @@
+<svg width="1600" height="420" viewBox="0 0 1600 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="420" fill="url(#sageBg)"/>
+  <circle cx="1236" cy="96" r="180" fill="#F2F0DD" fill-opacity="0.42"/>
+  <circle cx="1258" cy="110" r="126" fill="#C8D5AC" fill-opacity="0.28"/>
+  <path d="M0 314C106 260 218 242 338 248C478 255 570 326 678 330C815 336 922 251 1049 245C1157 240 1262 288 1364 284C1457 280 1536 241 1600 208V420H0V314Z" fill="#5A6F53" fill-opacity="0.6"/>
+  <path d="M86 420C122 342 164 299 212 292C270 283 321 330 345 420H86Z" fill="#2C4D3E" fill-opacity="0.82"/>
+  <path d="M262 420C316 326 378 282 446 282C530 282 604 348 645 420H262Z" fill="#42644F" fill-opacity="0.84"/>
+  <path d="M1002 420C1056 328 1127 278 1214 272C1311 265 1407 320 1482 420H1002Z" fill="#385540" fill-opacity="0.8"/>
+  <path d="M96 235C130 160 182 123 252 124C328 126 386 171 432 235H96Z" fill="#D9C690" fill-opacity="0.34"/>
+  <path d="M1024 262C1054 180 1116 132 1210 132C1305 132 1388 186 1438 262H1024Z" fill="#E4D79E" fill-opacity="0.32"/>
+  <path d="M702 316C768 215 832 165 894 165C968 165 1040 235 1108 316H702Z" fill="#6F7C53" fill-opacity="0.66"/>
+  <path d="M471 191C526 116 595 79 678 80C776 82 850 132 922 191H471Z" fill="#B5C58C" fill-opacity="0.32"/>
+  <rect x="0" y="348" width="1600" height="72" fill="#D8D9C4" fill-opacity="0.42"/>
+  <defs>
+    <linearGradient id="sageBg" x1="68" y1="22" x2="1519" y2="379" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#314338"/>
+      <stop offset="0.36" stop-color="#56684E"/>
+      <stop offset="0.7" stop-color="#7B785D"/>
+      <stop offset="1" stop-color="#A09B76"/>
+    </linearGradient>
+  </defs>
+</svg>

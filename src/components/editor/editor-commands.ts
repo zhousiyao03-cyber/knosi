@@ -30,6 +30,7 @@ export interface EditorCommandItem {
   description: string;
   keywords: string[];
   icon: LucideIcon;
+  shortcutHint?: string;
   run: (editor: Editor) => void;
   isActive?: (editor: Editor) => boolean;
   tone?: "default" | "danger";
@@ -61,6 +62,7 @@ export function createEditorCommandGroups(
           description: "普通段落文本",
           keywords: ["text", "paragraph", "正文", "段落"],
           icon: Type,
+          shortcutHint: "T",
           run: (editor) => {
             editor.chain().focus().setParagraph().run();
           },
@@ -73,6 +75,7 @@ export function createEditorCommandGroups(
           description: "页面大标题",
           keywords: ["h1", "heading", "标题", "大标题"],
           icon: Heading1,
+          shortcutHint: "#",
           run: (editor) => {
             editor.chain().focus().toggleHeading({ level: 1 }).run();
           },
@@ -84,6 +87,7 @@ export function createEditorCommandGroups(
           description: "章节标题",
           keywords: ["h2", "heading", "标题", "章节"],
           icon: Heading2,
+          shortcutHint: "##",
           run: (editor) => {
             editor.chain().focus().toggleHeading({ level: 2 }).run();
           },
@@ -95,6 +99,7 @@ export function createEditorCommandGroups(
           description: "小节标题",
           keywords: ["h3", "heading", "标题", "小节"],
           icon: Heading3,
+          shortcutHint: "###",
           run: (editor) => {
             editor.chain().focus().toggleHeading({ level: 3 }).run();
           },
@@ -112,6 +117,7 @@ export function createEditorCommandGroups(
           description: "用圆点列出项目",
           keywords: ["list", "bullet", "列表", "无序"],
           icon: List,
+          shortcutHint: "-",
           run: (editor) => {
             editor.chain().focus().toggleBulletList().run();
           },
@@ -123,6 +129,7 @@ export function createEditorCommandGroups(
           description: "用数字列出项目",
           keywords: ["list", "ordered", "列表", "有序"],
           icon: ListOrdered,
+          shortcutHint: "1.",
           run: (editor) => {
             editor.chain().focus().toggleOrderedList().run();
           },
@@ -134,6 +141,7 @@ export function createEditorCommandGroups(
           description: "用复选框追踪任务",
           keywords: ["todo", "task", "checkbox", "待办", "任务"],
           icon: CheckSquare,
+          shortcutHint: "[]",
           run: (editor) => {
             editor.chain().focus().toggleTaskList().run();
           },
@@ -151,6 +159,7 @@ export function createEditorCommandGroups(
           description: "引用块",
           keywords: ["quote", "blockquote", "引用"],
           icon: Quote,
+          shortcutHint: "\"",
           run: (editor) => {
             editor.chain().focus().toggleBlockquote().run();
           },
@@ -188,6 +197,7 @@ export function createEditorCommandGroups(
           description: "带语法高亮的代码块",
           keywords: ["code", "代码", "代码块"],
           icon: Code2,
+          shortcutHint: "</>",
           run: (editor) => {
             editor.chain().focus().toggleCodeBlock().run();
           },
@@ -199,6 +209,7 @@ export function createEditorCommandGroups(
           description: "插入水平分割线",
           keywords: ["divider", "hr", "line", "分割线"],
           icon: Minus,
+          shortcutHint: "---",
           run: (editor) => {
             editor.chain().focus().setHorizontalRule().run();
           },

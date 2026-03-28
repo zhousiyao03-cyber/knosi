@@ -22,6 +22,7 @@ import {
   getTokenUsageProviderLabel,
   isPersistedTokenUsageSource,
   summarizeTokenUsageEntries,
+  TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS,
   TOKEN_USAGE_PROVIDER_OPTIONS,
   type TokenUsageProvider,
 } from "@/lib/token-usage";
@@ -77,6 +78,7 @@ function parseNumberInput(value: string) {
 
 export default function TokenUsagePage() {
   const [showForm, setShowForm] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [providerFilter, setProviderFilter] = useState<"all" | TokenUsageProvider>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [form, setForm] = useState<UsageFormState>(() => createInitialFormState());
@@ -87,9 +89,12 @@ export default function TokenUsagePage() {
   const {
     data,
     isLoading,
-    isRefetching,
     refetch,
-  } = trpc.tokenUsage.list.useQuery();
+  } = trpc.tokenUsage.list.useQuery(undefined, {
+    refetchInterval: TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+  });
   const entries = data?.entries ?? [];
   const localSources = data?.localSources ?? [];
 
@@ -171,6 +176,16 @@ export default function TokenUsagePage() {
     });
   };
 
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+
+    try {
+      await refetch();
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -182,19 +197,22 @@ export default function TokenUsagePage() {
             Token Usage
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-stone-500 dark:text-stone-400">
-            自动读取当前工作区里的 Codex / Claude Code 本地 session，同时也支持手动补录 OpenAI API 或其他来源的 token 消耗。
+            自动读取本机里的 Codex / Claude Code 本地 session，并按全局口径聚合；同时也支持手动补录 OpenAI API 或其他来源的 token 消耗。
+          </p>
+          <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">
+            本地来源默认每 {Math.round(TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS / 1000)} 秒自动刷新一次。
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => void refetch()}
-            disabled={isRefetching}
+            onClick={() => void handleManualRefresh()}
+            disabled={isManualRefreshing}
             className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-900"
           >
-            <RefreshCcw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
-            {isRefetching ? "刷新中..." : "刷新本地用量"}
+            <RefreshCcw className={`h-4 w-4 ${isManualRefreshing ? "animate-spin" : ""}`} />
+            {isManualRefreshing ? "刷新中..." : "刷新本地用量"}
           </button>
           <button
             type="button"
@@ -420,9 +438,9 @@ export default function TokenUsagePage() {
             icon: Activity,
           },
           {
-            label: "本月",
-            value: formatCompactTokenCount(overview.totals.thisMonthTokens),
-            hint: `${formatTokenCount(overview.totals.last7DaysTokens)} tokens in 7d`,
+            label: "最近7天",
+            value: formatCompactTokenCount(overview.totals.last7DaysTokens),
+            hint: `本月累计 ${formatCompactTokenCount(overview.totals.thisMonthTokens)}`,
             icon: BarChart3,
           },
           {
@@ -465,7 +483,7 @@ export default function TokenUsagePage() {
             <div>
               <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">记录列表</h2>
               <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-                当前工作区的本地 session 会实时出现在这里，手动记录也会一起参与聚合和筛选。
+                本机的本地 session 会实时出现在这里，手动记录也会一起参与聚合和筛选。
               </p>
             </div>
 
@@ -508,7 +526,7 @@ export default function TokenUsagePage() {
                 </div>
                 <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
                   {entries.length === 0
-                    ? "如果当前工作区已经有 Codex 或 Claude Code session，它们会自动出现在这里；你也可以手动补录其他来源。"
+                    ? "如果本机已经有 Codex 或 Claude Code session，它们会自动出现在这里；你也可以手动补录其他来源。"
                     : "试试切换 provider，或搜索其他 model / notes / source。"}
                 </p>
               </div>

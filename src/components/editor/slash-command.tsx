@@ -4,13 +4,14 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
   useLayoutEffect,
 } from "react";
 import { Extension, type Editor } from "@tiptap/react";
 import type { EditorView } from "@tiptap/pm/view";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import type { EditorCommandItem } from "./editor-commands";
+import type { EditorCommandGroup, EditorCommandItem } from "./editor-commands";
 
 /**
  * Tiptap extension that listens for '/' at the start of a line
@@ -108,6 +109,8 @@ interface SlashCommandMenuProps {
   coords: { top: number; left: number } | null;
   query: string;
   items: EditorCommandItem[];
+  groups?: EditorCommandGroup[];
+  variant?: "default" | "insert";
   deleteTrigger?: boolean;
   onSelectItem?: (item: EditorCommandItem, editor: Editor) => void;
   testId?: string;
@@ -119,6 +122,8 @@ export function SlashCommandMenu({
   coords,
   query,
   items,
+  groups,
+  variant = "default",
   deleteTrigger = true,
   onSelectItem,
   testId,
@@ -128,15 +133,70 @@ export function SlashCommandMenu({
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const normalizedQuery = query.trim().toLowerCase();
-  const filtered = items.filter((item) => {
-    if (!normalizedQuery) return true;
+  const filtered = useMemo(
+    () =>
+      items.filter((item) => {
+        if (!normalizedQuery) return true;
+
+        return [item.title, item.description, ...item.keywords].some((value) =>
+          value.toLowerCase().includes(normalizedQuery)
+        );
+      }),
+    [items, normalizedQuery]
+  );
+
+  const filteredIds = useMemo(
+    () => new Set(filtered.map((item) => item.id)),
+    [filtered]
+  );
+
+  const insertSections = useMemo(() => {
+    if (variant !== "insert" || !groups) return [];
 
     return [
-      item.title,
-      item.description,
-      ...item.keywords,
-    ].some((value) => value.toLowerCase().includes(normalizedQuery));
-  });
+      {
+        id: "core",
+        label: "基本区块",
+        items: groups
+          .filter((group) => group.id === "basic" || group.id === "lists")
+          .flatMap((group) => group.items)
+          .filter((item) => filteredIds.has(item.id)),
+      },
+      {
+        id: "blocks",
+        label: "高级区块",
+        items: groups
+          .filter((group) => group.id === "blocks")
+          .flatMap((group) => group.items)
+          .filter((item) => filteredIds.has(item.id)),
+      },
+      {
+        id: "media",
+        label: "媒体",
+        items: groups
+          .filter((group) => group.id === "media")
+          .flatMap((group) => group.items)
+          .filter((item) => filteredIds.has(item.id)),
+      },
+    ].filter((section) => section.items.length > 0);
+  }, [filteredIds, groups, variant]);
+
+  const featuredItem = useMemo(() => {
+    if (variant !== "insert" || normalizedQuery) return null;
+
+    return filtered.find((item) => item.id === "paragraph") ?? filtered[0] ?? null;
+  }, [filtered, normalizedQuery, variant]);
+
+  const renderedInsertSections = useMemo(() => {
+    if (variant !== "insert") return [];
+
+    return insertSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => item.id !== featuredItem?.id),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [featuredItem, insertSections, variant]);
 
   useLayoutEffect(() => {
     if (!menuRef.current || !coords) return;
@@ -241,6 +301,122 @@ export function SlashCommandMenu({
   }, [coords, onClose]);
 
   if (!coords || filtered.length === 0) return null;
+
+  if (variant === "insert") {
+    return (
+      <div
+        ref={menuRef}
+        data-testid={testId}
+        className="fixed z-50 flex h-[385px] w-[min(324px,calc(100vw-24px))] flex-col overflow-hidden rounded-[24px] border border-stone-200/80 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.16)] dark:border-stone-800 dark:bg-stone-950"
+        style={{ top: coords.top, left: coords.left }}
+      >
+        <div className="flex-1 overflow-y-auto px-5 pb-3 pt-4">
+          {featuredItem && (
+            <div className="mb-4">
+              <div className="mb-2 px-1 text-[13px] font-semibold text-stone-500 dark:text-stone-400">
+                建议
+              </div>
+              <button
+                type="button"
+                onClick={() => executeCommand(featuredItem)}
+                onMouseEnter={() =>
+                  setSelectedIndex(
+                    Math.max(
+                      0,
+                      filtered.findIndex((item) => item.id === featuredItem.id)
+                    )
+                  )
+                }
+                className={`flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left transition-colors ${
+                  selectedIndex ===
+                  filtered.findIndex((item) => item.id === featuredItem.id)
+                    ? "border-stone-200 bg-stone-100/80 dark:border-stone-700 dark:bg-stone-900"
+                    : "border-stone-100 bg-stone-50/90 hover:bg-stone-100/70 dark:border-stone-800 dark:bg-stone-900/70 dark:hover:bg-stone-900"
+                }`}
+              >
+                <featuredItem.icon
+                  size={22}
+                  className="shrink-0 text-stone-700 dark:text-stone-200"
+                />
+                <div className="min-w-0 flex-1 text-[15px] font-semibold text-stone-900 dark:text-stone-100">
+                  {featuredItem.title}
+                </div>
+                <span className="rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-medium text-stone-500 dark:bg-stone-800 dark:text-stone-300">
+                  推荐
+                </span>
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-4 border-t border-stone-200/80 pt-4 dark:border-stone-800">
+            {renderedInsertSections.map((section) => (
+              <div key={section.id}>
+                <div className="mb-2 px-1 text-[13px] font-semibold text-stone-500 dark:text-stone-400">
+                  {section.label}
+                </div>
+                <div className="space-y-0.5">
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const itemIndex = filtered.findIndex(
+                      (candidate) => candidate.id === item.id
+                    );
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => executeCommand(item)}
+                        onMouseEnter={() => setSelectedIndex(Math.max(0, itemIndex))}
+                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${
+                          itemIndex === selectedIndex
+                            ? "bg-stone-100 dark:bg-stone-900"
+                            : "hover:bg-stone-50 dark:hover:bg-stone-900/70"
+                        }`}
+                      >
+                        <Icon
+                          size={20}
+                          className={`shrink-0 ${
+                            item.tone === "danger"
+                              ? "text-red-500 dark:text-red-400"
+                              : "text-stone-700 dark:text-stone-200"
+                          }`}
+                        />
+                        <div
+                          className={`min-w-0 flex-1 text-[14px] font-medium ${
+                            item.tone === "danger"
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-stone-900 dark:text-stone-100"
+                          }`}
+                        >
+                          {item.title}
+                        </div>
+                        {item.shortcutHint && (
+                          <span className="shrink-0 text-[13px] text-stone-400 dark:text-stone-500">
+                            {item.shortcutHint}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex w-full items-center justify-between border-t border-stone-200/80 px-5 py-3.5 text-left text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-800 dark:text-stone-200 dark:hover:bg-stone-900"
+        >
+          <span className="text-[14px] font-medium">关闭菜单</span>
+          <span className="text-[14px] text-stone-400 dark:text-stone-500">
+            esc
+          </span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div

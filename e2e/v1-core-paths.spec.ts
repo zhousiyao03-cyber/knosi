@@ -142,4 +142,31 @@ test.describe("V1 核心路径：Token Usage", () => {
       timeout: 5000,
     });
   });
+
+  test("已打开的 usage 页面会自动刷新新记录", async ({ page, context }) => {
+    const sessionModel = `auto-refresh-${uid()}`;
+    const observerPage = page;
+    const writerPage = await context.newPage();
+
+    await observerPage.goto("/usage");
+    await expect(observerPage.getByRole("heading", { name: "Token Usage" })).toBeVisible();
+
+    await writerPage.goto("/usage");
+    await writerPage.getByRole("button", { name: "添加记录" }).click();
+
+    const usageForm = writerPage.locator("form").first();
+    await usageForm.getByLabel("Provider").selectOption("openai-api");
+    await usageForm.getByLabel("Model").fill(sessionModel);
+    await usageForm.getByLabel("Total tokens").fill("4321");
+    await writerPage.getByRole("button", { name: "保存记录" }).click();
+
+    await expect(writerPage.getByText("已记录 4,321 tokens")).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(observerPage.locator("main")).toContainText(sessionModel, {
+      timeout: 8000,
+    });
+
+    await writerPage.close();
+  });
 });

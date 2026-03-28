@@ -1,0 +1,20 @@
+<svg width="1600" height="420" viewBox="0 0 1600 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="420" fill="url(#graphiteBg)"/>
+  <rect x="64" y="52" width="466" height="286" rx="28" fill="#E7DECF" fill-opacity="0.92"/>
+  <rect x="108" y="92" width="370" height="206" rx="18" fill="#D2C4B1"/>
+  <rect x="620" y="32" width="352" height="242" rx="26" fill="#D4C9BA" fill-opacity="0.94"/>
+  <rect x="652" y="72" width="292" height="162" rx="18" fill="#B3A79A"/>
+  <rect x="1048" y="64" width="430" height="274" rx="32" fill="#E5DED2" fill-opacity="0.88"/>
+  <rect x="1094" y="108" width="336" height="188" rx="20" fill="#C4BAAE"/>
+  <path d="M115 270C179 232 238 214 291 214C370 214 438 253 496 270" stroke="#87796E" stroke-width="12" stroke-linecap="round" stroke-opacity="0.74"/>
+  <path d="M696 214C734 177 779 158 831 158C891 158 942 183 986 214" stroke="#7A6F67" stroke-width="10" stroke-linecap="round" stroke-opacity="0.64"/>
+  <path d="M1128 249C1172 196 1229 170 1298 170C1386 170 1457 212 1511 249" stroke="#86796E" stroke-width="12" stroke-linecap="round" stroke-opacity="0.62"/>
+  <rect x="0" y="332" width="1600" height="88" fill="#B9ADA0" fill-opacity="0.4"/>
+  <defs>
+    <linearGradient id="graphiteBg" x1="0" y1="0" x2="1600" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B3A697"/>
+      <stop offset="0.5" stop-color="#CFC4B7"/>
+      <stop offset="1" stop-color="#A09285"/>
+    </linearGradient>
+  </defs>
+</svg>
