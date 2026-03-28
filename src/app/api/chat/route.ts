@@ -17,6 +17,8 @@ import {
   getChatAssistantIdentity,
   streamChatResponse,
 } from "@/server/ai/provider";
+import { auth } from "@/lib/auth";
+import { checkAiRateLimit, recordAiUsage } from "@/server/ai-rate-limit";
 
 export const maxDuration = 30;
 
@@ -168,6 +170,23 @@ function getUserMessageText(message: ModelMessage | undefined) {
 }
 
 export async function POST(req: Request) {
+  // Auth bypass for E2E testing
+  let userId: string | null = null;
+  if (process.env.AUTH_BYPASS !== "true") {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    userId = session.user.id;
+    const { allowed } = await checkAiRateLimit(userId);
+    if (!allowed) {
+      return Response.json(
+        { error: "Daily AI usage limit reached. Please try again tomorrow." },
+        { status: 429 }
+      );
+    }
+  }
+
   const body = await req.json();
   const parsed = chatInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -216,12 +235,19 @@ export async function POST(req: Request) {
             );
     }
 
-    return await streamChatResponse({
+    const response = await streamChatResponse({
       messages,
       sessionId: parsed.data.id,
       signal: req.signal,
       system: buildSystemPrompt(context, sourceScope),
     });
+
+    // Record usage (fire-and-forget, don't block the response)
+    if (process.env.AUTH_BYPASS !== "true" && userId) {
+      void recordAiUsage(userId).catch(() => undefined);
+    }
+
+    return response;
   } catch (error) {
     const isInvalidInput =
       error instanceof Error &&
