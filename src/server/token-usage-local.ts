@@ -357,6 +357,10 @@ function readClaudeWorkspaceEntries() {
 }
 
 export function readWorkspaceLocalTokenUsage() {
+  if (process.env.ENABLE_TOKEN_USAGE !== "true") {
+    return { entries: [], localSources: [] };
+  }
+
   if (cachedLocalTokenUsage != null && cachedLocalTokenUsage.expiresAt > Date.now()) {
     return cachedLocalTokenUsage.value;
   }

@@ -33,12 +33,15 @@ const statCardMeta = [
   },
 ];
 
+const enableTokenUsage = process.env.NEXT_PUBLIC_ENABLE_TOKEN_USAGE === "true";
+
 export default function DashboardPage() {
   const { data, isLoading } = trpc.dashboard.stats.useQuery();
   const { data: tokenOverview, isLoading: tokenLoading } = trpc.tokenUsage.overview.useQuery(
     undefined,
     {
-      refetchInterval: TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS,
+      enabled: enableTokenUsage,
+      refetchInterval: enableTokenUsage ? TOKEN_USAGE_AUTO_REFRESH_INTERVAL_MS : false,
       refetchIntervalInBackground: true,
       refetchOnWindowFocus: true,
     }
@@ -78,27 +81,29 @@ export default function DashboardPage() {
           </Link>
         ))}
 
-        <Link
-          href="/usage"
-          className="rounded-[22px] border border-stone-200 bg-white/92 p-4 shadow-[0_18px_50px_-42px_rgba(15,23,42,0.45)] transition-all hover:border-stone-300 hover:shadow-[0_24px_60px_-44px_rgba(15,23,42,0.55)] dark:border-stone-800 dark:bg-stone-950/88 dark:hover:border-stone-700"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-300">
-            <Activity className="h-4 w-4" />
-          </div>
-          <div className="mt-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {tokenLoading
-              ? "-"
-              : formatCompactTokenCount(tokenOverview?.totals.last7DaysTokens ?? 0)}
-          </div>
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">最近7天 Token</div>
-          <div className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
-            {tokenLoading
-              ? "统计中..."
-              : tokenOverview && tokenOverview.totals.entryCount > 0
-                ? `${tokenOverview.totals.providerCount} 个 provider`
-                : "支持本机本地自动读取"}
-          </div>
-        </Link>
+        {enableTokenUsage && (
+          <Link
+            href="/usage"
+            className="rounded-[22px] border border-stone-200 bg-white/92 p-4 shadow-[0_18px_50px_-42px_rgba(15,23,42,0.45)] transition-all hover:border-stone-300 hover:shadow-[0_24px_60px_-44px_rgba(15,23,42,0.55)] dark:border-stone-800 dark:bg-stone-950/88 dark:hover:border-stone-700"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-300">
+              <Activity className="h-4 w-4" />
+            </div>
+            <div className="mt-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {tokenLoading
+                ? "-"
+                : formatCompactTokenCount(tokenOverview?.totals.last7DaysTokens ?? 0)}
+            </div>
+            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">最近7天 Token</div>
+            <div className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
+              {tokenLoading
+                ? "统计中..."
+                : tokenOverview && tokenOverview.totals.entryCount > 0
+                  ? `${tokenOverview.totals.providerCount} 个 provider`
+                  : "支持本机本地自动读取"}
+            </div>
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -207,6 +212,7 @@ export default function DashboardPage() {
         </section>
       </div>
 
+      {enableTokenUsage && (
       <section className="rounded-[28px] border border-stone-200 bg-white/92 p-5 shadow-[0_22px_80px_-58px_rgba(15,23,42,0.55)] dark:border-stone-800 dark:bg-stone-950/88">
         <div className="flex flex-col gap-3 border-b border-stone-200 pb-4 dark:border-stone-800 md:flex-row md:items-center md:justify-between">
           <div>
@@ -352,6 +358,7 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }
