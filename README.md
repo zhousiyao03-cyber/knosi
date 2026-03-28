@@ -4,11 +4,12 @@
 
 ## 功能（V1）
 
+- **认证** — Auth.js v5 + GitHub / Google OAuth，多用户数据完全隔离
 - **笔记** — Notion 风格块编辑器，支持通栏 280px 头图与内置背景图库、轻量类型/标签 metadata 行、行级悬浮插入、324 × 385 分区插入面板、块菜单（上移/下移/复制/删除/转为）、Slash 命令、Todo/列表、Callout / Toggle、图片上传/拖拽/粘贴、自动保存，以及一键新建带日期标题与 Todo 模版的日记
 - **收藏** — URL 收藏自动抓取正文（Readability），AI 生成摘要和标签
 - **搜索** — Cmd+K 全局搜索笔记、收藏、待办，关键词高亮
 - **Ask AI** — 基于知识库的 chunk 级 hybrid RAG 问答，支持语义检索、关键词召回、邻近段落扩展和可点击引用来源
-- **Token Usage** — 自动读取本机里的 Codex / Claude Code 本地 session（含 Claude subagents，跨工作区聚合），用于展示真实 token 用量；也支持手动补录 OpenAI API / 其他来源，统一在 Dashboard 和独立页面聚合
+- **Token Usage** — 自动读取本机里的 Codex / Claude Code 本地 session（含 Claude subagents，跨工作区聚合），用于展示真实 token 用量；也支持手动补录 OpenAI API / 其他来源，统一在 Dashboard 和独立页面聚合（线上环境默认禁用，本地开发可开启）
 - **Dashboard** — 统计概览 + 最近条目 + token usage 聚合概览
 - **暗色模式** — 全局可切换
 
@@ -19,7 +20,8 @@
 - Next.js 16 (App Router) + React 19
 - Tailwind CSS v4
 - tRPC v11 + Zod v4
-- Drizzle ORM + SQLite (better-sqlite3)
+- Drizzle ORM + SQLite (libsql / Turso)
+- Auth.js v5 (GitHub / Google OAuth)
 - Vercel AI SDK v6 + OpenClaw / Codex OAuth（默认 `gpt-5.4`）/ OpenAI API / 本地 OpenAI-compatible 模型服务
 - @mozilla/readability + linkedom
 - Playwright (E2E)
@@ -34,21 +36,33 @@ pnpm db:push       # 初始化数据库
 pnpm dev            # 启动开发服务器 http://localhost:3000
 ```
 
-需要先基于仓库里的 `.env.example` 生成 `.env.local`，再按需调整环境变量。默认推荐直接复用你已经登录好的 OpenClaw / Codex OAuth：
+需要先基于仓库里的 `.env.example` 生成 `.env.local`，再按需调整环境变量。完整的环境变量示例：
 
 ```bash
-# .env.local
-AI_PROVIDER=codex
+# .env.local 示例
 
-# 下面这些通常可以不写，默认会读取 OpenClaw 的标准位置
-# CODEX_AUTH_STORE_PATH=/Users/yourname/.openclaw/agents/main/agent/auth-profiles.json
-# CODEX_AUTH_PROFILE_ID=openai-codex:default
-# CODEX_MODEL=gpt-5.4
-# CODEX_CHAT_MODEL=gpt-5.4
-# CODEX_TASK_MODEL=gpt-5.4
+# ── 数据库 ──────────────────────────────────────────
+TURSO_DATABASE_URL=file:data/second-brain.db  # 本地开发
+
+# ── 认证 ────────────────────────────────────────────
+AUTH_SECRET=local-dev-secret
+# AUTH_GITHUB_ID=...        # 部署时配置
+# AUTH_GITHUB_SECRET=...
+# AUTH_GOOGLE_ID=...
+# AUTH_GOOGLE_SECRET=...
+
+# ── AI ──────────────────────────────────────────────
+AI_PROVIDER=openai           # 线上用 openai
+OPENAI_API_KEY=...           # 线上配置
+# 本地开发可继续用 codex：
+# AI_PROVIDER=codex
+
+# ── 功能开关 ─────────────────────────────────────────
+ENABLE_TOKEN_USAGE=true
+NEXT_PUBLIC_ENABLE_TOKEN_USAGE=true
 ```
 
-这条路线不会使用 `OPENAI_API_KEY`。运行时会直接读取 `~/.openclaw/openclaw.json` 和 `~/.openclaw/agents/main/agent/auth-profiles.json`，按 OpenClaw 当前默认的 `openai-codex/gpt-5.4` 配置去请求 `chatgpt.com/backend-api`。为了让 Next.js 服务端运行更稳定，仓库内部固定走 SSE transport，而不是 OpenClaw 里的 `auto` WebSocket/SSE 策略。
+本地开发默认推荐直接复用你已经登录好的 OpenClaw / Codex OAuth（`AI_PROVIDER=codex`）。这条路线不会使用 `OPENAI_API_KEY`，运行时会直接读取 `~/.openclaw/openclaw.json` 和 `~/.openclaw/agents/main/agent/auth-profiles.json`，按 OpenClaw 当前默认的 `openai-codex/gpt-5.4` 配置去请求 `chatgpt.com/backend-api`。
 
 如果你想让 Ask AI 的新 chunk 级 RAG 同时开启语义检索，需要额外配置 embedding provider。最简单的两条路是：
 
@@ -172,5 +186,6 @@ docs/
 - [x] Pass 4: Search 增强 + API 加固
 - [x] Pass 5: UX/UI 打磨 + 暗色模式
 - [x] Pass 6: E2E 收尾 + 工程文档收口
+- [x] Vercel 部署准备：Auth.js 认证 + Turso 数据库 + 数据隔离
 
-详见 `docs/v1-plan.md` 和 `docs/changelog/v1-convergence.md`。
+详见 `docs/v1-plan.md` 和 `docs/changelog/`。

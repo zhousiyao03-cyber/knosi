@@ -1,7 +1,7 @@
-import { router, publicProcedure } from "../trpc";
+import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
 import { notes } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import crypto from "crypto";
 import {
@@ -13,18 +13,18 @@ const noteCoverSchema = z.string().trim().nullable().optional();
 const noteIconSchema = z.string().trim().max(8).nullable().optional();
 
 export const notesRouter = router({
-  list: publicProcedure.query(async () => {
-    return db.select().from(notes).orderBy(desc(notes.updatedAt));
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return db.select().from(notes).where(eq(notes.userId, ctx.userId)).orderBy(desc(notes.updatedAt));
   }),
 
-  get: publicProcedure
+  get: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
-      const result = await db.select().from(notes).where(eq(notes.id, input.id));
+    .query(async ({ input, ctx }) => {
+      const result = await db.select().from(notes).where(and(eq(notes.id, input.id), eq(notes.userId, ctx.userId)));
       return result[0] ?? null;
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
         title: z.string(),
@@ -36,11 +36,9 @@ export const notesRouter = router({
         tags: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const id = crypto.randomUUID();
-      // TODO(task-5): replace with real userId from session
-      const userId = "local-dev";
-      await db.insert(notes).values({ id, userId, ...input });
+      await db.insert(notes).values({ id, userId: ctx.userId, ...input });
       const [createdNote] = await db.select().from(notes).where(eq(notes.id, id));
       if (createdNote) {
         void syncNoteKnowledgeIndex(createdNote, "note-create").catch(
@@ -50,7 +48,7 @@ export const notesRouter = router({
       return { id };
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -63,14 +61,14 @@ export const notesRouter = router({
         tags: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
       await db
         .update(notes)
         .set({ ...data, updatedAt: new Date() })
-        .where(eq(notes.id, id));
+        .where(and(eq(notes.id, id), eq(notes.userId, ctx.userId)));
 
-      const [updatedNote] = await db.select().from(notes).where(eq(notes.id, id));
+      const [updatedNote] = await db.select().from(notes).where(and(eq(notes.id, id), eq(notes.userId, ctx.userId)));
       if (updatedNote) {
         void syncNoteKnowledgeIndex(updatedNote, "note-update").catch(
           () => undefined
@@ -80,10 +78,10 @@ export const notesRouter = router({
       return { id };
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
-      await db.delete(notes).where(eq(notes.id, input.id));
+    .mutation(async ({ input, ctx }) => {
+      await db.delete(notes).where(and(eq(notes.id, input.id), eq(notes.userId, ctx.userId)));
       void removeKnowledgeSourceIndex("note", input.id).catch(() => undefined);
       return { success: true };
     }),

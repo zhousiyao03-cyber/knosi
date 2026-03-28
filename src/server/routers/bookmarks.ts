@@ -1,7 +1,7 @@
-import { router, publicProcedure } from "../trpc";
+import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
 import { bookmarks } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import crypto from "crypto";
 import { fetchContent } from "../ai/fetch-content";
@@ -11,11 +11,11 @@ import {
 } from "../ai/indexer";
 
 export const bookmarksRouter = router({
-  list: publicProcedure.query(async () => {
-    return db.select().from(bookmarks).orderBy(desc(bookmarks.createdAt));
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return db.select().from(bookmarks).where(eq(bookmarks.userId, ctx.userId)).orderBy(desc(bookmarks.createdAt));
   }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
         url: z.string().optional(),
@@ -25,15 +25,13 @@ export const bookmarksRouter = router({
         source: z.enum(["url", "text", "lark"]).default("url"),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const id = crypto.randomUUID();
-      // TODO(task-5): replace with real userId from session
-      const userId = "local-dev";
 
       // Insert immediately with pending status
       await db.insert(bookmarks).values({
         id,
-        userId,
+        userId: ctx.userId,
         ...input,
         status: input.source === "url" && input.url ? "pending" : "processed",
       });
@@ -73,7 +71,7 @@ export const bookmarksRouter = router({
       return { id };
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -81,17 +79,17 @@ export const bookmarksRouter = router({
         tags: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
       await db
         .update(bookmarks)
         .set({ ...data, updatedAt: new Date() })
-        .where(eq(bookmarks.id, id));
+        .where(and(eq(bookmarks.id, id), eq(bookmarks.userId, ctx.userId)));
 
       const [updatedBookmark] = await db
         .select()
         .from(bookmarks)
-        .where(eq(bookmarks.id, id));
+        .where(and(eq(bookmarks.id, id), eq(bookmarks.userId, ctx.userId)));
       if (updatedBookmark) {
         void syncBookmarkKnowledgeIndex(updatedBookmark, "bookmark-update").catch(
           () => undefined
@@ -101,13 +99,13 @@ export const bookmarksRouter = router({
       return { success: true };
     }),
 
-  refetch: publicProcedure
+  refetch: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const [bookmark] = await db
         .select()
         .from(bookmarks)
-        .where(eq(bookmarks.id, input.id));
+        .where(and(eq(bookmarks.id, input.id), eq(bookmarks.userId, ctx.userId)));
 
       if (!bookmark || !bookmark.url) {
         return { success: false };
@@ -124,18 +122,18 @@ export const bookmarksRouter = router({
             status: "processed",
             updatedAt: new Date(),
           })
-          .where(eq(bookmarks.id, input.id));
+          .where(and(eq(bookmarks.id, input.id), eq(bookmarks.userId, ctx.userId)));
       } else {
         await db
           .update(bookmarks)
           .set({ status: "failed", updatedAt: new Date() })
-          .where(eq(bookmarks.id, input.id));
+          .where(and(eq(bookmarks.id, input.id), eq(bookmarks.userId, ctx.userId)));
       }
 
       const [updatedBookmark] = await db
         .select()
         .from(bookmarks)
-        .where(eq(bookmarks.id, input.id));
+        .where(and(eq(bookmarks.id, input.id), eq(bookmarks.userId, ctx.userId)));
       if (updatedBookmark) {
         void syncBookmarkKnowledgeIndex(updatedBookmark, "bookmark-refetch").catch(
           () => undefined
@@ -146,10 +144,10 @@ export const bookmarksRouter = router({
       return { success: false };
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
-      await db.delete(bookmarks).where(eq(bookmarks.id, input.id));
+    .mutation(async ({ input, ctx }) => {
+      await db.delete(bookmarks).where(and(eq(bookmarks.id, input.id), eq(bookmarks.userId, ctx.userId)));
       void removeKnowledgeSourceIndex("bookmark", input.id).catch(
         () => undefined
       );
