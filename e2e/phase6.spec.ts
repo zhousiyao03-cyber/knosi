@@ -18,6 +18,14 @@ test.describe("Phase 6: 首页仪表盘", () => {
     await expect(page.getByText("今日任务")).toHaveCount(0);
   });
 
+  test("桌面端首页使用铺满主栏的内容栅格", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 980 });
+    await page.goto("/");
+
+    await expect(page.getByTestId("dashboard-content-grid")).toBeVisible();
+    await expect(page.getByTestId("dashboard-notes-panel")).toBeVisible();
+  });
+
   test("统计卡片链接跳转", async ({ page }) => {
     await page.goto("/");
     // Click notes card link
