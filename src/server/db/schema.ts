@@ -1,6 +1,37 @@
 import { sqliteTable, text, integer, real, blob } from "drizzle-orm/sqlite-core";
 import { TOKEN_USAGE_PROVIDERS } from "@/lib/token-usage";
 
+// ── Auth.js tables ──────────────────────────────────
+
+export const users = sqliteTable("users", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email").unique(),
+  emailVerified: integer("email_verified", { mode: "timestamp" }),
+  image: text("image"),
+});
+
+export const accounts = sqliteTable("accounts", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  provider: text("provider").notNull(),
+  providerAccountId: text("provider_account_id").notNull(),
+  refresh_token: text("refresh_token"),
+  access_token: text("access_token"),
+  expires_at: integer("expires_at"),
+  token_type: text("token_type"),
+  scope: text("scope"),
+  id_token: text("id_token"),
+  session_state: text("session_state"),
+});
+
 export const notes = sqliteTable("notes", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),

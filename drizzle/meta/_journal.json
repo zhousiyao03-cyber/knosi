@@ -15,6 +15,13 @@
       "when": 1774190304453,
       "tag": "0001_strange_kat_farrell",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1774661655421,
+      "tag": "0002_heavy_fantastic_four",
+      "breakpoints": true
     }
   ]
 }

@@ -15,8 +15,9 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.47",
-    "@libsql/client": "^0.17.2",
     "@ai-sdk/react": "^3.0.136",
+    "@auth/drizzle-adapter": "^1.11.1",
+    "@libsql/client": "^0.17.2",
     "@mariozechner/pi-ai": "0.61.1",
     "@mozilla/readability": "^0.6.0",
     "@tanstack/react-query": "^5.91.3",
@@ -46,6 +47,7 @@
     "lowlight": "^3.3.0",
     "lucide-react": "^0.577.0",
     "next": "16.2.1",
+    "next-auth": "5.0.0-beta.30",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "superjson": "^2.2.6",
