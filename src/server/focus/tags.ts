@@ -35,6 +35,8 @@ const DOMAIN_TAG_RULES: TagRule[] = [
   { pattern: /npmjs\.com|nodejs\.org/i, tags: ["javascript", "reference"] },
   { pattern: /developer\.mozilla\.org/i, tags: ["reference"] },
   { pattern: /docs\.google\.com/i, tags: ["docs", "writing"] },
+  { pattern: /linear\.app|atlassian\.net/i, tags: ["coding"] },
+  { pattern: /perplexity\.ai/i, tags: ["reference"] },
   { pattern: /notion\.so/i, tags: ["writing"] },
   { pattern: /meet\.google\.com/i, tags: ["meeting"] },
   { pattern: /zoom\.us/i, tags: ["meeting"] },
@@ -78,6 +80,31 @@ function hostnameFromUrl(url: string) {
   }
 }
 
+function surfaceTypeTags(surfaceType: string | null | undefined): FocusTag[] {
+  switch (surfaceType) {
+    case "repo":
+    case "pr":
+    case "issue":
+      return ["git", "coding"];
+    case "docs":
+      return ["docs", "reference"];
+    case "design":
+      return ["design"];
+    case "mail":
+      return ["communication"];
+    case "calendar":
+      return ["meeting"];
+    case "video":
+      return ["entertainment"];
+    case "search":
+      return ["reference"];
+    case "chat":
+      return ["communication"];
+    default:
+      return [];
+  }
+}
+
 export function domainTags(url: string) {
   const hostname = hostnameFromUrl(url);
   if (!hostname) {
@@ -95,6 +122,7 @@ export function autoTag(input: {
   appName: string;
   windowTitle: string | null;
   browserUrl: string | null;
+  browserSurfaceType?: string | null;
 }) {
   const tags = new Set<FocusTag>();
 
@@ -107,6 +135,10 @@ export function autoTag(input: {
     for (const tag of domainTags(input.browserUrl)) {
       tags.add(tag);
     }
+  }
+
+  for (const tag of surfaceTypeTags(input.browserSurfaceType)) {
+    tags.add(tag);
   }
 
   return [...tags];

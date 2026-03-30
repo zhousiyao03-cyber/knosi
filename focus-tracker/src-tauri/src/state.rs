@@ -486,6 +486,10 @@ mod tests {
             window_title: window_title.map(str::to_string),
             browser_url: None,
             browser_page_title: None,
+            browser_host: None,
+            browser_path: None,
+            browser_search_query: None,
+            browser_surface_type: None,
             visible_apps: vec![],
             started_at,
             ended_at,
@@ -499,6 +503,10 @@ mod tests {
             window_title: window_title.map(str::to_string),
             browser_url: None,
             browser_page_title: None,
+            browser_host: None,
+            browser_path: None,
+            browser_search_query: None,
+            browser_surface_type: None,
             visible_apps: vec![],
         }
     }

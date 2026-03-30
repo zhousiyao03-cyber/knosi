@@ -36,6 +36,16 @@ test("domainTags tags google docs as docs + writing", () => {
   assert.ok(tags.includes("writing"));
 });
 
+test("domainTags tags linear as coding", () => {
+  const tags = domainTags("https://linear.app/team/issue/ABC-123/focus");
+  assert.ok(tags.includes("coding"));
+});
+
+test("domainTags tags perplexity as reference", () => {
+  const tags = domainTags("https://www.perplexity.ai/search?q=rust");
+  assert.ok(tags.includes("reference"));
+});
+
 test("domainTags tags google meet as meeting", () => {
   assert.ok(domainTags("https://meet.google.com/abc-def").includes("meeting"));
 });
@@ -81,6 +91,7 @@ test("autoTag combines browser URL tags with app tags", () => {
     appName: "Google Chrome",
     windowTitle: "GitHub",
     browserUrl: "https://github.com/user/repo",
+    browserSurfaceType: "repo",
   });
 
   assert.ok(tags.includes("browser"));
@@ -93,6 +104,7 @@ test("autoTag falls back to app tags when no URL", () => {
     appName: "Visual Studio Code",
     windowTitle: "index.ts",
     browserUrl: null,
+    browserSurfaceType: null,
   });
 
   assert.ok(tags.includes("editor"));
@@ -105,6 +117,7 @@ test("autoTag deduplicates tags", () => {
     appName: "Google Chrome",
     windowTitle: "GitHub",
     browserUrl: "https://github.com/user/repo",
+    browserSurfaceType: "repo",
   });
 
   assert.deepEqual(tags, [...new Set(tags)]);
@@ -124,4 +137,28 @@ test("countsTowardWorkHours returns false for social-media", () => {
 
 test("countsTowardWorkHours returns true for empty tags", () => {
   assert.equal(countsTowardWorkHours([]), true);
+});
+
+test("autoTag uses browser surface type when URL rules are weak", () => {
+  const tags = autoTag({
+    appName: "Google Chrome",
+    windowTitle: "Search results",
+    browserUrl: "https://www.google.com/search?q=rust",
+    browserSurfaceType: "search",
+  });
+
+  assert.ok(tags.includes("browser"));
+  assert.ok(tags.includes("reference"));
+});
+
+test("autoTag marks video surface as entertainment", () => {
+  const tags = autoTag({
+    appName: "Google Chrome",
+    windowTitle: "Video",
+    browserUrl: "https://example.com/video/123",
+    browserSurfaceType: "video",
+  });
+
+  assert.ok(tags.includes("entertainment"));
+  assert.equal(countsTowardWorkHours(tags), false);
 });

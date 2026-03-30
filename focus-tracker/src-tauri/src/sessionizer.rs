@@ -16,6 +16,14 @@ pub struct EnrichedSample {
     #[serde(default)]
     pub browser_page_title: Option<String>,
     #[serde(default)]
+    pub browser_host: Option<String>,
+    #[serde(default)]
+    pub browser_path: Option<String>,
+    #[serde(default)]
+    pub browser_search_query: Option<String>,
+    #[serde(default)]
+    pub browser_surface_type: Option<String>,
+    #[serde(default)]
     pub visible_apps: Vec<String>,
 }
 
@@ -30,6 +38,14 @@ pub struct QueuedSession {
     #[serde(default)]
     pub browser_page_title: Option<String>,
     #[serde(default)]
+    pub browser_host: Option<String>,
+    #[serde(default)]
+    pub browser_path: Option<String>,
+    #[serde(default)]
+    pub browser_search_query: Option<String>,
+    #[serde(default)]
+    pub browser_surface_type: Option<String>,
+    #[serde(default)]
     pub visible_apps: Vec<String>,
     pub started_at: DateTime<Utc>,
     pub ended_at: DateTime<Utc>,
@@ -43,6 +59,10 @@ struct ActiveSession {
     window_title: Option<String>,
     browser_url: Option<String>,
     browser_page_title: Option<String>,
+    browser_host: Option<String>,
+    browser_path: Option<String>,
+    browser_search_query: Option<String>,
+    browser_surface_type: Option<String>,
     visible_apps: Vec<String>,
     started_at: DateTime<Utc>,
     ended_at: DateTime<Utc>,
@@ -95,6 +115,10 @@ impl FocusSessionizer {
         if same_window {
             current.browser_url = sample.browser_url;
             current.browser_page_title = sample.browser_page_title;
+            current.browser_host = sample.browser_host;
+            current.browser_path = sample.browser_path;
+            current.browser_search_query = sample.browser_search_query;
+            current.browser_surface_type = sample.browser_surface_type;
             current.visible_apps = sample.visible_apps;
             current.ended_at = observed_at;
             self.pending = None;
@@ -120,6 +144,10 @@ impl FocusSessionizer {
             window_title: current.window_title,
             browser_url: current.browser_url,
             browser_page_title: current.browser_page_title,
+            browser_host: current.browser_host,
+            browser_path: current.browser_path,
+            browser_search_query: current.browser_search_query,
+            browser_surface_type: current.browser_surface_type,
             visible_apps: current.visible_apps,
             started_at: current.started_at,
             ended_at,
@@ -140,6 +168,10 @@ impl FocusSessionizer {
             window_title: current.window_title.clone(),
             browser_url: current.browser_url.clone(),
             browser_page_title: current.browser_page_title.clone(),
+            browser_host: current.browser_host.clone(),
+            browser_path: current.browser_path.clone(),
+            browser_search_query: current.browser_search_query.clone(),
+            browser_surface_type: current.browser_surface_type.clone(),
             visible_apps: current.visible_apps.clone(),
             started_at: current.started_at,
             ended_at,
@@ -157,6 +189,10 @@ impl FocusSessionizer {
                         window_title: sample.window_title,
                         browser_url: sample.browser_url,
                         browser_page_title: sample.browser_page_title,
+                        browser_host: sample.browser_host,
+                        browser_path: sample.browser_path,
+                        browser_search_query: sample.browser_search_query,
+                        browser_surface_type: sample.browser_surface_type,
                         visible_apps: sample.visible_apps,
                         started_at: pending.started_at,
                         ended_at: observed_at,
@@ -191,6 +227,10 @@ impl FocusSessionizer {
                     window_title: sample.window_title,
                     browser_url: sample.browser_url,
                     browser_page_title: sample.browser_page_title,
+                    browser_host: sample.browser_host,
+                    browser_path: sample.browser_path,
+                    browser_search_query: sample.browser_search_query,
+                    browser_surface_type: sample.browser_surface_type,
                     visible_apps: sample.visible_apps,
                     started_at: next_started_at,
                     ended_at: observed_at,
@@ -207,6 +247,10 @@ impl FocusSessionizer {
                     window_title: current.window_title,
                     browser_url: current.browser_url,
                     browser_page_title: current.browser_page_title,
+                    browser_host: current.browser_host,
+                    browser_path: current.browser_path,
+                    browser_search_query: current.browser_search_query,
+                    browser_surface_type: current.browser_surface_type,
                     visible_apps: current.visible_apps,
                     started_at: current.started_at,
                     ended_at,
@@ -292,6 +336,10 @@ mod tests {
             window_title: window_title.map(str::to_string),
             browser_url: None,
             browser_page_title: None,
+            browser_host: None,
+            browser_path: None,
+            browser_search_query: None,
+            browser_surface_type: None,
             visible_apps: vec![],
         }
     }

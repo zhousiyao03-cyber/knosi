@@ -228,6 +228,10 @@ export const activitySessions = sqliteTable(
     tags: text("tags"),
     browserUrl: text("browser_url"),
     browserPageTitle: text("browser_page_title"),
+    browserHost: text("browser_host"),
+    browserPath: text("browser_path"),
+    browserSearchQuery: text("browser_search_query"),
+    browserSurfaceType: text("browser_surface_type"),
     visibleApps: text("visible_apps"),
     aiSummary: text("ai_summary"),
     ingestionStatus: text("ingestion_status", {

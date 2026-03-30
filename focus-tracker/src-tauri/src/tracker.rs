@@ -2,6 +2,7 @@ use std::process::Command;
 
 use crate::{
     accessibility,
+    browser_semantics::extract_browser_semantics,
     sessionizer::EnrichedSample,
     window_list,
 };
@@ -85,6 +86,8 @@ pub fn get_enriched_sample() -> Option<EnrichedSample> {
     } else {
         None
     };
+    let browser_semantics =
+        extract_browser_semantics(browser_url.as_deref(), browser_page_title.as_deref());
     let visible_apps = window_list::get_visible_windows(&app_name)
         .into_iter()
         .filter(|window| !window.is_frontmost && window.app_name != app_name)
@@ -98,6 +101,10 @@ pub fn get_enriched_sample() -> Option<EnrichedSample> {
         window_title,
         browser_url,
         browser_page_title,
+        browser_host: browser_semantics.browser_host,
+        browser_path: browser_semantics.browser_path,
+        browser_search_query: browser_semantics.browser_search_query,
+        browser_surface_type: browser_semantics.browser_surface_type,
         visible_apps,
     })
 }

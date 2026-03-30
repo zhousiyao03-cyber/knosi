@@ -324,6 +324,10 @@ export const focusRouter = router({
           appName: session.appName,
           windowTitle: session.windowTitle,
           browserUrl: session.browserUrl,
+          browserPageTitle: session.browserPageTitle,
+          browserSearchQuery: session.browserSearchQuery,
+          browserSurfaceType: session.browserSurfaceType,
+          displayLabel: null,
           tags: session.tags,
           durationSecs: session.durationSecs,
         }))
@@ -369,7 +373,7 @@ export const focusRouter = router({
       }
 
       const summary = await generateDailySummary({
-        sessions: daily.sessions,
+        sessions: daily.displaySessions,
         totalSecs: daily.totalSecs,
         tagBreakdown: daily.tagBreakdown,
         longestStreakSecs: daily.longestStreakSecs,

@@ -5,6 +5,12 @@ type FocusSessionSlice = {
   appName: string;
   windowTitle: string | null;
   browserUrl?: string | null;
+  browserPageTitle?: string | null;
+  browserHost?: string | null;
+  browserPath?: string | null;
+  browserSearchQuery?: string | null;
+  browserSurfaceType?: string | null;
+  displayLabel?: string | null;
   startedAt: string | Date;
   endedAt: string | Date;
   durationSecs: number;
@@ -86,6 +92,54 @@ export function buildTopApps(sessions: FocusSessionSlice[]) {
   return [...byApp.values()]
     .sort((left, right) => right.durationSecs - left.durationSecs)
     .slice(0, 4);
+}
+
+export function getFocusSessionLabel(session: FocusSessionSlice) {
+  if (session.displayLabel) {
+    return session.displayLabel;
+  }
+
+  if (session.browserSurfaceType === "search" && session.browserSearchQuery) {
+    return `Search: ${session.browserSearchQuery}`;
+  }
+
+  if (session.browserSurfaceType === "pr") {
+    return "GitHub PR review";
+  }
+
+  if (session.browserSurfaceType === "issue") {
+    return "GitHub issue review";
+  }
+
+  if (session.browserSurfaceType === "repo") {
+    return "GitHub repository";
+  }
+
+  if (session.browserSurfaceType === "chat") {
+    return session.browserPageTitle || "AI chat";
+  }
+
+  if (session.browserSurfaceType === "docs") {
+    return session.browserPageTitle || "Documentation";
+  }
+
+  if (session.browserSurfaceType === "design") {
+    return session.browserPageTitle || "Design review";
+  }
+
+  if (session.browserSurfaceType === "mail") {
+    return "Mail";
+  }
+
+  if (session.browserSurfaceType === "calendar") {
+    return "Calendar";
+  }
+
+  if (session.browserSurfaceType === "video") {
+    return session.browserPageTitle || "Video";
+  }
+
+  return session.browserPageTitle || session.appName;
 }
 
 function getSegmentColor(appName: string) {

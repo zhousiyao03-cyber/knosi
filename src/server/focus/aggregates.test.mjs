@@ -15,6 +15,10 @@ const baseSession = {
   windowTitle: "auth.ts - second-brain",
   browserUrl: null,
   browserPageTitle: null,
+  browserHost: null,
+  browserPath: null,
+  browserSearchQuery: null,
+  browserSurfaceType: null,
   visibleApps: JSON.stringify(["Visual Studio Code"]),
   startedAt: new Date("2026-03-29T23:50:00.000Z"),
   endedAt: new Date("2026-03-30T00:20:00.000Z"),
@@ -217,4 +221,117 @@ test("workHours excludes sessions that resolve to other", () => {
 
   assert.equal(stats.focusedSecs, 35 * 60);
   assert.equal(stats.workHoursSecs, 30 * 60);
+});
+
+test("buildDisplaySessionsFromSlices keeps distinct search queries in separate blocks", () => {
+  const slices = [
+    {
+      ...baseSession,
+      id: "search-a",
+      sourceSessionId: "search-a",
+      appName: "Google Chrome",
+      browserUrl: "https://www.google.com/search?q=rust+tauri",
+      browserPageTitle: "rust tauri - Google Search",
+      browserHost: "www.google.com",
+      browserPath: "/search",
+      browserSearchQuery: "rust tauri",
+      browserSurfaceType: "search",
+      tags: JSON.stringify(["browser", "reference"]),
+      startedAt: new Date("2026-03-30T10:00:00.000Z"),
+      endedAt: new Date("2026-03-30T10:08:00.000Z"),
+      durationSecs: 8 * 60,
+      originalStartedAt: new Date("2026-03-30T10:00:00.000Z"),
+      originalEndedAt: new Date("2026-03-30T10:08:00.000Z"),
+    },
+    {
+      ...baseSession,
+      id: "search-b",
+      sourceSessionId: "search-b",
+      appName: "Google Chrome",
+      browserUrl: "https://www.google.com/search?q=swift+tauri",
+      browserPageTitle: "swift tauri - Google Search",
+      browserHost: "www.google.com",
+      browserPath: "/search",
+      browserSearchQuery: "swift tauri",
+      browserSurfaceType: "search",
+      tags: JSON.stringify(["browser", "reference"]),
+      startedAt: new Date("2026-03-30T10:08:30.000Z"),
+      endedAt: new Date("2026-03-30T10:16:00.000Z"),
+      durationSecs: 7 * 60 + 30,
+      originalStartedAt: new Date("2026-03-30T10:08:30.000Z"),
+      originalEndedAt: new Date("2026-03-30T10:16:00.000Z"),
+    },
+  ];
+
+  const displaySessions = buildDisplaySessionsFromSlices(slices);
+
+  assert.equal(displaySessions.length, 2);
+  assert.equal(displaySessions[0].displayLabel, "Search: rust tauri");
+  assert.equal(displaySessions[1].displayLabel, "Search: swift tauri");
+});
+
+test("buildDisplaySessionsFromSlices merges the same PR across a short interruption", () => {
+  const slices = [
+    {
+      ...baseSession,
+      id: "pr-a",
+      sourceSessionId: "pr-a",
+      appName: "Google Chrome",
+      browserUrl: "https://github.com/openai/openai-node/pull/42",
+      browserPageTitle: "Improve focus ingestion by teammate",
+      browserHost: "github.com",
+      browserPath: "/openai/openai-node/pull/42",
+      browserSearchQuery: null,
+      browserSurfaceType: "pr",
+      tags: JSON.stringify(["browser", "git", "coding"]),
+      startedAt: new Date("2026-03-30T11:00:00.000Z"),
+      endedAt: new Date("2026-03-30T11:12:00.000Z"),
+      durationSecs: 12 * 60,
+      originalStartedAt: new Date("2026-03-30T11:00:00.000Z"),
+      originalEndedAt: new Date("2026-03-30T11:12:00.000Z"),
+    },
+    {
+      ...baseSession,
+      id: "interrupt",
+      sourceSessionId: "interrupt",
+      appName: "Slack",
+      browserUrl: null,
+      browserPageTitle: null,
+      browserHost: null,
+      browserPath: null,
+      browserSearchQuery: null,
+      browserSurfaceType: null,
+      tags: JSON.stringify(["communication"]),
+      startedAt: new Date("2026-03-30T11:12:10.000Z"),
+      endedAt: new Date("2026-03-30T11:12:55.000Z"),
+      durationSecs: 45,
+      originalStartedAt: new Date("2026-03-30T11:12:10.000Z"),
+      originalEndedAt: new Date("2026-03-30T11:12:55.000Z"),
+    },
+    {
+      ...baseSession,
+      id: "pr-b",
+      sourceSessionId: "pr-b",
+      appName: "Google Chrome",
+      browserUrl: "https://github.com/openai/openai-node/pull/42",
+      browserPageTitle: "Improve focus ingestion by teammate",
+      browserHost: "github.com",
+      browserPath: "/openai/openai-node/pull/42",
+      browserSearchQuery: null,
+      browserSurfaceType: "pr",
+      tags: JSON.stringify(["browser", "git", "coding"]),
+      startedAt: new Date("2026-03-30T11:13:00.000Z"),
+      endedAt: new Date("2026-03-30T11:30:00.000Z"),
+      durationSecs: 17 * 60,
+      originalStartedAt: new Date("2026-03-30T11:13:00.000Z"),
+      originalEndedAt: new Date("2026-03-30T11:30:00.000Z"),
+    },
+  ];
+
+  const displaySessions = buildDisplaySessionsFromSlices(slices);
+
+  assert.equal(displaySessions.length, 1);
+  assert.equal(displaySessions[0].displayLabel, "GitHub PR review");
+  assert.equal(displaySessions[0].rawSessionCount, 3);
+  assert.equal(displaySessions[0].interruptionCount, 1);
 });

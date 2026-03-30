@@ -52,6 +52,31 @@ function hostnameFromUrl(url) {
   }
 }
 
+function surfaceTypeTags(surfaceType) {
+  switch (surfaceType) {
+    case "repo":
+    case "pr":
+    case "issue":
+      return ["git", "coding"];
+    case "docs":
+      return ["docs", "reference"];
+    case "design":
+      return ["design"];
+    case "mail":
+      return ["communication"];
+    case "calendar":
+      return ["meeting"];
+    case "video":
+      return ["entertainment"];
+    case "search":
+      return ["reference"];
+    case "chat":
+      return ["communication"];
+    default:
+      return [];
+  }
+}
+
 export function domainTags(url) {
   const hostname = hostnameFromUrl(url);
   if (!hostname) {
@@ -77,6 +102,10 @@ export function autoTag(input) {
     for (const tag of domainTags(input.browserUrl)) {
       tags.add(tag);
     }
+  }
+
+  for (const tag of surfaceTypeTags(input.browserSurfaceType)) {
+    tags.add(tag);
   }
 
   return [...tags];

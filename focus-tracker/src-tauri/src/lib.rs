@@ -1,4 +1,5 @@
 mod accessibility;
+mod browser_semantics;
 mod error_state;
 mod outbox;
 mod pairing;

@@ -14,6 +14,18 @@ function formatDurationShort(totalSecs: number) {
 }
 
 function fallbackSessionSummary(session: SessionForClassification) {
+  if (session.displayLabel?.trim()) {
+    return `${session.displayLabel} for ${formatDurationShort(session.durationSecs)}`;
+  }
+
+  if (session.browserSearchQuery?.trim()) {
+    return `Searched for ${session.browserSearchQuery} in ${session.appName}`;
+  }
+
+  if (session.browserPageTitle?.trim()) {
+    return `${session.browserPageTitle} in ${session.appName}`;
+  }
+
   const title = session.windowTitle?.trim();
   if (title) {
     return `${title} in ${session.appName}`;
@@ -35,6 +47,10 @@ type SessionForClassification = {
   appName: string;
   windowTitle: string | null;
   browserUrl: string | null;
+  browserPageTitle?: string | null;
+  browserSearchQuery?: string | null;
+  browserSurfaceType?: string | null;
+  displayLabel?: string | null;
   tags: string | null;
   durationSecs: number;
 };
@@ -43,6 +59,10 @@ type SessionForSummary = {
   appName: string;
   windowTitle: string | null;
   browserUrl: string | null;
+  browserPageTitle?: string | null;
+  browserSearchQuery?: string | null;
+  browserSurfaceType?: string | null;
+  displayLabel?: string | null;
   tags: string | null;
   startedAt: Date;
   endedAt: Date;
@@ -58,7 +78,7 @@ export async function classifyActivitySessions(sessions: SessionForClassificatio
   const sessionList = sessions
     .map(
       (session) =>
-        `- id=${session.id} | app=${session.appName} | title=${session.windowTitle ?? "(no title)"} | duration=${Math.max(1, Math.round(session.durationSecs / 60))}min`
+        `- id=${session.id} | app=${session.appName} | label=${session.displayLabel ?? "(none)"} | title=${session.windowTitle ?? "(no title)"} | page=${session.browserPageTitle ?? "(no page title)"} | surface=${session.browserSurfaceType ?? "unknown"} | query=${session.browserSearchQuery ?? "(none)"} | duration=${Math.max(1, Math.round(session.durationSecs / 60))}min`
     )
     .join("\n");
 
@@ -99,7 +119,12 @@ export async function generateDailySummary(input: {
       const start = session.startedAt.toISOString();
       const end = session.endedAt.toISOString();
       const tags = parseTags(session.tags).join(", ") || "untagged";
-      const summary = session.aiSummary ?? session.windowTitle ?? session.appName;
+      const summary =
+        session.displayLabel ??
+        session.aiSummary ??
+        session.browserPageTitle ??
+        session.windowTitle ??
+        session.appName;
       const location = session.browserUrl ? ` (${session.browserUrl})` : "";
       return `${start} -> ${end} [${tags}] ${summary}${location}`;
     })
@@ -128,8 +153,18 @@ ${timeline}`,
 
     return result.summary;
   } catch {
-    const topApps = [...new Set(input.sessions.map((session) => session.appName))].slice(0, 3);
-    return `Focused for ${formatDurationShort(input.totalSecs)} on ${input.date}, mostly in ${topApps.join(", ")}. Longest streak was ${formatDurationShort(input.longestStreakSecs)} with ${input.appSwitches} app switches.`;
+    const topLabels = [
+      ...new Set(
+        input.sessions.map(
+          (session) =>
+            session.displayLabel ??
+            session.browserPageTitle ??
+            session.windowTitle ??
+            session.appName
+        )
+      ),
+    ].slice(0, 3);
+    return `Focused for ${formatDurationShort(input.totalSecs)} on ${input.date}, mostly in ${topLabels.join(", ")}. Longest streak was ${formatDurationShort(input.longestStreakSecs)} with ${input.appSwitches} app switches.`;
   }
 }
 

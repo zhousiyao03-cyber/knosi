@@ -9,6 +9,10 @@ export type FocusSessionRecord = {
   windowTitle: string | null;
   browserUrl: string | null;
   browserPageTitle: string | null;
+  browserHost: string | null;
+  browserPath: string | null;
+  browserSearchQuery: string | null;
+  browserSurfaceType: string | null;
   visibleApps: string | null;
   startedAt: Date;
   endedAt: Date;
@@ -30,6 +34,7 @@ export type FocusSessionSlice = FocusSessionRecord & {
 export type FocusDisplaySession = FocusSessionSlice & {
   id: string;
   sourceSessionId: string;
+  displayLabel: string;
   spanSecs: number;
   focusedSecs: number;
   rawSessionCount: number;
@@ -202,9 +207,34 @@ export function buildDailyStats({
 }
 
 function sharesDisplayGroup(
-  left: Pick<FocusSessionSlice, "appName" | "tags">,
-  right: Pick<FocusSessionSlice, "appName" | "tags">
+  left: Pick<
+    FocusSessionSlice,
+    | "appName"
+    | "tags"
+    | "browserSurfaceType"
+    | "browserSearchQuery"
+    | "browserHost"
+    | "browserPath"
+    | "browserPageTitle"
+  >,
+  right: Pick<
+    FocusSessionSlice,
+    | "appName"
+    | "tags"
+    | "browserSurfaceType"
+    | "browserSearchQuery"
+    | "browserHost"
+    | "browserPath"
+    | "browserPageTitle"
+  >
 ) {
+  const leftSemanticKey = getSessionSemanticKey(left);
+  const rightSemanticKey = getSessionSemanticKey(right);
+
+  if (leftSemanticKey && rightSemanticKey) {
+    return leftSemanticKey === rightSemanticKey;
+  }
+
   const leftTags = parseJsonStringArray(left.tags);
   const rightTags = parseJsonStringArray(right.tags);
 
@@ -238,12 +268,102 @@ function toDisplaySession(slice: FocusSessionSlice): FocusDisplaySession {
     ...slice,
     id: `display-${slice.sourceSessionId}`,
     sourceSessionId: `display-${slice.sourceSessionId}`,
+    displayLabel: getSessionDisplayLabel(slice),
     spanSecs: slice.durationSecs,
     focusedSecs: slice.durationSecs,
     rawSessionCount: 1,
     interruptionCount: 0,
     mergedSourceSessionIds: [slice.sourceSessionId],
   };
+}
+
+function normalizeLabelSegment(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function getSessionSemanticKey(
+  session: Pick<
+    FocusSessionSlice,
+    | "appName"
+    | "browserSurfaceType"
+    | "browserSearchQuery"
+    | "browserHost"
+    | "browserPath"
+    | "browserPageTitle"
+  >
+) {
+  const surfaceType = session.browserSurfaceType?.trim().toLowerCase();
+  if (!surfaceType) {
+    return null;
+  }
+
+  switch (surfaceType) {
+    case "search":
+      return session.browserSearchQuery
+        ? `search:${normalizeLabelSegment(session.browserSearchQuery)}`
+        : `search:${session.browserHost ?? "unknown"}`;
+    case "pr":
+    case "issue":
+      return `${surfaceType}:${session.browserHost ?? ""}${session.browserPath ?? ""}`;
+    case "repo": {
+      const segments = (session.browserPath ?? "")
+        .split("/")
+        .filter(Boolean)
+        .slice(0, 2)
+        .join("/");
+      return `repo:${session.browserHost ?? ""}/${segments}`;
+    }
+    case "docs":
+    case "design":
+    case "chat":
+      return `${surfaceType}:${normalizeLabelSegment(
+        session.browserPageTitle ?? `${session.browserHost ?? ""}${session.browserPath ?? ""}`
+      )}`;
+    case "mail":
+    case "calendar":
+    case "video":
+      return `${surfaceType}:${session.browserHost ?? ""}`;
+    default:
+      return `${surfaceType}:${session.browserHost ?? ""}${session.browserPath ?? ""}`;
+  }
+}
+
+function getSessionDisplayLabel(
+  session: Pick<
+    FocusSessionSlice,
+    | "appName"
+    | "browserSurfaceType"
+    | "browserSearchQuery"
+    | "browserPageTitle"
+    | "browserHost"
+  >
+) {
+  switch (session.browserSurfaceType) {
+    case "search":
+      return session.browserSearchQuery
+        ? `Search: ${session.browserSearchQuery}`
+        : "Search";
+    case "pr":
+      return "GitHub PR review";
+    case "issue":
+      return "GitHub issue review";
+    case "repo":
+      return session.browserPageTitle || "GitHub repository";
+    case "chat":
+      return session.browserPageTitle || "AI chat";
+    case "docs":
+      return session.browserPageTitle || "Documentation";
+    case "design":
+      return session.browserPageTitle || "Design review";
+    case "mail":
+      return "Mail";
+    case "calendar":
+      return "Calendar";
+    case "video":
+      return session.browserPageTitle || "Video";
+    default:
+      return session.browserPageTitle || session.appName;
+  }
 }
 
 function mergeIntoDisplaySession(

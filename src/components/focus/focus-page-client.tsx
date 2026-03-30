@@ -18,8 +18,13 @@ import {
   formatClockLabel,
   formatDateLabel,
   formatFocusDuration,
+  getFocusSessionLabel,
   getLocalDateString,
 } from "./focus-shared";
+import {
+  splitSessionsByDisplayThreshold,
+  WEB_FOCUS_DISPLAY_MIN_SECS,
+} from "./focus-display";
 
 function shiftDate(date: string, deltaDays: number) {
   const [year, month, day] = date.split("-").map(Number);
@@ -99,16 +104,6 @@ function getDeviceStatus(device: {
   };
 }
 
-function shouldShowFocusBlock(session: {
-  focusedSecs?: number;
-  durationSecs: number;
-  spanSecs?: number;
-}) {
-  const focusedSecs = session.focusedSecs ?? session.durationSecs;
-  const spanSecs = session.spanSecs ?? session.durationSecs;
-  return Math.max(focusedSecs, spanSecs) >= 120;
-}
-
 export function FocusPageClient() {
   const timeZone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -144,6 +139,8 @@ export function FocusPageClient() {
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [pairingExpiresAt, setPairingExpiresAt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showShortBlocks, setShowShortBlocks] = useState(false);
+  const [showShortRawSessions, setShowShortRawSessions] = useState(false);
   const createPairingCode = trpc.focus.createPairingCode.useMutation({
     onSuccess: async (result) => {
       setPairingCode(result.code);
@@ -177,9 +174,13 @@ export function FocusPageClient() {
     () => buildTopApps(displaySessions.data ?? []),
     [displaySessions.data]
   );
-  const visibleDisplaySessions = useMemo(
-    () => (displaySessions.data ?? []).filter(shouldShowFocusBlock),
+  const displaySessionGroups = useMemo(
+    () => splitSessionsByDisplayThreshold(displaySessions.data ?? []),
     [displaySessions.data]
+  );
+  const rawSessionGroups = useMemo(
+    () => splitSessionsByDisplayThreshold(dailySessions.data ?? []),
+    [dailySessions.data]
   );
   const goalPct = dailyStats.data
     ? Math.min(100, Math.round((dailyStats.data.workHoursSecs / (8 * 3600)) * 100))
@@ -320,7 +321,10 @@ export function FocusPageClient() {
           </Link>
         </div>
 
-        <FocusTimeline sessions={visibleDisplaySessions} testId="focus-day-timeline" />
+        <FocusTimeline
+          sessions={displaySessionGroups.visibleSessions}
+          testId="focus-day-timeline"
+        />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
@@ -328,7 +332,7 @@ export function FocusPageClient() {
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">Focus blocks</h2>
             <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-              Short fragments are merged into larger work blocks before being shown here.
+              Blocks under {formatFocusDuration(WEB_FOCUS_DISPLAY_MIN_SECS)} are collapsed by default so the main view stays readable.
             </p>
           </div>
 
@@ -337,8 +341,8 @@ export function FocusPageClient() {
               <div className="rounded-[22px] border border-dashed border-stone-200 px-4 py-10 text-center text-sm text-stone-400 dark:border-stone-800">
                 Loading focus blocks...
               </div>
-            ) : visibleDisplaySessions.length ? (
-              visibleDisplaySessions.map((session) => (
+            ) : displaySessionGroups.visibleSessions.length ? (
+              displaySessionGroups.visibleSessions.map((session) => (
                 <div
                   key={session.id}
                   className="rounded-[22px] border border-stone-200 bg-stone-50/80 p-4 dark:border-stone-800 dark:bg-stone-900/50"
@@ -346,10 +350,10 @@ export function FocusPageClient() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="truncate text-base font-medium text-stone-900 dark:text-stone-100">
-                        {session.appName}
+                        {getFocusSessionLabel(session)}
                       </div>
                       <div className="mt-1 truncate text-sm text-stone-500 dark:text-stone-400">
-                        {session.windowTitle ?? "Untitled window"}
+                        {session.browserHost ?? session.windowTitle ?? session.appName}
                       </div>
                     </div>
                     <div className="shrink-0 text-right text-sm text-stone-500 dark:text-stone-400">
@@ -379,11 +383,63 @@ export function FocusPageClient() {
                   No focus blocks for this day
                 </div>
                 <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
-                  Short fragments under 2 minutes are hidden from the default view. Upload a few longer sessions to populate this list.
+                  Blocks under {formatFocusDuration(WEB_FOCUS_DISPLAY_MIN_SECS)} are hidden from the default view. Upload a few longer sessions or expand the short-session section below.
                 </p>
               </div>
             )}
           </div>
+
+          {displaySessionGroups.hiddenCount ? (
+            <div className="mt-4 rounded-[22px] border border-dashed border-stone-200 bg-stone-50/60 p-4 dark:border-stone-800 dark:bg-stone-900/40">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                    Short focus blocks
+                  </div>
+                  <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                    {displaySessionGroups.hiddenCount} block
+                    {displaySessionGroups.hiddenCount > 1 ? "s" : ""} ·{" "}
+                    {formatFocusDuration(displaySessionGroups.hiddenTotalSecs)} total
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowShortBlocks((current) => !current)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
+                >
+                  {showShortBlocks ? "Hide short blocks" : "Show short blocks"}
+                </button>
+              </div>
+
+              {showShortBlocks ? (
+                <div className="mt-3 space-y-3">
+                  {displaySessionGroups.hiddenSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="rounded-[18px] border border-stone-200 bg-white/80 p-3 dark:border-stone-800 dark:bg-stone-950/60"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium text-stone-900 dark:text-stone-100">
+                            {getFocusSessionLabel(session)}
+                          </div>
+                          <div className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">
+                            {session.browserHost ?? session.windowTitle ?? session.appName}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right text-xs text-stone-500 dark:text-stone-400">
+                          <div>{formatFocusDuration(session.focusedSecs ?? session.durationSecs)}</div>
+                          <div className="mt-1">
+                            {formatClockLabel(session.startedAt)}-{formatClockLabel(session.endedAt)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <details className="mt-5 rounded-[22px] border border-dashed border-stone-200 bg-stone-50/60 p-4 dark:border-stone-800 dark:bg-stone-900/40">
             <summary className="cursor-pointer text-sm font-medium text-stone-700 dark:text-stone-300">
@@ -392,8 +448,8 @@ export function FocusPageClient() {
             <div className="mt-4 space-y-3">
               {dailySessions.isLoading ? (
                 <div className="text-sm text-stone-400">Loading raw sessions...</div>
-              ) : dailySessions.data?.length ? (
-                dailySessions.data.map((session) => (
+              ) : rawSessionGroups.visibleSessions.length ? (
+                rawSessionGroups.visibleSessions.map((session) => (
                   <div
                     key={session.id}
                     className="rounded-[18px] border border-stone-200 bg-white/80 p-3 dark:border-stone-800 dark:bg-stone-950/60"
@@ -401,10 +457,10 @@ export function FocusPageClient() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium text-stone-900 dark:text-stone-100">
-                          {session.appName}
+                          {getFocusSessionLabel(session)}
                         </div>
                         <div className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">
-                          {session.windowTitle ?? "Untitled window"}
+                          {session.browserHost ?? session.windowTitle ?? session.appName}
                         </div>
                       </div>
                       <div className="shrink-0 text-right text-xs text-stone-500 dark:text-stone-400">
@@ -417,8 +473,59 @@ export function FocusPageClient() {
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-stone-400">No raw sessions for this day.</div>
+                <div className="text-sm text-stone-400">
+                  No raw sessions at or above {formatFocusDuration(WEB_FOCUS_DISPLAY_MIN_SECS)} for this day.
+                </div>
               )}
+
+              {rawSessionGroups.hiddenCount ? (
+                <div className="rounded-[18px] border border-dashed border-stone-200 bg-stone-50/70 p-3 dark:border-stone-800 dark:bg-stone-900/40">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-sm text-stone-600 dark:text-stone-300">
+                      Short sessions: {rawSessionGroups.hiddenCount} item
+                      {rawSessionGroups.hiddenCount > 1 ? "s" : ""} ·{" "}
+                      {formatFocusDuration(rawSessionGroups.hiddenTotalSecs)} total
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowShortRawSessions((current) => !current)}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
+                    >
+                      {showShortRawSessions
+                        ? "Hide short sessions"
+                        : "Show short sessions"}
+                    </button>
+                  </div>
+
+                  {showShortRawSessions ? (
+                    <div className="mt-3 space-y-3">
+                      {rawSessionGroups.hiddenSessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className="rounded-[18px] border border-stone-200 bg-white/80 p-3 dark:border-stone-800 dark:bg-stone-950/60"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium text-stone-900 dark:text-stone-100">
+                                {getFocusSessionLabel(session)}
+                              </div>
+                              <div className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">
+                                {session.browserHost ?? session.windowTitle ?? session.appName}
+                              </div>
+                            </div>
+                            <div className="shrink-0 text-right text-xs text-stone-500 dark:text-stone-400">
+                              <div>{formatFocusDuration(session.durationSecs)}</div>
+                              <div className="mt-1">
+                                {formatClockLabel(session.startedAt)}-{formatClockLabel(session.endedAt)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </details>
         </section>
