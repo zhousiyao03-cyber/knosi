@@ -29,6 +29,7 @@ import {
   getDefaultSelectedApp,
   getSelectedAppDetails,
 } from "./focus-app-groups";
+import { getWorkingHoursBaselineCopy } from "./focus-working-hours";
 
 function shiftDate(date: string, deltaDays: number) {
   const [year, month, day] = date.split("-").map(Number);
@@ -208,12 +209,6 @@ export function FocusPageClient() {
       setSelectedAppName(defaultAppName);
     }
   }, [appGroups, selectedAppName]);
-  const goalRemainingSecs = dailyStats.data
-    ? Math.max(0, 8 * 3600 - dailyStats.data.totalSecs)
-    : null;
-  const goalReached = dailyStats.data
-    ? dailyStats.data.totalSecs >= 8 * 3600
-    : false;
   const filteredRows = useMemo(() => {
     if (!dailyStats.data?.nonWorkBreakdown) {
       return [];
@@ -313,11 +308,7 @@ export function FocusPageClient() {
               {dailyStats.data ? formatFocusDuration(dailyStats.data.workHoursSecs) : "--"}
             </div>
             <div className="mt-2 text-sm font-medium text-stone-700 dark:text-stone-300">
-              {goalReached
-                ? "Past the 8h working-hours baseline."
-                : goalRemainingSecs !== null
-                  ? `${formatFocusDuration(goalRemainingSecs)} left to reach 8h.`
-                  : "Waiting for more data."}
+              {getWorkingHoursBaselineCopy(dailyStats.data?.workHoursSecs)}
             </div>
           </div>
 

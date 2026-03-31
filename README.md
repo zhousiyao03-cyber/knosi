@@ -205,7 +205,7 @@ pnpm focus:collector --fixture tools/focus-collector/fixtures/demo-sessions.json
 
 - dashboard 上有 Focus card，可直接进入 `/focus`
 - `/focus` 现在是 App-first 页面：先看当天累计时长的 top apps，再看选中 app 的 session 明细和 mini timeline，最后用全局 day timeline 辅助确认时间分布
-- `/focus` 与 dashboard 现在默认展示当天累计记录时长，并把 `Working Hours` 作为辅助口径单独说明
+- `/focus` 与 dashboard 现在默认展示当天累计记录时长，并把 `Working Hours` 作为辅助口径单独说明；`Working Hours` 按当天原始 session 累计时长减去 `social-media / entertainment / gaming` 等 non-work tags 计算，display merge 只影响展示，不再影响统计
 - `/focus` 支持手动刷新 session 分类和 daily summary
 - `/focus` 支持为桌面端生成一次性 pairing code，桌面 collector 输入 code 后会自动换成 per-device token；设备列表会显示 `Connected / Recent / Revoked / Last seen`，配对与连接失败也会给出重连指引
 

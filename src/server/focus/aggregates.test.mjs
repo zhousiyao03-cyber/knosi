@@ -316,6 +316,50 @@ test("buildDailyStats groups filtered-out time by non-work reason", () => {
   assert.equal(stats.nonWorkBreakdown.gaming, 0);
 });
 
+test("buildDailyStats keeps non-work interruption time filtered out after display merging", () => {
+  const stats = buildDailyStats({
+    date: "2026-03-30",
+    timeZone: "UTC",
+    sessions: [
+      {
+        ...baseSession,
+        id: "coding-a",
+        sourceSessionId: "coding-a",
+        appName: "Cursor",
+        tags: JSON.stringify(["editor", "coding"]),
+        startedAt: new Date("2026-03-30T09:00:00.000Z"),
+        endedAt: new Date("2026-03-30T09:10:00.000Z"),
+        durationSecs: 10 * 60,
+      },
+      {
+        ...baseSession,
+        id: "wechat-a",
+        sourceSessionId: "wechat-a",
+        appName: "WeChat",
+        tags: JSON.stringify(["social-media"]),
+        startedAt: new Date("2026-03-30T09:10:00.000Z"),
+        endedAt: new Date("2026-03-30T09:12:00.000Z"),
+        durationSecs: 2 * 60,
+      },
+      {
+        ...baseSession,
+        id: "coding-b",
+        sourceSessionId: "coding-b",
+        appName: "Cursor",
+        tags: JSON.stringify(["editor", "coding"]),
+        startedAt: new Date("2026-03-30T09:12:00.000Z"),
+        endedAt: new Date("2026-03-30T09:20:00.000Z"),
+        durationSecs: 8 * 60,
+      },
+    ],
+  });
+
+  assert.equal(stats.totalSecs, 20 * 60);
+  assert.equal(stats.filteredOutSecs, 2 * 60);
+  assert.equal(stats.nonWorkBreakdown["social-media"], 2 * 60);
+  assert.equal(stats.workHoursSecs, 18 * 60);
+});
+
 test("buildDisplaySessionsFromSlices keeps distinct search queries in separate blocks", () => {
   const slices = [
     {

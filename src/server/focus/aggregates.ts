@@ -198,17 +198,17 @@ export function buildDailyStats({
   }
 
   const displaySessions = buildDisplaySessionsFromSlices(slices);
-  const workHoursSecs = displaySessions.reduce((sum, session) => {
+  const workHoursSecs = slices.reduce((sum, session) => {
     const tags = parseJsonStringArray(session.tags);
-    const focusedSecs = session.focusedSecs;
+    const durationSecs = session.durationSecs;
     const nonWorkReason = getNonWorkReason(tags);
 
     if (nonWorkReason) {
-      nonWorkBreakdown[nonWorkReason] += focusedSecs;
+      nonWorkBreakdown[nonWorkReason] += durationSecs;
       return sum;
     }
 
-    return countsTowardWorkHours(tags) ? sum + focusedSecs : sum;
+    return countsTowardWorkHours(tags) ? sum + durationSecs : sum;
   }, 0);
   const filteredOutSecs = Object.values(nonWorkBreakdown).reduce((sum, secs) => sum + secs, 0);
 
