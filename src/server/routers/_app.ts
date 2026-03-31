@@ -7,6 +7,7 @@ import { workflowsRouter } from "./workflows";
 import { dashboardRouter } from "./dashboard";
 import { focusRouter } from "./focus";
 import { tokenUsageRouter } from "./token-usage";
+import { portfolioRouter } from "./portfolio";
 
 export const appRouter = router({
   notes: notesRouter,
@@ -17,6 +18,7 @@ export const appRouter = router({
   dashboard: dashboardRouter,
   focus: focusRouter,
   tokenUsage: tokenUsageRouter,
+  portfolio: portfolioRouter,
 });
 
 export type AppRouter = typeof appRouter;
