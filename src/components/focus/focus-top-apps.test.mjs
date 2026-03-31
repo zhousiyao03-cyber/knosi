@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { buildTopApps, FOCUS_TOP_APPS_LIMIT } from "./focus-top-apps.ts";
 
-test("buildTopApps returns up to ten apps sorted by focused time", () => {
+test("buildTopApps returns up to ten apps sorted by cumulative duration", () => {
   const sessions = Array.from({ length: 12 }, (_, index) => ({
     appName: `App ${index + 1}`,
     durationSecs: 60 * (index + 1),
@@ -27,4 +27,32 @@ test("buildTopApps returns up to ten apps sorted by focused time", () => {
       "App 3",
     ]
   );
+});
+
+test("buildTopApps ignores derived focused time and uses recorded app duration", () => {
+  const result = buildTopApps([
+    {
+      appName: "Code",
+      durationSecs: 15 * 60,
+      focusedSecs: 25 * 60,
+    },
+    {
+      appName: "Chrome",
+      durationSecs: 12 * 60,
+      focusedSecs: 3 * 60,
+    },
+  ]);
+
+  assert.deepEqual(result, [
+    {
+      appName: "Code",
+      durationSecs: 15 * 60,
+      sessions: 1,
+    },
+    {
+      appName: "Chrome",
+      durationSecs: 12 * 60,
+      sessions: 1,
+    },
+  ]);
 });

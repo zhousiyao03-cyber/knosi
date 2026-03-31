@@ -34,7 +34,7 @@ export default function DashboardPage() {
   );
   const today = useMemo(() => getLocalDateString(), []);
   const focusStats = trpc.focus.dailyStats.useQuery({ date: today, timeZone });
-  const focusSessions = trpc.focus.displaySessions.useQuery({ date: today, timeZone });
+  const focusSessions = trpc.focus.dailySessions.useQuery({ date: today, timeZone });
   const utils = trpc.useUtils();
   const noteCount = isLoading ? "-" : (data?.counts.notes ?? 0);
   const topApps = useMemo(
@@ -42,7 +42,7 @@ export default function DashboardPage() {
     [focusSessions.data]
   );
   const focusGoalPct = focusStats.data
-    ? Math.min(100, Math.round((focusStats.data.workHoursSecs / (8 * 3600)) * 100))
+    ? Math.min(100, Math.round((focusStats.data.totalSecs / (8 * 3600)) * 100))
     : 0;
   const greetingLabel = getGreetingLabel(new Date().getHours());
   const displayName = getUserDisplayName(
@@ -147,10 +147,10 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.18em] text-sky-600 dark:text-sky-300/80">
-                  Working Hours
+                  Tracked today
                 </div>
                 <div className="mt-2 text-2xl font-semibold text-stone-950 dark:text-stone-50">
-                  {focusStats.data ? formatFocusDuration(focusStats.data.workHoursSecs) : "--"}
+                  {focusStats.data ? formatFocusDuration(focusStats.data.totalSecs) : "--"}
                 </div>
               </div>
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/80 text-sky-700 shadow-sm dark:bg-stone-900 dark:text-sky-300">
@@ -165,7 +165,7 @@ export default function DashboardPage() {
               />
             </div>
             <div className="mt-2 text-xs text-stone-500 dark:text-stone-400">
-              {focusGoalPct}% of an 8h goal
+              {focusGoalPct}% of an 8h tracked-time goal
             </div>
 
             <div className="mt-4">

@@ -7,6 +7,8 @@ function localIsoAt(hour: number, minute: number) {
 }
 
 test.describe("Focus Tracker flow", () => {
+  test.describe.configure({ mode: "serial" });
+
   test("dashboard focus card and /focus page render uploaded sessions without duplicates", async ({
     page,
     request,
@@ -74,31 +76,31 @@ test.describe("Focus Tracker flow", () => {
       sessions: [
         {
           sourceSessionId: `${deviceId}-code-a`,
-          appName: "Code",
+          appName: "Interrupt Test Code",
           windowTitle: "index.tsx — web_monorepo-master",
           startedAt: localIsoAt(15, 19),
-          endedAt: localIsoAt(15, 28),
+          endedAt: localIsoAt(15, 31),
         },
         {
           sourceSessionId: `${deviceId}-chrome-a`,
-          appName: "Google Chrome",
+          appName: "Interrupt Test Browser",
           windowTitle: "Google Chrome",
-          startedAt: localIsoAt(15, 28),
-          endedAt: localIsoAt(15, 32),
+          startedAt: localIsoAt(15, 31),
+          endedAt: localIsoAt(15, 42),
         },
         {
           sourceSessionId: `${deviceId}-devtools-a`,
-          appName: "HybridDevtool",
+          appName: "Interrupt Test Devtool",
           windowTitle: "DevTool (electron) (v0.0.72)",
-          startedAt: localIsoAt(15, 33),
-          endedAt: localIsoAt(15, 38),
+          startedAt: localIsoAt(15, 42),
+          endedAt: localIsoAt(15, 52),
         },
         {
           sourceSessionId: `${deviceId}-code-b`,
-          appName: "Code",
+          appName: "Interrupt Test Code",
           windowTitle: "index.tsx — web_monorepo-master",
-          startedAt: localIsoAt(15, 38),
-          endedAt: localIsoAt(15, 44),
+          startedAt: localIsoAt(15, 52),
+          endedAt: localIsoAt(16, 7),
         },
       ],
     };
@@ -108,9 +110,18 @@ test.describe("Focus Tracker flow", () => {
 
     await page.goto("/focus");
     await expect(page.getByRole("heading", { name: "Focus", exact: true })).toBeVisible();
-    await expect(page.getByTestId("focus-session-count")).toContainText("1");
-    await expect(page.getByTestId("focus-session-list")).toContainText("Code");
-    await expect(page.getByTestId("focus-session-list")).toContainText("2 short interruptions");
-    await expect(page.getByTestId("focus-session-list")).toContainText("3:19 PM-3:44 PM");
+    await expect(page.getByTestId("focus-session-list")).toContainText("Interrupt Test Code");
+    await expect(page.getByTestId("focus-session-list")).toContainText("Interrupt Test Browser");
+    await expect(page.getByTestId("focus-session-list")).toContainText("Interrupt Test Devtool");
+    const topAppsSection = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: "Top apps" }) });
+    await expect(topAppsSection.getByRole("heading", { name: "Top apps" })).toBeVisible();
+    await expect(topAppsSection).toContainText("Interrupt Test Code");
+    await expect(topAppsSection).toContainText("27m");
+    await expect(topAppsSection).toContainText("Interrupt Test Devtool");
+    await expect(topAppsSection).toContainText("10m");
+    await expect(topAppsSection).toContainText("Interrupt Test Browser");
+    await expect(topAppsSection).toContainText("11m");
   });
 });

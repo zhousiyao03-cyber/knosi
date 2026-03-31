@@ -3,9 +3,12 @@ import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
 import { notes, bookmarks, todos } from "../db/schema";
 import { and, asc, count, desc, eq, gte, like, lt, or } from "drizzle-orm";
+import { normalizeJournalTitlesForUser } from "../notes/journal-titles";
 
 export const dashboardRouter = router({
   stats: protectedProcedure.query(async ({ ctx }) => {
+    await normalizeJournalTitlesForUser(ctx.userId);
+
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const startOfTomorrow = new Date(startOfToday);

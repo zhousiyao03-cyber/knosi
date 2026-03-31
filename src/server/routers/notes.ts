@@ -1,7 +1,7 @@
 import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
 import { notes } from "../db/schema";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, ne, or } from "drizzle-orm";
 import { z } from "zod/v4";
 import crypto from "crypto";
 import {
@@ -10,27 +10,33 @@ import {
 } from "../ai/indexer";
 import {
   createJournalTemplate,
-  extractTomorrowPlanItems,
   formatJournalTitle,
+  formatLegacyJournalTitle,
+  extractTomorrowPlanItems,
 } from "@/lib/note-templates";
+import { normalizeJournalTitlesForUser } from "../notes/journal-titles";
 
 const noteCoverSchema = z.string().trim().nullable().optional();
 const noteIconSchema = z.string().trim().max(8).nullable().optional();
 
 export const notesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
+    await normalizeJournalTitlesForUser(ctx.userId);
     return db.select().from(notes).where(eq(notes.userId, ctx.userId)).orderBy(desc(notes.updatedAt));
   }),
 
   get: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input, ctx }) => {
+      await normalizeJournalTitlesForUser(ctx.userId);
       const result = await db.select().from(notes).where(and(eq(notes.id, input.id), eq(notes.userId, ctx.userId)));
       return result[0] ?? null;
     }),
 
   openTodayJournal: protectedProcedure.mutation(async ({ ctx }) => {
+    await normalizeJournalTitlesForUser(ctx.userId);
     const todayTitle = formatJournalTitle();
+    const legacyTodayTitle = formatLegacyJournalTitle();
     const [existingTodayJournal] = await db
       .select()
       .from(notes)
@@ -38,7 +44,7 @@ export const notesRouter = router({
         and(
           eq(notes.userId, ctx.userId),
           eq(notes.type, "journal"),
-          eq(notes.title, todayTitle)
+          or(eq(notes.title, todayTitle), eq(notes.title, legacyTodayTitle))
         )
       )
       .orderBy(desc(notes.updatedAt))

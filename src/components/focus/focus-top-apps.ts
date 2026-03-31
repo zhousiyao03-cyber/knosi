@@ -3,7 +3,6 @@ export const FOCUS_TOP_APPS_LIMIT = 10;
 export type FocusTopAppSession = {
   appName: string;
   durationSecs: number;
-  focusedSecs?: number;
 };
 
 export function buildTopApps(
@@ -21,7 +20,7 @@ export function buildTopApps(
       durationSecs: 0,
       sessions: 0,
     };
-    current.durationSecs += session.focusedSecs ?? session.durationSecs;
+    current.durationSecs += session.durationSecs;
     current.sessions += 1;
     byApp.set(session.appName, current);
   }

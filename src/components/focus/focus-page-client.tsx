@@ -121,7 +121,7 @@ export function FocusPageClient() {
     date: selectedDate,
     timeZone,
   });
-  const displaySessions = trpc.focus.displaySessions.useQuery({
+  const dailySessions = trpc.focus.dailySessions.useQuery({
     date: selectedDate,
     timeZone,
   });
@@ -158,7 +158,7 @@ export function FocusPageClient() {
   const classifySessions = trpc.focus.classifySessions.useMutation({
     onSuccess: async () => {
       await Promise.all([
-        displaySessions.refetch(),
+        dailySessions.refetch(),
         dailyStats.refetch(),
         summaryStatus.refetch(),
       ]);
@@ -171,21 +171,21 @@ export function FocusPageClient() {
   });
 
   const topApps = useMemo(
-    () => buildTopApps(displaySessions.data ?? []),
-    [displaySessions.data]
+    () => buildTopApps(dailySessions.data ?? [], Number.MAX_SAFE_INTEGER),
+    [dailySessions.data]
   );
   const displaySessionGroups = useMemo(
-    () => splitSessionsByDisplayThreshold(displaySessions.data ?? []),
-    [displaySessions.data]
+    () => splitSessionsByDisplayThreshold(dailySessions.data ?? []),
+    [dailySessions.data]
   );
   const goalPct = dailyStats.data
-    ? Math.min(100, Math.round((dailyStats.data.workHoursSecs / (8 * 3600)) * 100))
+    ? Math.min(100, Math.round((dailyStats.data.totalSecs / (8 * 3600)) * 100))
     : 0;
   const goalRemainingSecs = dailyStats.data
-    ? Math.max(0, 8 * 3600 - dailyStats.data.workHoursSecs)
+    ? Math.max(0, 8 * 3600 - dailyStats.data.totalSecs)
     : null;
   const goalReached = dailyStats.data
-    ? dailyStats.data.workHoursSecs >= 8 * 3600
+    ? dailyStats.data.totalSecs >= 8 * 3600
     : false;
   const filteredRows = useMemo(() => {
     if (!dailyStats.data?.nonWorkBreakdown) {
@@ -246,7 +246,7 @@ export function FocusPageClient() {
               onClick={() =>
                 Promise.all([
                   dailyStats.refetch(),
-                  displaySessions.refetch(),
+                  dailySessions.refetch(),
                   weeklyStats.refetch(),
                   summary.refetch(),
                   summaryStatus.refetch(),
@@ -273,7 +273,7 @@ export function FocusPageClient() {
                 ? "You have reached today's standard."
                 : goalRemainingSecs !== null
                   ? `${formatFocusDuration(goalRemainingSecs)} left to reach 8h.`
-                  : "Tracking today's progress."}
+                  : "Tracking today's app time."}
             </div>
             <div className="mt-3 h-2 rounded-full bg-white/80 dark:bg-stone-900">
               <div
@@ -285,19 +285,20 @@ export function FocusPageClient() {
 
           <div className="rounded-[24px] border border-stone-200 bg-stone-50/90 p-5 dark:border-stone-800 dark:bg-stone-900/60">
             <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400 dark:text-stone-500">
-              Working Hours
+              Tracked today
             </div>
             <div
               data-testid="focus-total-secs"
               className="mt-2 text-3xl font-semibold text-stone-950 dark:text-stone-50"
             >
-              {dailyStats.data ? formatFocusDuration(dailyStats.data.workHoursSecs) : "--"}
+              {dailyStats.data ? formatFocusDuration(dailyStats.data.totalSecs) : "--"}
             </div>
             <div className="mt-2 text-sm font-medium text-stone-700 dark:text-stone-300">
-              Actual work time recorded for today.
+              All recorded app time for today.
             </div>
             <div className="mt-2 text-xs leading-5 text-stone-500 dark:text-stone-400">
-              {dailyStats.data ? formatFocusDuration(dailyStats.data.focusedSecs) : "--"} focused time and {dailyStats.data ? formatFocusDuration(dailyStats.data.spanSecs) : "--"} active span
+              {dailyStats.data ? formatFocusDuration(dailyStats.data.workHoursSecs) : "--"} counts toward working hours and{" "}
+              {dailyStats.data ? formatFocusDuration(dailyStats.data.filteredOutSecs) : "--"} is filtered out
             </div>
           </div>
         </div>
@@ -310,7 +311,7 @@ export function FocusPageClient() {
             data-testid="focus-session-count"
             className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 dark:border-stone-800 dark:bg-stone-900/60"
           >
-            Focus blocks: {dailyStats.data?.displaySessionCount ?? 0}
+            Activity blocks: {dailyStats.data?.sessionCount ?? 0}
           </span>
           <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 dark:border-stone-800 dark:bg-stone-900/60">
             App switches: {dailyStats.data?.appSwitches ?? 0}
@@ -323,7 +324,7 @@ export function FocusPageClient() {
           <div>
             <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">Day timeline</h2>
             <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-              Sessions are positioned by true time of day, not duration share.
+              Recorded app sessions are positioned by true time of day.
             </p>
           </div>
           <Link
@@ -343,16 +344,16 @@ export function FocusPageClient() {
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
         <section className="rounded-[28px] border border-stone-200 bg-white/92 p-5 shadow-[0_22px_80px_-58px_rgba(15,23,42,0.55)] dark:border-stone-800 dark:bg-stone-950/88">
           <div className="mb-4">
-            <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">Focus blocks</h2>
+            <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">Activity blocks</h2>
             <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-              Blocks under {formatFocusDuration(WEB_FOCUS_DISPLAY_MIN_SECS)} are collapsed by default so the main view stays readable.
+              Raw recorded sessions under {formatFocusDuration(WEB_FOCUS_DISPLAY_MIN_SECS)} are collapsed by default so the main view stays readable.
             </p>
           </div>
 
           <div data-testid="focus-session-list" className="space-y-3">
-            {displaySessions.isLoading ? (
+            {dailySessions.isLoading ? (
               <div className="rounded-[22px] border border-dashed border-stone-200 px-4 py-10 text-center text-sm text-stone-400 dark:border-stone-800">
-                Loading focus blocks...
+                Loading activity blocks...
               </div>
             ) : displaySessionGroups.visibleSessions.length ? (
               displaySessionGroups.visibleSessions.map((session) => (
@@ -370,22 +371,10 @@ export function FocusPageClient() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right text-sm text-stone-500 dark:text-stone-400">
-                      <div>{formatFocusDuration(session.focusedSecs ?? session.durationSecs)}</div>
+                      <div>{formatFocusDuration(session.durationSecs)}</div>
                       <div className="mt-1 text-xs">
                         {formatClockLabel(session.startedAt)}-{formatClockLabel(session.endedAt)}
                       </div>
-                      {(session.spanSecs ?? session.durationSecs) >
-                      (session.focusedSecs ?? session.durationSecs) ? (
-                        <div className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
-                          span {formatFocusDuration(session.spanSecs ?? session.durationSecs)}
-                        </div>
-                      ) : null}
-                      {session.interruptionCount > 0 ? (
-                        <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-stone-400 dark:text-stone-500">
-                          {session.interruptionCount} short interruption
-                          {session.interruptionCount > 1 ? "s" : ""}
-                        </div>
-                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -393,10 +382,10 @@ export function FocusPageClient() {
             ) : (
               <div className="rounded-[22px] border border-dashed border-stone-200 px-4 py-10 text-center dark:border-stone-800">
                 <div className="text-base font-medium text-stone-900 dark:text-stone-100">
-                  No focus blocks for this day
+                  No activity blocks for this day
                 </div>
                 <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
-                  Blocks under {formatFocusDuration(WEB_FOCUS_DISPLAY_MIN_SECS)} are hidden from the default view. Upload a few longer sessions or expand the short-session section below.
+                  Sessions under {formatFocusDuration(WEB_FOCUS_DISPLAY_MIN_SECS)} are hidden from the default view. Upload a few longer sessions or expand the short-session section below.
                 </p>
               </div>
             )}
@@ -407,7 +396,7 @@ export function FocusPageClient() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium text-stone-800 dark:text-stone-200">
-                    Short focus blocks
+                    Short activity blocks
                   </div>
                   <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
                     {displaySessionGroups.hiddenCount} block
@@ -441,7 +430,7 @@ export function FocusPageClient() {
                           </div>
                         </div>
                         <div className="shrink-0 text-right text-xs text-stone-500 dark:text-stone-400">
-                          <div>{formatFocusDuration(session.focusedSecs ?? session.durationSecs)}</div>
+                          <div>{formatFocusDuration(session.durationSecs)}</div>
                           <div className="mt-1">
                             {formatClockLabel(session.startedAt)}-{formatClockLabel(session.endedAt)}
                           </div>
@@ -462,7 +451,7 @@ export function FocusPageClient() {
               <div>
                 <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">Daily summary</h2>
                 <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-                  Turn today&apos;s focus blocks into a short recap of what you spent time on.
+                  Turn today&apos;s activity blocks into a short recap of what you spent time on.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -473,7 +462,7 @@ export function FocusPageClient() {
                   className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-white disabled:opacity-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
                 >
                   <RefreshCcw className="h-4 w-4" />
-                  {classifySessions.isPending ? "Classifying..." : "Classify blocks"}
+                  {classifySessions.isPending ? "Classifying..." : "Classify sessions"}
                 </button>
                 <button
                   type="button"
@@ -508,6 +497,9 @@ export function FocusPageClient() {
 
           <section className="rounded-[28px] border border-stone-200 bg-white/92 p-5 shadow-[0_22px_80px_-58px_rgba(15,23,42,0.55)] dark:border-stone-800 dark:bg-stone-950/88">
             <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100">Top apps</h2>
+            <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+              Simple cumulative time by app for the selected day.
+            </p>
             <div className="mt-4 space-y-3">
               {topApps.length ? (
                 topApps.map((app) => (
@@ -524,7 +516,7 @@ export function FocusPageClient() {
                         style={{
                           width: `${Math.max(
                             8,
-                            Math.round((app.durationSecs / Math.max(dailyStats.data?.focusedSecs ?? 1, 1)) * 100)
+                            Math.round((app.durationSecs / Math.max(dailyStats.data?.totalSecs ?? 1, 1)) * 100)
                           )}%`,
                         }}
                       />
@@ -595,12 +587,12 @@ export function FocusPageClient() {
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-amber-400 to-rose-400"
                       style={{
-                        width: `${Math.max(4, Math.round(((day.focusedSecs ?? day.totalSecs) / (8 * 3600)) * 100))}%`,
+                        width: `${Math.max(4, Math.round((day.totalSecs / (8 * 3600)) * 100))}%`,
                       }}
                     />
                   </div>
                   <div className="w-16 shrink-0 text-right text-sm text-stone-600 dark:text-stone-300">
-                    {formatFocusDuration(day.focusedSecs ?? day.totalSecs)}
+                    {formatFocusDuration(day.totalSecs)}
                   </div>
                 </div>
               )) ?? (

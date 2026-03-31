@@ -2,11 +2,10 @@ export const WEB_FOCUS_DISPLAY_MIN_SECS = 10 * 60;
 
 type FocusDisplaySession = {
   durationSecs: number;
-  focusedSecs?: number;
 };
 
 export function getSessionDisplaySecs(session: FocusDisplaySession) {
-  return session.focusedSecs ?? session.durationSecs;
+  return session.durationSecs;
 }
 
 export function splitSessionsByDisplayThreshold<T extends FocusDisplaySession>(

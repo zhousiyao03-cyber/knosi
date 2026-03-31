@@ -7,13 +7,13 @@ import {
   splitSessionsByDisplayThreshold,
 } from "./focus-display.ts";
 
-test("getSessionDisplaySecs prefers focused seconds when present", () => {
+test("getSessionDisplaySecs always uses cumulative duration", () => {
   assert.equal(
     getSessionDisplaySecs({
       durationSecs: 1200,
       focusedSecs: 480,
     }),
-    480
+    1200
   );
 });
 
@@ -36,10 +36,10 @@ test("splitSessionsByDisplayThreshold keeps sessions at or above ten minutes vis
   assert.equal(result.hiddenTotalSecs, 599);
 });
 
-test("splitSessionsByDisplayThreshold sums hidden sessions using focused seconds", () => {
+test("splitSessionsByDisplayThreshold sums hidden sessions using cumulative duration", () => {
   const result = splitSessionsByDisplayThreshold([
-    { id: "block-a", durationSecs: 900, focusedSecs: 300 },
-    { id: "block-b", durationSecs: 720, focusedSecs: 540 },
+    { id: "block-a", durationSecs: 420, focusedSecs: 900 },
+    { id: "block-b", durationSecs: 540, focusedSecs: 720 },
     { id: "block-c", durationSecs: 1800, focusedSecs: 900 },
   ]);
 
@@ -52,5 +52,5 @@ test("splitSessionsByDisplayThreshold sums hidden sessions using focused seconds
     ["block-a", "block-b"]
   );
   assert.equal(result.hiddenCount, 2);
-  assert.equal(result.hiddenTotalSecs, 840);
+  assert.equal(result.hiddenTotalSecs, 960);
 });

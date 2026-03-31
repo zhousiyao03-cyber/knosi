@@ -31,15 +31,15 @@ test.describe("Phase 2: 笔记本模块", () => {
     const todayTitle = formatJournalTitle();
 
     await page.goto("/notes");
-    await page.getByText("打开今日日报").click();
+    await page.getByRole("button", { name: "Open today’s daily note" }).click();
 
     await expect(page).toHaveURL(/\/notes\/.+/);
-    await expect(page.locator("textarea[placeholder='新页面']")).toHaveValue(
+    await expect(page.locator("textarea[placeholder='New page']")).toHaveValue(
       todayTitle
     );
-    await expect(page.locator(".ProseMirror")).toContainText("今天的 todo");
-    await expect(page.locator(".ProseMirror")).toContainText("今日的复盘");
-    await expect(page.locator(".ProseMirror")).toContainText("明日计划");
+    await expect(page.locator(".ProseMirror")).toContainText("Today's todo");
+    await expect(page.locator(".ProseMirror")).toContainText("Today's review");
+    await expect(page.locator(".ProseMirror")).toContainText("Tomorrow's plan");
     await expect(
       page.locator(".ProseMirror ul[data-type='taskList'] li")
     ).toHaveCount(2);
@@ -51,7 +51,7 @@ test.describe("Phase 2: 笔记本模块", () => {
     await page.getByTestId("note-editor-back").click();
     await expect(page).toHaveURL("/notes");
     await expect(page.getByText(todayTitle).first()).toBeVisible();
-    await expect(page.getByText("日报").first()).toBeVisible();
+    await expect(page.getByText("Daily note").first()).toBeVisible();
   });
 
   test("编辑笔记标题", async ({ page }) => {

@@ -1,9 +1,44 @@
-export function formatJournalTitle(date = new Date()) {
+const JOURNAL_TITLE_DATE_PATTERN = /^(\d{4})年(\d{1,2})月(\d{1,2})日(?:\s+(星期[日一二三四五六]|周[日一二三四五六天]))?$/;
+
+function formatJournalDatePart(date: Date) {
   return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
     month: "long",
     day: "numeric",
   }).format(date);
+}
+
+function formatJournalWeekdayPart(date: Date) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    weekday: "long",
+  }).format(date);
+}
+
+export function formatJournalTitle(date = new Date()) {
+  return `${formatJournalDatePart(date)} ${formatJournalWeekdayPart(date)}`;
+}
+
+export function formatLegacyJournalTitle(date = new Date()) {
+  return formatJournalDatePart(date);
+}
+
+export function parseAutoJournalTitleDate(title: string) {
+  const match = title.trim().match(JOURNAL_TITLE_DATE_PATTERN);
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0, 0);
+}
+
+export function normalizeAutoJournalTitle(title: string) {
+  const date = parseAutoJournalTitleDate(title);
+  if (!date) {
+    return null;
+  }
+
+  return formatJournalTitle(date);
 }
 
 const TODAY_TODO_HEADING = "Today's todo";
