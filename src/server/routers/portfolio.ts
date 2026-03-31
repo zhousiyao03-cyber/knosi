@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
 import { portfolioHoldings, portfolioNews } from "../db/schema";
@@ -40,7 +41,10 @@ export const portfolioRouter = router({
         id: z.string(),
         quantity: z.number().positive().optional(),
         costPrice: z.number().positive().optional(),
-      })
+      }).refine(
+        ({ quantity, costPrice }) => quantity !== undefined || costPrice !== undefined,
+        { message: "At least one field must be updated" }
+      )
     )
     .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
@@ -88,7 +92,15 @@ export const portfolioRouter = router({
 
   // ── 价格（占位，Task 3 补充实现）──────────────────────────────
   getPrices: protectedProcedure
-    .input(z.object({ symbols: z.array(z.string()), assetTypes: z.array(z.enum(["stock", "crypto"])) }))
+    .input(
+      z.object({
+        symbols: z.array(z.string()),
+        assetTypes: z.array(z.enum(["stock", "crypto"])),
+      }).refine(
+        ({ symbols, assetTypes }) => symbols.length === assetTypes.length,
+        { message: "symbols and assetTypes must have the same length" }
+      )
+    )
     .query(async () => {
       // placeholder — real implementation in Task 3
       return {} as Record<string, { price: number | null; changePercent: number | null }>;
