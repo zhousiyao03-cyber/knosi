@@ -380,6 +380,7 @@ function EditHoldingModal({
 function HoldingCard({
   holding,
   priceData,
+  totalPortfolioValue,
   isSelected,
   onClick,
   onEdit,
@@ -387,6 +388,7 @@ function HoldingCard({
 }: {
   holding: Holding;
   priceData: PriceData | undefined;
+  totalPortfolioValue: number;
   isSelected: boolean;
   onClick: () => void;
   onEdit: () => void;
@@ -397,9 +399,11 @@ function HoldingCard({
   const changePercent = priceData?.changePercent ?? null;
   const currentValue = currentPrice !== null ? currentPrice * holding.quantity : null;
   const costValue = holding.costPrice * holding.quantity;
+  const displayValue = currentValue ?? costValue;
   const pnl = currentValue !== null ? currentValue - costValue : null;
   const pnlPercent = pnl !== null ? (pnl / costValue) * 100 : null;
   const dailyChange = calculateDailyChangeAmount(currentPrice, changePercent, holding.quantity);
+  const portfolioWeight = totalPortfolioValue > 0 ? (displayValue / totalPortfolioValue) * 100 : null;
 
   return (
     <div
@@ -468,6 +472,25 @@ function HoldingCard({
           {formatUSD(Math.abs(dailyChange))}
         </div>
       )}
+
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-stone-500 dark:text-stone-400">
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-stone-400 dark:text-stone-500">
+            持仓金额
+          </div>
+          <div className="mt-0.5 font-medium text-stone-700 dark:text-stone-200">
+            {formatUSD(displayValue)}
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-stone-400 dark:text-stone-500">
+            占组合
+          </div>
+          <div className="mt-0.5 font-medium text-stone-700 dark:text-stone-200">
+            {portfolioWeight !== null ? formatPercent(portfolioWeight) : "—"}
+          </div>
+        </div>
+      </div>
 
       {confirmingDelete ? (
         <div className="mt-2 flex items-center gap-2">
@@ -689,6 +712,9 @@ export function PortfolioClient() {
   const totalPnl = hasAllPrices ? totalValue - totalCost : null;
   const totalPnlPercent = totalPnl !== null && totalCost > 0 ? (totalPnl / totalCost) * 100 : null;
   const totalDailyChangeDisplay = hasDailyChange ? totalDailyChange : null;
+  const totalPortfolioValueForDisplay = totalValue > 0
+    ? totalValue
+    : holdings.reduce((sum, holding) => sum + (holding.costPrice * holding.quantity), 0);
 
   const deleteMutation = trpc.portfolio.deleteHolding.useMutation({
     onSuccess: () => utils.portfolio.getHoldings.invalidate(),
@@ -775,6 +801,7 @@ export function PortfolioClient() {
                     key={h.id}
                     holding={h}
                     priceData={prices[h.symbol]}
+                    totalPortfolioValue={totalPortfolioValueForDisplay}
                     isSelected={selectedSymbol === h.symbol}
                     onClick={() => setSelectedSymbol(h.symbol)}
                     onEdit={() => setEditingHolding(h)}
