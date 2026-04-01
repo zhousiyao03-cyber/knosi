@@ -1,9 +1,26 @@
-import crypto from "crypto";
 import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
 import { portfolioHoldings, portfolioNews } from "../db/schema";
 import { and, eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
+
+const CRYPTO_ID_MAP: Record<string, string> = {
+  BTC: "bitcoin",
+  ETH: "ethereum",
+  SOL: "solana",
+  BNB: "binancecoin",
+  XRP: "ripple",
+  ADA: "cardano",
+  DOGE: "dogecoin",
+  AVAX: "avalanche-2",
+  DOT: "polkadot",
+  MATIC: "matic-network",
+  LINK: "chainlink",
+  UNI: "uniswap",
+  ATOM: "cosmos",
+  LTC: "litecoin",
+  BCH: "bitcoin-cash",
+};
 
 export const portfolioRouter = router({
   // ── 持仓 CRUD ──────────────────────────────────────────────
@@ -109,49 +126,34 @@ export const portfolioRouter = router({
       const stockSymbols = symbols.filter((_, i) => assetTypes[i] === "stock");
       const cryptoSymbols = symbols.filter((_, i) => assetTypes[i] === "crypto");
 
-      // 美股：Yahoo Finance
-      for (const sym of stockSymbols) {
-        try {
-          const res = await fetch(
-            `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`,
-            { next: { revalidate: 0 } }
-          );
-          if (!res.ok) throw new Error(`Yahoo Finance error: ${res.status}`);
-          const json = await res.json() as {
-            chart?: {
-              result?: Array<{
-                meta?: { regularMarketPrice?: number; regularMarketChangePercent?: number };
-              }>;
+      // 美股：Yahoo Finance（并行请求）
+      await Promise.all(
+        stockSymbols.map(async (sym) => {
+          try {
+            const res = await fetch(
+              `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`,
+              { next: { revalidate: 0 } }
+            );
+            if (!res.ok) throw new Error(`Yahoo Finance error: ${res.status}`);
+            const json = await res.json() as {
+              chart?: {
+                result?: Array<{
+                  meta?: { regularMarketPrice?: number; regularMarketChangePercent?: number };
+                }>;
+              };
             };
-          };
-          const meta = json.chart?.result?.[0]?.meta;
-          result[sym] = {
-            price: meta?.regularMarketPrice ?? null,
-            changePercent: meta?.regularMarketChangePercent ?? null,
-          };
-        } catch {
-          result[sym] = { price: null, changePercent: null };
-        }
-      }
+            const meta = json.chart?.result?.[0]?.meta;
+            result[sym] = {
+              price: meta?.regularMarketPrice ?? null,
+              changePercent: meta?.regularMarketChangePercent ?? null,
+            };
+          } catch {
+            result[sym] = { price: null, changePercent: null };
+          }
+        })
+      );
 
       // 加密货币：CoinGecko（symbol → coingecko id 映射，常见标的）
-      const CRYPTO_ID_MAP: Record<string, string> = {
-        BTC: "bitcoin",
-        ETH: "ethereum",
-        SOL: "solana",
-        BNB: "binancecoin",
-        XRP: "ripple",
-        ADA: "cardano",
-        DOGE: "dogecoin",
-        AVAX: "avalanche-2",
-        DOT: "polkadot",
-        MATIC: "matic-network",
-        LINK: "chainlink",
-        UNI: "uniswap",
-        ATOM: "cosmos",
-        LTC: "litecoin",
-        BCH: "bitcoin-cash",
-      };
 
       if (cryptoSymbols.length > 0) {
         const ids = cryptoSymbols
