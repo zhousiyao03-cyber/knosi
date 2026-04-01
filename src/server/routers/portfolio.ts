@@ -4,6 +4,7 @@ import { portfolioHoldings, portfolioNews } from "../db/schema";
 import { and, eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import { generateStructuredData } from "../ai/provider";
+import { fetchRecentPortfolioNewsArticles } from "../portfolio-news";
 
 const CRYPTO_ID_MAP: Record<string, string> = {
   BTC: "bitcoin",
@@ -30,19 +31,79 @@ const newsSummarySchema = z.object({
 
 export async function generatePortfolioNews(userId: string, symbol: string) {
   const today = new Date().toISOString().split("T")[0];
+  const normalizedSymbol = symbol.trim().toUpperCase();
+  const holding = await db
+    .select({
+      name: portfolioHoldings.name,
+      assetType: portfolioHoldings.assetType,
+    })
+    .from(portfolioHoldings)
+    .where(
+      and(
+        eq(portfolioHoldings.userId, userId),
+        eq(portfolioHoldings.symbol, normalizedSymbol)
+      )
+    )
+    .limit(1);
 
-  const result = await generateStructuredData({
-    name: "portfolio_news_summary",
-    description: `Search for recent news about ${symbol} (stock or crypto) and summarize in Traditional Chinese or Simplified Chinese.`,
-    prompt: `Today is ${today}. Search for the latest news and developments about "${symbol}" from the past 24-48 hours. Summarize the key news in 3-5 bullet points in Chinese. Each bullet should be concise (1-2 sentences). End with an overall market sentiment assessment. Return JSON with "summary" (Markdown bullet list in Chinese) and "sentiment" ("bullish", "bearish", or "neutral").`,
-    schema: newsSummarySchema,
+  const subjectName = holding[0]?.name?.trim() || normalizedSymbol;
+  const subjectType = holding[0]?.assetType ?? null;
+  const articles = await fetchRecentPortfolioNewsArticles({
+    symbol: normalizedSymbol,
+    name: holding[0]?.name ?? normalizedSymbol,
+    assetType: subjectType,
   });
+
+  const fallbackSummary = articles.length > 0
+    ? articles
+      .slice(0, 5)
+      .map((article) => (
+        `- ${article.title}（${article.source}，${new Date(article.publishedAt).toLocaleString("zh-CN", {
+          month: "numeric",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })}）`
+      ))
+      .join("\n")
+    : `- 最近 72 小时内未从公开新闻 RSS 源检索到与“${subjectName}（${normalizedSymbol}）”明确匹配的新闻。\n- 当前新闻面板已改为基于真实外部文章生成；如果这里仍为空，通常意味着该标的覆盖度较低，或 ticker 本身存在歧义。\n- 可尝试补充更准确的持仓名称，或稍后再次刷新。`;
+
+  const result = articles.length === 0
+    ? {
+      summary: fallbackSummary,
+      sentiment: "neutral" as const,
+    }
+    : await generateStructuredData({
+      name: "portfolio_news_summary",
+      description: `Summarize recent grounded news for ${subjectName} (${normalizedSymbol}) using only the provided article list.`,
+      prompt: [
+        `Today is ${today}.`,
+        `Target asset: ${subjectName} (${normalizedSymbol}).`,
+        `Asset type: ${subjectType ?? "unknown"}.`,
+        "Use only the article list below as evidence. Do not claim you searched the web.",
+        "If the evidence is thin or ambiguous, say that explicitly.",
+        'Return JSON with "summary" (3-5 Chinese bullet points) and "sentiment" ("bullish", "bearish", or "neutral").',
+        "",
+        "Articles:",
+        articles
+          .slice(0, 6)
+          .map((article, index) => (
+            `${index + 1}. ${article.title}\nSource: ${article.source}\nPublished: ${article.publishedAt}\nSnippet: ${article.snippet || "N/A"}\nLink: ${article.link}`
+          ))
+          .join("\n\n"),
+      ].join("\n"),
+      schema: newsSummarySchema,
+    }).catch(() => ({
+      summary: fallbackSummary,
+      sentiment: "neutral" as const,
+    }));
 
   // upsert：有则覆盖，无则插入
   const existing = await db
     .select()
     .from(portfolioNews)
-    .where(and(eq(portfolioNews.userId, userId), eq(portfolioNews.symbol, symbol)))
+    .where(and(eq(portfolioNews.userId, userId), eq(portfolioNews.symbol, normalizedSymbol)))
     .limit(1);
 
   if (existing[0]) {
@@ -53,12 +114,12 @@ export async function generatePortfolioNews(userId: string, symbol: string) {
         sentiment: result.sentiment,
         generatedAt: new Date(),
       })
-      .where(and(eq(portfolioNews.userId, userId), eq(portfolioNews.symbol, symbol)));
+      .where(and(eq(portfolioNews.userId, userId), eq(portfolioNews.symbol, normalizedSymbol)));
   } else {
     await db.insert(portfolioNews).values({
       id: crypto.randomUUID(),
       userId,
-      symbol,
+      symbol: normalizedSymbol,
       summary: result.summary,
       sentiment: result.sentiment,
     });
@@ -148,28 +209,7 @@ export const portfolioRouter = router({
   refreshNews: protectedProcedure
     .input(z.object({ symbol: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const { symbol } = input;
-
-      // 防抖：同一标的 1 小时内不重复调用
-      const existing = await db
-        .select()
-        .from(portfolioNews)
-        .where(
-          and(
-            eq(portfolioNews.userId, ctx.userId),
-            eq(portfolioNews.symbol, symbol)
-          )
-        )
-        .limit(1);
-
-      if (existing[0]) {
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        if (existing[0].generatedAt && existing[0].generatedAt > oneHourAgo) {
-          return { success: true, skipped: true };
-        }
-      }
-
-      const result = await generatePortfolioNews(ctx.userId, symbol);
+      const result = await generatePortfolioNews(ctx.userId, input.symbol);
       return { success: true, skipped: false, ...result };
     }),
 
