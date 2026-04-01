@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
   Plus,
+  Pencil,
   RefreshCw,
   TrendingDown,
   TrendingUp,
@@ -48,6 +49,11 @@ interface AddHoldingDraft {
   costPrice: string;
 }
 
+interface EditHoldingDraft {
+  quantity: string;
+  costPrice: string;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function formatUSD(value: number) {
@@ -68,6 +74,24 @@ function sentimentLabel(sentiment: Sentiment | null) {
   if (sentiment === "bullish") return "看涨";
   if (sentiment === "bearish") return "看跌";
   return "中性";
+}
+
+function calculateDailyChangeAmount(
+  currentPrice: number | null,
+  changePercent: number | null,
+  quantity: number
+) {
+  if (currentPrice === null || changePercent === null) {
+    return null;
+  }
+
+  const ratio = 1 + changePercent / 100;
+  if (ratio <= 0) {
+    return null;
+  }
+
+  const previousClose = currentPrice / ratio;
+  return (currentPrice - previousClose) * quantity;
 }
 
 // ── Empty State ────────────────────────────────────────────────────────────
@@ -240,6 +264,117 @@ function AddHoldingModal({
   );
 }
 
+function EditHoldingModal({
+  holding,
+  onClose,
+  onSaved,
+}: {
+  holding: Holding;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [draft, setDraft] = useState<EditHoldingDraft>({
+    quantity: String(holding.quantity),
+    costPrice: String(holding.costPrice),
+  });
+  const [error, setError] = useState("");
+
+  const updateMutation = trpc.portfolio.updateHolding.useMutation({
+    onSuccess: () => {
+      onSaved();
+      onClose();
+    },
+    onError: (err) => setError(err.message),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    const quantity = parseFloat(draft.quantity);
+    const costPrice = parseFloat(draft.costPrice);
+
+    if (Number.isNaN(quantity) || quantity <= 0) {
+      setError("数量必须大于 0");
+      return;
+    }
+
+    if (Number.isNaN(costPrice) || costPrice <= 0) {
+      setError("成本价必须大于 0");
+      return;
+    }
+
+    updateMutation.mutate({
+      id: holding.id,
+      quantity,
+      costPrice,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-stone-900">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+              修改持仓
+            </h2>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+              {holding.symbol} · {holding.name}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="edit-quantity" className="mb-1 block text-xs text-stone-500">
+                数量 *
+              </label>
+              <input
+                id="edit-quantity"
+                type="number"
+                min="0"
+                step="any"
+                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                value={draft.quantity}
+                onChange={(e) => setDraft((current) => ({ ...current, quantity: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="edit-cost-price" className="mb-1 block text-xs text-stone-500">
+                成本价 (USD) *
+              </label>
+              <input
+                id="edit-cost-price"
+                type="number"
+                min="0"
+                step="any"
+                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                value={draft.costPrice}
+                onChange={(e) => setDraft((current) => ({ ...current, costPrice: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {error && <p className="text-xs text-red-500">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={updateMutation.isPending}
+            className="w-full rounded-xl bg-stone-900 py-2 text-sm text-white hover:bg-stone-700 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300"
+          >
+            {updateMutation.isPending ? "保存中..." : "保存修改"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Holding Card ───────────────────────────────────────────────────────────
 
 function HoldingCard({
@@ -247,12 +382,14 @@ function HoldingCard({
   priceData,
   isSelected,
   onClick,
+  onEdit,
   onDelete,
 }: {
   holding: Holding;
   priceData: PriceData | undefined;
   isSelected: boolean;
   onClick: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -262,6 +399,7 @@ function HoldingCard({
   const costValue = holding.costPrice * holding.quantity;
   const pnl = currentValue !== null ? currentValue - costValue : null;
   const pnlPercent = pnl !== null ? (pnl / costValue) * 100 : null;
+  const dailyChange = calculateDailyChangeAmount(currentPrice, changePercent, holding.quantity);
 
   return (
     <div
@@ -319,6 +457,18 @@ function HoldingCard({
         </div>
       )}
 
+      {dailyChange !== null && (
+        <div
+          className={cn(
+            "mt-1 text-xs font-medium",
+            dailyChange >= 0 ? "text-emerald-600" : "text-red-500"
+          )}
+        >
+          今日 {dailyChange >= 0 ? "+" : "-"}
+          {formatUSD(Math.abs(dailyChange))}
+        </div>
+      )}
+
       {confirmingDelete ? (
         <div className="mt-2 flex items-center gap-2">
           <button
@@ -341,15 +491,27 @@ function HoldingCard({
           </button>
         </div>
       ) : (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setConfirmingDelete(true);
-          }}
-          className="mt-2 hidden text-xs text-red-400 hover:text-red-600 group-hover:block"
-        >
-          删除
-        </button>
+        <div className="mt-2 hidden items-center gap-3 group-hover:flex">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="flex items-center gap-1 text-xs text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+          >
+            <Pencil className="h-3 w-3" />
+            修改
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirmingDelete(true);
+            }}
+            className="text-xs text-red-400 hover:text-red-600"
+          >
+            删除
+          </button>
+        </div>
       )}
     </div>
   );
@@ -451,6 +613,7 @@ function NewsPanel({
 
 export function PortfolioClient() {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingHolding, setEditingHolding] = useState<Holding | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [refreshingSymbol, setRefreshingSymbol] = useState<string | null>(null);
 
@@ -459,7 +622,7 @@ export function PortfolioClient() {
   const holdingsQuery = trpc.portfolio.getHoldings.useQuery();
   const newsQuery = trpc.portfolio.getNews.useQuery();
 
-  const holdings: Holding[] = holdingsQuery.data ?? [];
+  const holdings = useMemo<Holding[]>(() => holdingsQuery.data ?? [], [holdingsQuery.data]);
   const newsItems: NewsItem[] = newsQuery.data ?? [];
 
   const symbols = useMemo(() => holdings.map((h) => h.symbol), [holdings]);
@@ -470,14 +633,36 @@ export function PortfolioClient() {
 
   const pricesQuery = trpc.portfolio.getPrices.useQuery(
     { symbols, assetTypes },
-    { enabled: symbols.length > 0 }
+    {
+      enabled: symbols.length > 0,
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    }
   );
-  const prices = pricesQuery.data ?? {};
+  const prices = useMemo<Record<string, PriceData>>(
+    () => pricesQuery.data ?? {},
+    [pricesQuery.data]
+  );
+  const sortedHoldings = useMemo(
+    () =>
+      [...holdings].sort((left, right) => {
+        const leftPrice = prices[left.symbol]?.price ?? null;
+        const rightPrice = prices[right.symbol]?.price ?? null;
+        const leftValue = leftPrice !== null ? leftPrice * left.quantity : left.costPrice * left.quantity;
+        const rightValue = rightPrice !== null ? rightPrice * right.quantity : right.costPrice * right.quantity;
+        return rightValue - leftValue;
+      }),
+    [holdings, prices]
+  );
 
   // 总资产 & 总盈亏
   let totalValue = 0;
   let totalCost = 0;
+  let totalDailyChange = 0;
   let hasAllPrices = symbols.length > 0;
+  let hasDailyChange = symbols.length > 0;
 
   for (const h of holdings) {
     const p = prices[h.symbol];
@@ -488,10 +673,22 @@ export function PortfolioClient() {
     } else {
       hasAllPrices = false;
     }
+
+    const dailyChange = calculateDailyChangeAmount(
+      p?.price ?? null,
+      p?.changePercent ?? null,
+      h.quantity
+    );
+    if (dailyChange !== null) {
+      totalDailyChange += dailyChange;
+    } else {
+      hasDailyChange = false;
+    }
   }
 
   const totalPnl = hasAllPrices ? totalValue - totalCost : null;
   const totalPnlPercent = totalPnl !== null && totalCost > 0 ? (totalPnl / totalCost) * 100 : null;
+  const totalDailyChangeDisplay = hasDailyChange ? totalDailyChange : null;
 
   const deleteMutation = trpc.portfolio.deleteHolding.useMutation({
     onSuccess: () => utils.portfolio.getHoldings.invalidate(),
@@ -546,6 +743,18 @@ export function PortfolioClient() {
                   {formatUSD(Math.abs(totalPnl))}{" "}
                   {totalPnlPercent !== null && `(${formatPercent(totalPnlPercent)})`}
                 </div>
+
+                {totalDailyChangeDisplay !== null && (
+                  <div
+                    className={cn(
+                      "mt-1 text-xs font-medium",
+                      totalDailyChangeDisplay >= 0 ? "text-emerald-600" : "text-red-500"
+                    )}
+                  >
+                    今日变化 {totalDailyChangeDisplay >= 0 ? "+" : "-"}
+                    {formatUSD(Math.abs(totalDailyChangeDisplay))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -561,13 +770,14 @@ export function PortfolioClient() {
                   ))}
                 </div>
               ) : (
-                holdings.map((h) => (
+                sortedHoldings.map((h) => (
                   <HoldingCard
                     key={h.id}
                     holding={h}
                     priceData={prices[h.symbol]}
                     isSelected={selectedSymbol === h.symbol}
                     onClick={() => setSelectedSymbol(h.symbol)}
+                    onEdit={() => setEditingHolding(h)}
                     onDelete={() => handleDelete(h.id)}
                   />
                 ))
@@ -586,7 +796,7 @@ export function PortfolioClient() {
           {/* 右栏：新闻面板 */}
           <div className="min-h-64 flex-1 rounded-xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900 md:min-h-[500px]">
             <NewsPanel
-              symbol={selectedSymbol ?? (holdings[0]?.symbol ?? null)}
+              symbol={selectedSymbol ?? (sortedHoldings[0]?.symbol ?? null)}
               newsItems={newsItems}
               onRefresh={handleRefresh}
               isRefreshing={refreshingSymbol !== null}
@@ -601,6 +811,17 @@ export function PortfolioClient() {
           onSaved={() => {
             utils.portfolio.getHoldings.invalidate();
             utils.portfolio.getNews.invalidate();
+            pricesQuery.refetch();
+          }}
+        />
+      )}
+
+      {editingHolding && (
+        <EditHoldingModal
+          holding={editingHolding}
+          onClose={() => setEditingHolding(null)}
+          onSaved={() => {
+            utils.portfolio.getHoldings.invalidate();
             pricesQuery.refetch();
           }}
         />

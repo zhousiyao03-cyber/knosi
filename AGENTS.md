@@ -50,6 +50,7 @@ Do not stop at "code compiles in theory" or "the logic looks right".
   - Server logic, database logic, utilities: prefer unit or integration tests.
   - Broad repository changes: run lint and build in addition to targeted checks when the toolchain is available.
 - If a user-facing flow changes and no e2e exists yet, prefer adding a minimal e2e test rather than skipping verification.
+- If the change is a very small, low-risk frontend tweak explicitly treated as simple by the user, you may skip adding a dedicated automated test case and use the next best executable verification instead.
 - If e2e is too heavy for the task, use the next best executable validation and explain why.
 - For schema or persistence changes, verify the resulting tables, queries, or migration output.
 - For bug fixes, reproduce the issue before fixing it when feasible, then verify the fix after the change.
