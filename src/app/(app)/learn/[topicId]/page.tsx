@@ -41,6 +41,7 @@ export default function LearningTopicPage({
   const [draftKeyword, setDraftKeyword] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
 
   const { data: topic, isLoading: topicLoading } =
     trpc.learningNotebook.getTopic.useQuery({ id: topicId });
@@ -219,24 +220,30 @@ export default function LearningTopicPage({
                     />
                     <button
                       type="button"
-                      disabled={!draftKeyword.trim()}
+                      disabled={!draftKeyword.trim() || draftLoading}
                       onClick={async () => {
-                        const response = await fetch("/api/learn/draft", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ topicId, keyword: draftKeyword }),
-                        });
-                        const result = (await response.json()) as { id?: string };
-                        if (result.id) {
-                          await utils.learningNotebook.listNotes.invalidate({ topicId });
-                          setComposerOpen(false);
-                          setDraftKeyword("");
-                          router.push(`/learn/${topicId}/notes/${result.id}`);
+                        setDraftLoading(true);
+                        try {
+                          const response = await fetch("/api/learn/draft", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ topicId, keyword: draftKeyword }),
+                          });
+                          const result = (await response.json()) as { id?: string };
+                          if (result.id) {
+                            await utils.learningNotebook.listNotes.invalidate({ topicId });
+                            setComposerOpen(false);
+                            setDraftKeyword("");
+                            router.push(`/learn/${topicId}/notes/${result.id}`);
+                          }
+                        } finally {
+                          setDraftLoading(false);
                         }
                       }}
-                      className="w-full rounded-lg bg-stone-900 px-3 py-2 text-sm text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-stone-900 px-3 py-2 text-sm text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950"
                     >
-                      Generate draft
+                      {draftLoading && <Loader2 size={14} className="animate-spin" />}
+                      {draftLoading ? "Generating…" : "Generate draft"}
                     </button>
                   </div>
                 </div>

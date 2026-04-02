@@ -44,6 +44,11 @@ pnpm test:e2e
 - schema 修改后必须运行 `pnpm db:generate` 生成迁移
 - 然后运行 `pnpm db:push` 应用到本地数据库
 - 迁移文件必须提交到版本控制
+- 如果这次 schema 变更会影响线上环境，不能停在本地：
+  - 必须确认生产 Turso 是否已经同步到新 schema
+  - 如果 `drizzle-kit push` 不能稳定用于生产，必须执行一次明确记录过的 production schema rollout
+  - rollout 后必须用实际查询验证线上表 / 列已经存在
+  - 没做完这一步，不算“已上线完成”
 
 ### 5. 每个 Phase 完成后必须 commit
 

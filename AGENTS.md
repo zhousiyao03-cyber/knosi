@@ -54,6 +54,10 @@ Do not stop at "code compiles in theory" or "the logic looks right".
 - If e2e is too heavy for the task, use the next best executable validation and explain why.
 - For schema or persistence changes, verify the resulting tables, queries, or migration output.
 - For bug fixes, reproduce the issue before fixing it when feasible, then verify the fix after the change.
+- For any schema change that affects deployed environments, do not stop at local `db:push`.
+  - Before handoff or deploy completion, verify the production Turso schema state too.
+  - If `drizzle-kit push` is not a reliable path for production, run a documented production schema rollout with explicit SQL / script steps.
+  - Record the production rollout command(s) and verification query result in `docs/changelog/`.
 
 ## Handoff Rules
 
@@ -65,6 +69,11 @@ The final response for any substantive task must include:
 4. Any blockers, assumptions, or residual risks.
 
 If the environment prevents execution, state the exact blocker and do not pretend the check passed.
+
+For schema changes, the final response must also state one of:
+
+1. Production Turso schema was updated and verified.
+2. Production rollout was intentionally not performed yet, and this is an explicit blocker / follow-up.
 
 ## Repository Hygiene
 
