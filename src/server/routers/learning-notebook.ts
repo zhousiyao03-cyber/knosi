@@ -13,7 +13,7 @@ import { protectedProcedure, router } from "../trpc";
 const createTopicSchema = z.object({
   title: z.string().trim().min(1),
   description: z.string().trim().optional(),
-  icon: z.string().trim().max(8).optional(),
+  icon: z.string().trim().optional(),
 });
 
 const updateTopicSchema = createTopicSchema.extend({

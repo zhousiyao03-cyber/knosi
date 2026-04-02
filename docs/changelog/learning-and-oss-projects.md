@@ -57,3 +57,34 @@
 
 - 学习模块的 AI draft 目前会把生成内容先作为单段文本落到 Tiptap JSON 中，可用但不是精细结构化 block；后续可以把 Markdown 映射成更丰富的节点结构
 - 全仓 `pnpm lint` 仍会被仓库里已有的 `focus-tracker/dist` 与 `focus-tracker/src-tauri/target` 生成产物噪声干扰，这不是本次改动引入的问题，但会继续影响全量 lint 信号
+
+---
+
+## Date
+
+2026-04-02
+
+## Task / Goal
+
+修复线上 `learningNotebook.createTopic` 在提交组合 emoji icon 时返回 `BAD_REQUEST` 的问题。
+
+## Key Changes
+
+- 去掉 `src/server/routers/learning-notebook.ts` 中对 topic `icon` 的 `max(8)` 校验
+- 更新 `e2e/learning-notebook.spec.ts`，改用 `👨‍👩‍👧‍👦` 这类稳定超过 8 code units 的组合 emoji 作为回归样例
+
+## Files Touched
+
+- `docs/changelog/learning-and-oss-projects.md`
+- `e2e/learning-notebook.spec.ts`
+- `src/server/routers/learning-notebook.ts`
+
+## Verification Commands And Results
+
+- `pnpm exec eslint src/server/routers/learning-notebook.ts e2e/learning-notebook.spec.ts` : passed
+- `pnpm test:e2e e2e/learning-notebook.spec.ts` : passed, `1 passed`
+- `pnpm build` : passed
+
+## Remaining Risks / Follow-up
+
+- 目前修复是移除长度上限，因为 topic icon 本质是展示字段而不是协议字段；如果后续确实需要限制，应改成基于 grapheme cluster 的校验，而不是 UTF-16 code unit 长度

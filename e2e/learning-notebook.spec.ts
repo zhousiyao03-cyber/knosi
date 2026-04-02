@@ -14,7 +14,7 @@ test.describe("Learning notebook", () => {
     await page.getByRole("button", { name: "New topic" }).click();
     await page.getByLabel("Topic title").fill(topicName);
     await page.getByLabel("Description").fill("Study backend fundamentals");
-    await page.getByLabel("Icon").fill("📘");
+    await page.getByLabel("Icon").fill("👨‍👩‍👧‍👦");
     await page.getByRole("button", { name: "Create topic" }).click();
 
     await expect(page).toHaveURL(/\/learn\/.+/);
