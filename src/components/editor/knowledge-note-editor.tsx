@@ -170,24 +170,9 @@ export function KnowledgeNoteEditor({
     });
   }, [noteId]);
 
-  /** Flush any pending save immediately (for beforeunload / route change) */
-  const flushSave = useCallback(() => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = undefined;
-    }
-    if (saveStatusRef.current !== "saved") {
-      // Save draft to localStorage as a guaranteed fallback
-      saveDraft();
-      // Also fire the network save (best-effort, may not complete on unload)
-      void doSave();
-    }
-  }, [doSave, saveDraft]);
-
   const scheduleAutoSave = useCallback(() => {
     setSaveStatus("unsaved");
     saveStatusRef.current = "unsaved";
-    // Save draft to localStorage immediately for crash safety
     saveDraft();
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
@@ -195,17 +180,24 @@ export function KnowledgeNoteEditor({
     }, 1500);
   }, [doSave, saveDraft]);
 
-  // beforeunload: warn user and flush save
+  // beforeunload: save draft to localStorage only (no network request).
+  // Network saves during page unload are unreliable and can block navigation.
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (saveStatusRef.current !== "saved") {
-        flushSave();
+        saveDraftToLocal(noteId, {
+          title: titleRef.current,
+          content: contentRef.current.content,
+          plainText: contentRef.current.plainText,
+          tags: JSON.stringify(tagsRef.current),
+          savedAt: Date.now(),
+        });
         e.preventDefault();
       }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [flushSave]);
+  }, [noteId]);
 
   // On unmount (route change within SPA): save draft to localStorage only.
   useEffect(
@@ -273,15 +265,13 @@ export function KnowledgeNoteEditor({
       <div className="mx-auto mb-4 flex w-full max-w-[980px] items-center justify-between gap-4 px-6 pt-5 md:px-10 md:pt-6">
         <button
           onClick={() => {
-            // Cancel any pending auto-save timer
+            // Stop any pending saves and navigate immediately.
+            // The unmount effect will save draft to localStorage.
             if (saveTimerRef.current) {
               clearTimeout(saveTimerRef.current);
               saveTimerRef.current = undefined;
             }
-            // Mark as unmounted to prevent doSave from running
             unmountedRef.current = true;
-            // Save draft to localStorage for safety
-            saveDraft();
             router.push(backHref);
           }}
           data-testid="note-editor-back"
