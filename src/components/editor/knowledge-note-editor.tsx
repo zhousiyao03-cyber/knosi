@@ -113,6 +113,8 @@ export function KnowledgeNoteEditor({
   const tagsRef = useRef<string[]>(parseTags(note.tags));
   const [draftRecovery, setDraftRecovery] = useState<DraftData | null>(null);
   const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
+  const [editorContent, setEditorContent] = useState(note.content ?? undefined);
 
   // Keep refs in sync with state
   useEffect(() => { titleRef.current = title; }, [title]);
@@ -201,33 +203,45 @@ export function KnowledgeNoteEditor({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [flushSave]);
 
-  // Flush on unmount (route change within SPA)
+  // On unmount (route change within SPA): save draft to localStorage only.
+  // Network save is NOT called here because doSave changing would cause
+  // the cleanup to fire mid-render, blocking navigation.
   useEffect(
     () => () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       if (saveStatusRef.current !== "saved") {
-        saveDraft();
-        // Use sendBeacon-style keepalive fetch as best-effort
-        void doSave();
+        saveDraftToLocal(noteId, {
+          title: titleRef.current,
+          content: contentRef.current.content,
+          plainText: contentRef.current.plainText,
+          tags: JSON.stringify(tagsRef.current),
+          savedAt: Date.now(),
+        });
       }
     },
-    [doSave, saveDraft]
+    [noteId]
   );
 
   const handleRecoverDraft = useCallback(() => {
     if (!draftRecovery) return;
     setTitle(draftRecovery.title);
+    titleRef.current = draftRecovery.title;
     contentRef.current = {
       content: draftRecovery.content,
       plainText: draftRecovery.plainText,
     };
     try {
-      setTags(JSON.parse(draftRecovery.tags) as string[]);
+      const recoveredTags = JSON.parse(draftRecovery.tags) as string[];
+      setTags(recoveredTags);
+      tagsRef.current = recoveredTags;
     } catch { /* ignore */ }
+    // Update editor content and force remount via key change
+    setEditorContent(draftRecovery.content);
+    setEditorKey((k) => k + 1);
     setDraftRecovery(null);
     clearDraftFromLocal(noteId);
-    // Trigger save with recovered data
-    void doSave({ title: draftRecovery.title });
+    // Schedule save after state settles
+    setTimeout(() => { void doSave(); }, 100);
   }, [draftRecovery, noteId, doSave]);
 
   const handleDismissRecovery = useCallback(() => {
@@ -252,7 +266,7 @@ export function KnowledgeNoteEditor({
   };
 
   return (
-    <div className="-mx-4 -mt-5 w-auto pb-10 md:-mx-6 md:-mt-6">
+    <div className="relative -mx-4 -mt-5 w-auto pb-10 md:-mx-6 md:-mt-6">
       <div className="mx-auto mb-4 flex w-full max-w-[980px] items-center justify-between gap-4 px-6 pt-5 md:px-10 md:pt-6">
         <button
           onClick={() => {
@@ -378,7 +392,8 @@ export function KnowledgeNoteEditor({
         </div>
 
         <TiptapEditor
-          content={note.content ?? undefined}
+          key={editorKey}
+          content={editorContent}
           placeholder={emptyMessage}
           onEditorReady={setEditorInstance}
           onChange={(content, plainText) => {
@@ -388,9 +403,11 @@ export function KnowledgeNoteEditor({
         />
       </div>
 
-      {/* TOC sidebar — positioned in the left margin area outside content */}
-      <div className="fixed left-4 top-24 z-10 hidden xl:block">
-        <TocSidebar editor={editorInstance} />
+      {/* TOC sidebar — positioned in the left margin of the content area */}
+      <div className="absolute left-2 top-28 hidden 2xl:block">
+        <div className="sticky top-6">
+          <TocSidebar editor={editorInstance} />
+        </div>
       </div>
     </div>
   );
