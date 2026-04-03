@@ -11,6 +11,7 @@ import {
 } from "@tiptap/react";
 import { PenTool } from "lucide-react";
 import type { ExcalidrawProps } from "@excalidraw/excalidraw";
+import "@excalidraw/excalidraw/index.css";
 
 /**
  * Dynamically import Excalidraw to avoid SSR issues.
