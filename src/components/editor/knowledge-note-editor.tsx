@@ -256,7 +256,8 @@ export function KnowledgeNoteEditor({
       <div className="mx-auto mb-4 flex w-full max-w-[980px] items-center justify-between gap-4 px-6 pt-5 md:px-10 md:pt-6">
         <button
           onClick={() => {
-            flushSave();
+            // Save draft synchronously for safety, then navigate immediately
+            saveDraft();
             router.push(backHref);
           }}
           data-testid="note-editor-back"
@@ -376,22 +377,20 @@ export function KnowledgeNoteEditor({
           />
         </div>
 
-        <div className="flex gap-6">
-          <div className="hidden lg:block">
-            <TocSidebar editor={editorInstance} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <TiptapEditor
-              content={note.content ?? undefined}
-              placeholder={emptyMessage}
-              onEditorReady={setEditorInstance}
-              onChange={(content, plainText) => {
-                contentRef.current = { content, plainText };
-                scheduleAutoSave();
-              }}
-            />
-          </div>
-        </div>
+        <TiptapEditor
+          content={note.content ?? undefined}
+          placeholder={emptyMessage}
+          onEditorReady={setEditorInstance}
+          onChange={(content, plainText) => {
+            contentRef.current = { content, plainText };
+            scheduleAutoSave();
+          }}
+        />
+      </div>
+
+      {/* TOC sidebar — positioned in the left margin area outside content */}
+      <div className="fixed left-4 top-24 z-10 hidden xl:block">
+        <TocSidebar editor={editorInstance} />
       </div>
     </div>
   );

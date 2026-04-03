@@ -83,9 +83,10 @@ export function TocSidebar({ editor }: TocSidebarProps) {
   // Collapsed state: show a small expand button
   if (collapsed) {
     return (
-      <div className="sticky top-6 shrink-0">
+      <div className="shrink-0">
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => setCollapsed(false)}
           title="Show table of contents"
           className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:text-stone-500 dark:hover:bg-stone-800 dark:hover:text-stone-300"
@@ -97,7 +98,7 @@ export function TocSidebar({ editor }: TocSidebarProps) {
   }
 
   return (
-    <div className="sticky top-6 w-52 shrink-0">
+    <div className="w-48 shrink-0">
       <div className="flex items-center justify-between pb-2">
         <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
           <List size={14} />
@@ -105,6 +106,7 @@ export function TocSidebar({ editor }: TocSidebarProps) {
         </div>
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => setCollapsed(true)}
           title="Hide table of contents"
           className="flex h-6 w-6 items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:text-stone-500 dark:hover:bg-stone-800 dark:hover:text-stone-300"
@@ -123,6 +125,7 @@ export function TocSidebar({ editor }: TocSidebarProps) {
           <button
             key={`${h.pos}-${i}`}
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleClick(h.pos)}
             className={cn(
               "block w-full truncate rounded-md px-2 py-1 text-left text-[13px] leading-relaxed transition-colors",
