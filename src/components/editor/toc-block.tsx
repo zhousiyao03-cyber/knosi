@@ -37,6 +37,9 @@ function scanHeadings(editor: Editor): TocEntry[] {
 function indentClass(level: number): string {
   if (level === 2) return "pl-4";
   if (level === 3) return "pl-8";
+  if (level === 4) return "pl-12";
+  if (level === 5) return "pl-16";
+  if (level >= 6) return "pl-20";
   return "";
 }
 

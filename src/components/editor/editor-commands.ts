@@ -6,6 +6,9 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Heading4,
+  Heading5,
+  Heading6,
   ImagePlus,
   ImageUp,
   Lightbulb,
@@ -113,6 +116,45 @@ export function createEditorCommandGroups(
             editor.chain().focus().toggleHeading({ level: 3 }).run();
           },
           isActive: (editor) => editor.isActive("heading", { level: 3 }),
+        },
+        {
+          id: "heading-4",
+          title: "标题 4",
+          description: "段落标题",
+          keywords: ["h4", "heading", "标题"],
+          icon: Heading4,
+          shortcutHint: "####",
+          keyboardShortcut: "⌘⌥4",
+          run: (editor) => {
+            editor.chain().focus().toggleHeading({ level: 4 }).run();
+          },
+          isActive: (editor) => editor.isActive("heading", { level: 4 }),
+        },
+        {
+          id: "heading-5",
+          title: "标题 5",
+          description: "细分标题",
+          keywords: ["h5", "heading", "标题"],
+          icon: Heading5,
+          shortcutHint: "#####",
+          keyboardShortcut: "⌘⌥5",
+          run: (editor) => {
+            editor.chain().focus().toggleHeading({ level: 5 }).run();
+          },
+          isActive: (editor) => editor.isActive("heading", { level: 5 }),
+        },
+        {
+          id: "heading-6",
+          title: "标题 6",
+          description: "最小标题",
+          keywords: ["h6", "heading", "标题"],
+          icon: Heading6,
+          shortcutHint: "######",
+          keyboardShortcut: "⌘⌥6",
+          run: (editor) => {
+            editor.chain().focus().toggleHeading({ level: 6 }).run();
+          },
+          isActive: (editor) => editor.isActive("heading", { level: 6 }),
         },
       ],
     },

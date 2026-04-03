@@ -128,6 +128,9 @@ export function TocSidebar({ editor }: TocSidebarProps) {
               "block w-full truncate rounded-md px-2 py-1 text-left text-[13px] leading-relaxed transition-colors",
               h.level === 2 && "pl-5",
               h.level === 3 && "pl-8",
+              h.level === 4 && "pl-10",
+              h.level === 5 && "pl-12",
+              h.level >= 6 && "pl-14",
               activePos === h.pos
                 ? "bg-blue-50 font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
                 : "text-stone-600 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"

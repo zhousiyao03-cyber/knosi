@@ -79,7 +79,7 @@ const BLOCK_CONTROL_GUTTER_RIGHT_PADDING = 12;
 const BLOCK_CONTROL_BUTTON_SIZE = 24;
 const BLOCK_CONTROL_LEFT_OFFSET = 60;
 const BLOCK_SELECTOR =
-  "p, h1, h2, h3, ul, ol, blockquote, pre, hr, img, table, [data-callout-block='true'], [data-toggle-block='true'], [data-excalidraw-block='true'], [data-toc-block='true']";
+  "p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr, img, table, [data-callout-block='true'], [data-toggle-block='true'], [data-excalidraw-block='true'], [data-toc-block='true']";
 
 interface TiptapEditorProps {
   content?: string;
@@ -530,7 +530,7 @@ export function TiptapEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
+        heading: { levels: [1, 2, 3, 4, 5, 6] },
         codeBlock: false,
         link: {
           openOnClick: false,
