@@ -109,6 +109,7 @@ export function KnowledgeNoteEditor({
   });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const saveStatusRef = useRef<"saved" | "saving" | "unsaved">("saved");
+  const unmountedRef = useRef(false);
   const titleRef = useRef(note.title);
   const tagsRef = useRef<string[]>(parseTags(note.tags));
   const [draftRecovery, setDraftRecovery] = useState<DraftData | null>(null);
@@ -132,6 +133,7 @@ export function KnowledgeNoteEditor({
 
   const doSave = useCallback(
     async (overrides?: { title?: string; tags?: string[] }) => {
+      if (unmountedRef.current) return;
       setSaveStatus("saving");
       saveStatusRef.current = "saving";
 
@@ -143,11 +145,13 @@ export function KnowledgeNoteEditor({
           plainText: contentRef.current.plainText,
           tags: JSON.stringify(overrides?.tags ?? tagsRef.current),
         });
+        if (unmountedRef.current) return;
         setSaveStatus("saved");
         saveStatusRef.current = "saved";
         setLastEditedAt(new Date());
         clearDraftFromLocal(noteId);
       } catch {
+        if (unmountedRef.current) return;
         setSaveStatus("unsaved");
         saveStatusRef.current = "unsaved";
       }
@@ -204,10 +208,9 @@ export function KnowledgeNoteEditor({
   }, [flushSave]);
 
   // On unmount (route change within SPA): save draft to localStorage only.
-  // Network save is NOT called here because doSave changing would cause
-  // the cleanup to fire mid-render, blocking navigation.
   useEffect(
     () => () => {
+      unmountedRef.current = true;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       if (saveStatusRef.current !== "saved") {
         saveDraftToLocal(noteId, {
@@ -270,7 +273,14 @@ export function KnowledgeNoteEditor({
       <div className="mx-auto mb-4 flex w-full max-w-[980px] items-center justify-between gap-4 px-6 pt-5 md:px-10 md:pt-6">
         <button
           onClick={() => {
-            // Save draft synchronously for safety, then navigate immediately
+            // Cancel any pending auto-save timer
+            if (saveTimerRef.current) {
+              clearTimeout(saveTimerRef.current);
+              saveTimerRef.current = undefined;
+            }
+            // Mark as unmounted to prevent doSave from running
+            unmountedRef.current = true;
+            // Save draft to localStorage for safety
             saveDraft();
             router.push(backHref);
           }}
