@@ -388,6 +388,59 @@ body {
   min-height: 1.5rem;
 }
 
+/* ========== Table Styles ========== */
+
+.notion-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.notion-editor th,
+.notion-editor td {
+  border: 1px solid #e7e5e4;
+  padding: 0.5rem 0.75rem;
+  min-width: 100px;
+  vertical-align: top;
+  position: relative;
+}
+
+.notion-editor th {
+  background: #f5f5f4;
+  font-weight: 600;
+  text-align: left;
+}
+
+.notion-editor td > p,
+.notion-editor th > p {
+  margin: 0;
+}
+
+.notion-editor .selectedCell {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.notion-editor .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #2563eb;
+  pointer-events: none;
+}
+
+.notion-editor .tableWrapper {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.notion-editor .resize-cursor {
+  cursor: col-resize;
+}
+
 /* ========== Dark Mode Editor Overrides ========== */
 
 .dark .notion-editor {
@@ -484,4 +537,17 @@ body {
 
 .dark .notion-toggle-summary::placeholder {
   color: #78716c;
+}
+
+.dark .notion-editor th,
+.dark .notion-editor td {
+  border-color: #3a3a3a;
+}
+
+.dark .notion-editor th {
+  background: #1c1917;
+}
+
+.dark .notion-editor .selectedCell {
+  background: rgba(37, 99, 235, 0.15);
 }

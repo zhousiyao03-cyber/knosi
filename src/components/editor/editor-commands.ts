@@ -14,6 +14,7 @@ import {
   ListOrdered,
   Minus,
   Quote,
+  Table,
   Type,
 } from "lucide-react";
 import {
@@ -202,6 +203,21 @@ export function createEditorCommandGroups(
             editor.chain().focus().toggleCodeBlock().run();
           },
           isActive: (editor) => editor.isActive("codeBlock"),
+        },
+        {
+          id: "table",
+          title: "表格",
+          description: "插入表格",
+          keywords: ["table", "表格", "grid"],
+          icon: Table,
+          run: (editor) => {
+            editor
+              .chain()
+              .focus()
+              .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+              .run();
+          },
+          transformable: false,
         },
         {
           id: "horizontal-rule",

@@ -11,7 +11,20 @@ import {
   Code,
   Highlighter,
   Link as LinkIcon,
+  Palette,
 } from "lucide-react";
+
+const TEXT_COLORS = [
+  { label: "默认", value: "" },
+  { label: "红色", value: "#dc2626" },
+  { label: "橙色", value: "#ea580c" },
+  { label: "黄色", value: "#ca8a04" },
+  { label: "绿色", value: "#16a34a" },
+  { label: "蓝色", value: "#2563eb" },
+  { label: "紫色", value: "#9333ea" },
+  { label: "粉色", value: "#db2777" },
+  { label: "灰色", value: "#6b7280" },
+];
 
 function BubbleButton({
   onClick,
@@ -50,6 +63,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
   const updatePosition = useCallback(() => {
     const { from, to, empty } = editor.state.selection;
@@ -173,6 +187,50 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
       >
         <LinkIcon size={iconSize} className="text-gray-300" />
       </BubbleButton>
+
+      <div className="mx-0.5 h-4 w-px bg-stone-700" />
+
+      <div className="relative">
+        <BubbleButton
+          onClick={() => setColorPickerOpen((open) => !open)}
+          isActive={editor.isActive("textStyle")}
+          title="文字颜色"
+        >
+          <Palette size={iconSize} className="text-gray-300" />
+        </BubbleButton>
+        {colorPickerOpen && (
+          <div className="absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 rounded-xl border border-stone-700 bg-stone-900 p-2 shadow-xl">
+            <div className="grid grid-cols-5 gap-1">
+              {TEXT_COLORS.map((color) => (
+                <button
+                  key={color.label}
+                  type="button"
+                  title={color.label}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    if (color.value) {
+                      editor.chain().focus().setColor(color.value).run();
+                    } else {
+                      editor.chain().focus().unsetColor().run();
+                    }
+                    setColorPickerOpen(false);
+                  }}
+                  className="flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-white/20"
+                >
+                  {color.value ? (
+                    <span
+                      className="h-4 w-4 rounded-full border border-stone-600"
+                      style={{ backgroundColor: color.value }}
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-400">A</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

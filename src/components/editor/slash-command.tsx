@@ -145,58 +145,30 @@ export function SlashCommandMenu({
     [items, normalizedQuery]
   );
 
-  const filteredIds = useMemo(
-    () => new Set(filtered.map((item) => item.id)),
-    [filtered]
+  // Build grouped sections for display
+  const sections = useMemo(() => {
+    const filteredIds = new Set(filtered.map((item) => item.id));
+
+    // For insert variant or default with groups, show grouped
+    if (groups) {
+      return groups
+        .map((group) => ({
+          id: group.id,
+          label: group.label,
+          items: group.items.filter((item) => filteredIds.has(item.id)),
+        }))
+        .filter((section) => section.items.length > 0);
+    }
+
+    // For block action menus (no groups), single flat section
+    return [{ id: "all", label: "", items: filtered }];
+  }, [filtered, groups]);
+
+  // Flat ordered list for keyboard navigation
+  const flatItems = useMemo(
+    () => sections.flatMap((s) => s.items),
+    [sections]
   );
-
-  const insertSections = useMemo(() => {
-    if (variant !== "insert" || !groups) return [];
-
-    return [
-      {
-        id: "core",
-        label: "基本区块",
-        items: groups
-          .filter((group) => group.id === "basic" || group.id === "lists")
-          .flatMap((group) => group.items)
-          .filter((item) => filteredIds.has(item.id)),
-      },
-      {
-        id: "blocks",
-        label: "高级区块",
-        items: groups
-          .filter((group) => group.id === "blocks")
-          .flatMap((group) => group.items)
-          .filter((item) => filteredIds.has(item.id)),
-      },
-      {
-        id: "media",
-        label: "媒体",
-        items: groups
-          .filter((group) => group.id === "media")
-          .flatMap((group) => group.items)
-          .filter((item) => filteredIds.has(item.id)),
-      },
-    ].filter((section) => section.items.length > 0);
-  }, [filteredIds, groups, variant]);
-
-  const featuredItem = useMemo(() => {
-    if (variant !== "insert" || normalizedQuery) return null;
-
-    return filtered.find((item) => item.id === "paragraph") ?? filtered[0] ?? null;
-  }, [filtered, normalizedQuery, variant]);
-
-  const renderedInsertSections = useMemo(() => {
-    if (variant !== "insert") return [];
-
-    return insertSections
-      .map((section) => ({
-        ...section,
-        items: section.items.filter((item) => item.id !== featuredItem?.id),
-      }))
-      .filter((section) => section.items.length > 0);
-  }, [featuredItem, insertSections, variant]);
 
   useLayoutEffect(() => {
     if (!menuRef.current || !coords) return;
@@ -243,21 +215,21 @@ export function SlashCommandMenu({
   );
 
   useEffect(() => {
-    if (!filtered.length) return;
+    if (!flatItems.length) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        setSelectedIndex((previous) => (previous + 1) % filtered.length);
+        setSelectedIndex((previous) => (previous + 1) % flatItems.length);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         setSelectedIndex(
-          (previous) => (previous - 1 + filtered.length) % filtered.length
+          (previous) => (previous - 1 + flatItems.length) % flatItems.length
         );
       } else if (event.key === "Enter") {
         event.preventDefault();
 
-        const selectedItem = filtered[selectedIndex];
+        const selectedItem = flatItems[selectedIndex];
         if (selectedItem) {
           executeCommand(selectedItem);
         }
@@ -266,7 +238,7 @@ export function SlashCommandMenu({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [executeCommand, filtered, selectedIndex]);
+  }, [executeCommand, flatItems, selectedIndex]);
 
   useEffect(() => {
     if (!coords) return;
@@ -300,174 +272,82 @@ export function SlashCommandMenu({
     };
   }, [coords, onClose]);
 
-  if (!coords || filtered.length === 0) return null;
+  if (!coords || flatItems.length === 0) return null;
 
-  if (variant === "insert") {
-    return (
-      <div
-        ref={menuRef}
-        data-testid={testId}
-        className="fixed z-50 flex h-[385px] w-[min(324px,calc(100vw-24px))] flex-col overflow-hidden rounded-[24px] border border-stone-200/80 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.16)] dark:border-stone-800 dark:bg-stone-950"
-        style={{ top: coords.top, left: coords.left }}
-      >
-        <div className="flex-1 overflow-y-auto px-5 pb-3 pt-4">
-          {featuredItem && (
-            <div className="mb-4">
-              <div className="mb-2 px-1 text-[13px] font-semibold text-stone-500 dark:text-stone-400">
-                建议
-              </div>
-              <button
-                type="button"
-                onClick={() => executeCommand(featuredItem)}
-                onMouseEnter={() =>
-                  setSelectedIndex(
-                    Math.max(
-                      0,
-                      filtered.findIndex((item) => item.id === featuredItem.id)
-                    )
-                  )
-                }
-                className={`flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left transition-colors ${
-                  selectedIndex ===
-                  filtered.findIndex((item) => item.id === featuredItem.id)
-                    ? "border-stone-200 bg-stone-100/80 dark:border-stone-700 dark:bg-stone-900"
-                    : "border-stone-100 bg-stone-50/90 hover:bg-stone-100/70 dark:border-stone-800 dark:bg-stone-900/70 dark:hover:bg-stone-900"
-                }`}
-              >
-                <featuredItem.icon
-                  size={22}
-                  className="shrink-0 text-stone-700 dark:text-stone-200"
-                />
-                <div className="min-w-0 flex-1 text-[15px] font-semibold text-stone-900 dark:text-stone-100">
-                  {featuredItem.title}
-                </div>
-                <span className="rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-medium text-stone-500 dark:bg-stone-800 dark:text-stone-300">
-                  推荐
-                </span>
-              </button>
-            </div>
-          )}
-
-          <div className="space-y-4 border-t border-stone-200/80 pt-4 dark:border-stone-800">
-            {renderedInsertSections.map((section) => (
-              <div key={section.id}>
-                <div className="mb-2 px-1 text-[13px] font-semibold text-stone-500 dark:text-stone-400">
-                  {section.label}
-                </div>
-                <div className="space-y-0.5">
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    const itemIndex = filtered.findIndex(
-                      (candidate) => candidate.id === item.id
-                    );
-
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => executeCommand(item)}
-                        onMouseEnter={() => setSelectedIndex(Math.max(0, itemIndex))}
-                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${
-                          itemIndex === selectedIndex
-                            ? "bg-stone-100 dark:bg-stone-900"
-                            : "hover:bg-stone-50 dark:hover:bg-stone-900/70"
-                        }`}
-                      >
-                        <Icon
-                          size={20}
-                          className={`shrink-0 ${
-                            item.tone === "danger"
-                              ? "text-red-500 dark:text-red-400"
-                              : "text-stone-700 dark:text-stone-200"
-                          }`}
-                        />
-                        <div
-                          className={`min-w-0 flex-1 text-[14px] font-medium ${
-                            item.tone === "danger"
-                              ? "text-red-600 dark:text-red-400"
-                              : "text-stone-900 dark:text-stone-100"
-                          }`}
-                        >
-                          {item.title}
-                        </div>
-                        {item.shortcutHint && (
-                          <span className="shrink-0 text-[13px] text-stone-400 dark:text-stone-500">
-                            {item.shortcutHint}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex w-full items-center justify-between border-t border-stone-200/80 px-5 py-3.5 text-left text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-800 dark:text-stone-200 dark:hover:bg-stone-900"
-        >
-          <span className="text-[14px] font-medium">关闭菜单</span>
-          <span className="text-[14px] text-stone-400 dark:text-stone-500">
-            esc
-          </span>
-        </button>
-      </div>
-    );
-  }
+  // Track running index across sections for keyboard selection
+  let runningIndex = 0;
 
   return (
     <div
       ref={menuRef}
       data-testid={testId}
-      className="fixed z-50 w-80 max-h-96 overflow-y-auto rounded-2xl border border-stone-200 bg-white p-1 shadow-2xl dark:border-stone-800 dark:bg-stone-950"
+      className="fixed z-50 w-[min(320px,calc(100vw-24px))] max-h-[380px] overflow-y-auto rounded-2xl border border-stone-200/80 bg-white p-1.5 shadow-[0_16px_48px_rgba(15,23,42,0.12)] dark:border-stone-800 dark:bg-stone-950"
       style={{ top: coords.top, left: coords.left }}
     >
-      {filtered.map((item, index) => {
-        const Icon = item.icon;
-        const isActive = item.isActive?.(editor) ?? false;
+      {sections.map((section) => {
+        const sectionEl = (
+          <div key={section.id}>
+            {section.label && (
+              <div className="mb-0.5 mt-2 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-stone-400 first:mt-1 dark:text-stone-500">
+                {section.label}
+              </div>
+            )}
+            <div className="space-y-px">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = item.isActive?.(editor) ?? false;
+                const itemIndex = runningIndex++;
 
-        return (
-          <button
-            key={item.id}
-            type="button"
-            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${
-              index === selectedIndex
-                ? "bg-stone-100 dark:bg-stone-900"
-                : "hover:bg-stone-50 dark:hover:bg-stone-900/70"
-            }`}
-            onClick={() => executeCommand(item)}
-            onMouseEnter={() => setSelectedIndex(index)}
-          >
-            <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${
-                isActive
-                  ? "border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950"
-                  : item.tone === "danger"
-                    ? "border-red-200 bg-white text-red-500 dark:border-red-900 dark:bg-stone-950 dark:text-red-400"
-                    : "border-stone-200 bg-white text-stone-500 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300"
-              }`}
-            >
-              <Icon size={18} />
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors ${
+                      itemIndex === selectedIndex
+                        ? "bg-stone-100 dark:bg-stone-900"
+                        : "hover:bg-stone-50 dark:hover:bg-stone-900/60"
+                    }`}
+                    onClick={() => executeCommand(item)}
+                    onMouseEnter={() => setSelectedIndex(itemIndex)}
+                  >
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                        isActive
+                          ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-950"
+                          : item.tone === "danger"
+                            ? "bg-red-50 text-red-500 dark:bg-red-950/50 dark:text-red-400"
+                            : "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300"
+                      }`}
+                    >
+                      <Icon size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={`text-[13px] font-medium leading-tight ${
+                          item.tone === "danger"
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-stone-900 dark:text-stone-100"
+                        }`}
+                      >
+                        {item.title}
+                      </div>
+                      <div className="text-[11px] leading-tight text-stone-400 dark:text-stone-500">
+                        {item.description}
+                      </div>
+                    </div>
+                    {item.shortcutHint && (
+                      <span className="shrink-0 rounded bg-stone-100 px-1.5 py-0.5 text-[11px] font-mono text-stone-400 dark:bg-stone-800 dark:text-stone-500">
+                        {item.shortcutHint}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            <div className="min-w-0">
-              <div
-                className={`text-sm font-medium ${
-                  item.tone === "danger"
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-stone-900 dark:text-stone-100"
-                }`}
-              >
-                {item.title}
-              </div>
-              <div className="text-xs text-stone-500 dark:text-stone-400">
-                {item.description}
-              </div>
-            </div>
-          </button>
+          </div>
         );
+
+        return sectionEl;
       })}
     </div>
   );

@@ -23,6 +23,12 @@ import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Typography from "@tiptap/extension-typography";
+import { Table } from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import Color from "@tiptap/extension-color";
+import { TextStyle } from "@tiptap/extension-text-style";
 import { common, createLowlight } from "lowlight";
 import {
   ArrowDown,
@@ -70,7 +76,7 @@ const BLOCK_CONTROL_GUTTER_RIGHT_PADDING = 12;
 const BLOCK_CONTROL_BUTTON_SIZE = 24;
 const BLOCK_CONTROL_LEFT_OFFSET = 60;
 const BLOCK_SELECTOR =
-  "p, h1, h2, h3, ul, ol, blockquote, pre, hr, img, [data-callout-block='true'], [data-toggle-block='true']";
+  "p, h1, h2, h3, ul, ol, blockquote, pre, hr, img, table, [data-callout-block='true'], [data-toggle-block='true']";
 
 interface TiptapEditorProps {
   content?: string;
@@ -510,6 +516,12 @@ export function TiptapEditor({
       }),
       CodeBlockLowlight.configure({ lowlight }),
       Typography,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      TextStyle,
+      Color,
       CalloutBlock,
       ToggleBlock,
       slashCommandExtension,
@@ -877,6 +889,7 @@ export function TiptapEditor({
           coords={slashCoords}
           query={slashQuery}
           items={slashItems}
+          groups={commandGroups}
           testId="editor-slash-menu"
           onClose={handleSlashDeactivate}
         />
@@ -890,7 +903,6 @@ export function TiptapEditor({
           query=""
           items={slashItems}
           groups={commandGroups}
-          variant="insert"
           testId="editor-insert-menu"
           onSelectItem={handleInsertMenuSelection}
           onClose={() => setInsertMenuState(null)}
