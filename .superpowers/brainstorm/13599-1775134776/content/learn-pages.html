@@ -1,0 +1,179 @@
+<h2>学习笔记本 — 页面结构</h2>
+<p class="subtitle">两层结构：主题列表 → 主题详情（笔记 + AI 工具）</p>
+
+<div class="cards">
+  <div class="card" data-choice="learn-list" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>📚 主题列表页 <code>/learn</code></h3>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">学习笔记本</div>
+        <div class="mockup-body" style="padding:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div style="font-size:13px;color:#888">3 个学习主题</div>
+            <button class="mock-button">+ 新主题</button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="font-size:24px">🐹</span>
+                <div>
+                  <div style="font-weight:600;color:#e0e0e0">Go 语言</div>
+                  <div style="font-size:12px;color:#888">从零开始学后端</div>
+                </div>
+                <div style="margin-left:auto;font-size:12px;color:#666">12 篇笔记</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <span style="font-size:11px;background:#2d2d4a;color:#8b8bcd;padding:2px 8px;border-radius:10px">goroutine</span>
+                <span style="font-size:11px;background:#2d2d4a;color:#8b8bcd;padding:2px 8px;border-radius:10px">channel</span>
+                <span style="font-size:11px;background:#2d2d4a;color:#8b8bcd;padding:2px 8px;border-radius:10px">interface</span>
+              </div>
+            </div>
+
+            <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span style="font-size:24px">🐳</span>
+                <div>
+                  <div style="font-weight:600;color:#e0e0e0">Docker & K8s</div>
+                  <div style="font-size:12px;color:#888">容器化部署</div>
+                </div>
+                <div style="margin-left:auto;font-size:12px;color:#666">5 篇笔记</div>
+              </div>
+            </div>
+
+            <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:24px">🗄️</span>
+                <div>
+                  <div style="font-weight:600;color:#e0e0e0">数据库</div>
+                  <div style="font-size:12px;color:#888">SQL / Redis / 索引优化</div>
+                </div>
+                <div style="margin-left:auto;font-size:12px;color:#666">3 篇笔记</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="learn-detail" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>📖 主题详情页 <code>/learn/[topicId]</code></h3>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">🐹 Go 语言</div>
+        <div class="mockup-body" style="padding:16px">
+          <!-- Tab bar -->
+          <div style="display:flex;gap:0;border-bottom:1px solid #333;margin-bottom:16px">
+            <div style="padding:8px 16px;border-bottom:2px solid #7c3aed;color:#7c3aed;font-size:13px;font-weight:500">笔记</div>
+            <div style="padding:8px 16px;color:#888;font-size:13px">AI 助手</div>
+          </div>
+
+          <!-- Notes tab content -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <input class="mock-input" placeholder="搜索笔记..." style="width:200px;font-size:12px;padding:6px 10px">
+            <button class="mock-button">+ 新笔记</button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div style="font-weight:500;color:#e0e0e0;font-size:14px">Goroutine 与并发模型</div>
+                <div style="font-size:11px;color:#666">3月28日</div>
+              </div>
+              <div style="font-size:12px;color:#999;margin-top:4px;line-height:1.4">Go 的并发不是并行。goroutine 是轻量级线程，由 Go runtime 调度...</div>
+              <div style="display:flex;gap:4px;margin-top:8px">
+                <span style="font-size:10px;background:#1e3a2e;color:#6bcf8e;padding:1px 6px;border-radius:8px">goroutine</span>
+                <span style="font-size:10px;background:#1e3a2e;color:#6bcf8e;padding:1px 6px;border-radius:8px">并发</span>
+              </div>
+            </div>
+
+            <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div style="font-weight:500;color:#e0e0e0;font-size:14px">Channel 通信机制</div>
+                <div style="font-size:11px;color:#666">3月25日</div>
+              </div>
+              <div style="font-size:12px;color:#999;margin-top:4px;line-height:1.4">Channel 是 goroutine 之间通信的管道。无缓冲 channel 会阻塞...</div>
+              <div style="display:flex;gap:4px;margin-top:8px">
+                <span style="font-size:10px;background:#1e3a2e;color:#6bcf8e;padding:1px 6px;border-radius:8px">channel</span>
+              </div>
+            </div>
+
+            <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div style="font-weight:500;color:#e0e0e0;font-size:14px">Interface 的隐式实现</div>
+                <div style="font-size:11px;color:#666">3月20日</div>
+              </div>
+              <div style="font-size:12px;color:#999;margin-top:4px;line-height:1.4">Go 不需要 implements 关键字，只要类型实现了接口的所有方法...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="learn-ai" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>🤖 AI 助手 Tab</h3>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">🐹 Go 语言 → AI 助手</div>
+        <div class="mockup-body" style="padding:16px">
+          <!-- Tab bar -->
+          <div style="display:flex;gap:0;border-bottom:1px solid #333;margin-bottom:16px">
+            <div style="padding:8px 16px;color:#888;font-size:13px">笔记</div>
+            <div style="padding:8px 16px;border-bottom:2px solid #7c3aed;color:#7c3aed;font-size:13px;font-weight:500">AI 助手</div>
+          </div>
+
+          <!-- AI tools -->
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="background:#1a1030;border:1px solid #3a2a5a;border-radius:8px;padding:14px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span>🗺️</span>
+                <div style="font-weight:500;color:#c4b5fd">生成知识大纲</div>
+              </div>
+              <div style="font-size:12px;color:#999">根据你的所有笔记，梳理出知识结构和学习脉络</div>
+            </div>
+
+            <div style="background:#1a1030;border:1px solid #3a2a5a;border-radius:8px;padding:14px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span>🔍</span>
+                <div style="font-weight:500;color:#c4b5fd">盲点分析</div>
+              </div>
+              <div style="font-size:12px;color:#999">分析你已学的内容，指出可能遗漏的关键知识点</div>
+            </div>
+
+            <div style="background:#1a1030;border:1px solid #3a2a5a;border-radius:8px;padding:14px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span>❓</span>
+                <div style="font-weight:500;color:#c4b5fd">生成复习题</div>
+              </div>
+              <div style="font-size:12px;color:#999">根据笔记内容生成问答题，检验你的理解程度</div>
+            </div>
+
+            <div style="background:#1a1030;border:1px solid #3a2a5a;border-radius:8px;padding:14px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span>💬</span>
+                <div style="font-weight:500;color:#c4b5fd">问 AI</div>
+              </div>
+              <div style="font-size:12px;color:#999">结合你的笔记上下文提问，获得个性化的解答</div>
+            </div>
+          </div>
+
+          <!-- Previous AI results -->
+          <div style="margin-top:16px;padding-top:12px;border-top:1px solid #333">
+            <div style="font-size:12px;color:#666;margin-bottom:8px">历史生成</div>
+            <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:10px;font-size:12px">
+              <div style="display:flex;justify-content:space-between">
+                <span style="color:#c4b5fd">🗺️ 知识大纲</span>
+                <span style="color:#666">3月30日</span>
+              </div>
+              <div style="color:#999;margin-top:4px">基础语法 → 类型系统 → 并发模型 → 网络编程 → ...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px">点击卡片查看大图，或直接在终端告诉我你的反馈</p>

@@ -1,0 +1,124 @@
+<h2>开源项目 — 页面结构</h2>
+<p class="subtitle">两层结构：项目列表 → 项目详情（分析笔记）</p>
+
+<div class="cards">
+  <div class="card" data-choice="project-list" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>📦 项目列表页 <code>/projects</code></h3>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">开源项目</div>
+        <div class="mockup-body" style="padding:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div style="font-size:13px;color:#888">2 个项目</div>
+            <button class="mock-button">+ 添加项目</button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <div style="width:36px;height:36px;background:#2d2d4a;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🍸</div>
+                <div style="flex:1">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-weight:600;color:#e0e0e0">gin-gonic/gin</span>
+                    <span style="font-size:11px;background:#1e2d1e;color:#6bcf8e;padding:1px 6px;border-radius:8px">Go</span>
+                  </div>
+                  <div style="font-size:12px;color:#888;margin-top:2px">高性能 HTTP Web 框架</div>
+                </div>
+                <div style="font-size:12px;color:#666">8 篇笔记</div>
+              </div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">
+                <span style="font-size:10px;background:#2d2d4a;color:#8b8bcd;padding:1px 6px;border-radius:10px">路由</span>
+                <span style="font-size:10px;background:#2d2d4a;color:#8b8bcd;padding:1px 6px;border-radius:10px">中间件</span>
+                <span style="font-size:10px;background:#2d2d4a;color:#8b8bcd;padding:1px 6px;border-radius:10px">Context</span>
+                <span style="font-size:10px;background:#2d2d4a;color:#8b8bcd;padding:1px 6px;border-radius:10px">设计模式</span>
+              </div>
+            </div>
+
+            <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <div style="width:36px;height:36px;background:#2d2d4a;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🐳</div>
+                <div style="flex:1">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-weight:600;color:#e0e0e0">moby/moby</span>
+                    <span style="font-size:11px;background:#1e2d1e;color:#6bcf8e;padding:1px 6px;border-radius:8px">Go</span>
+                  </div>
+                  <div style="font-size:12px;color:#888;margin-top:2px">Docker 容器引擎</div>
+                </div>
+                <div style="font-size:12px;color:#666">3 篇笔记</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="project-detail" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>📄 项目详情页 <code>/projects/[id]</code></h3>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">🍸 gin-gonic/gin</div>
+        <div class="mockup-body" style="padding:16px">
+          <!-- Project header -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:11px;background:#1e2d1e;color:#6bcf8e;padding:1px 6px;border-radius:8px">Go</span>
+            <a style="font-size:12px;color:#7c3aed;text-decoration:none" href="#">github.com/gin-gonic/gin ↗</a>
+          </div>
+          <div style="font-size:12px;color:#999;margin-bottom:16px">高性能 HTTP Web 框架，基于 httprouter</div>
+
+          <!-- Filter bar -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="display:flex;gap:6px">
+              <span style="font-size:11px;background:#7c3aed;color:white;padding:2px 10px;border-radius:10px;cursor:pointer">全部</span>
+              <span style="font-size:11px;background:#2d2d4a;color:#8b8bcd;padding:2px 10px;border-radius:10px;cursor:pointer">架构</span>
+              <span style="font-size:11px;background:#2d2d4a;color:#8b8bcd;padding:2px 10px;border-radius:10px;cursor:pointer">路由</span>
+              <span style="font-size:11px;background:#2d2d4a;color:#8b8bcd;padding:2px 10px;border-radius:10px;cursor:pointer">中间件</span>
+              <span style="font-size:11px;background:#2d2d4a;color:#8b8bcd;padding:2px 10px;border-radius:10px;cursor:pointer">设计模式</span>
+            </div>
+            <button class="mock-button">+ 添加笔记</button>
+          </div>
+
+          <!-- Notes list -->
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div style="font-weight:500;color:#e0e0e0;font-size:14px">整体架构分析</div>
+                <div style="font-size:11px;color:#666">3月30日</div>
+              </div>
+              <div style="font-size:12px;color:#999;margin-top:4px;line-height:1.4">gin 的核心是 Engine 结构体，内嵌 RouterGroup。请求处理流程：Engine.ServeHTTP → handleHTTPRequest → 路由匹配 → 执行 handler chain...</div>
+              <div style="display:flex;gap:4px;margin-top:8px">
+                <span style="font-size:10px;background:#2d2d4a;color:#8b8bcd;padding:1px 6px;border-radius:8px">架构</span>
+              </div>
+            </div>
+
+            <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div style="font-weight:500;color:#e0e0e0;font-size:14px">路由树实现 — Radix Tree</div>
+                <div style="font-size:11px;color:#666">3月28日</div>
+              </div>
+              <div style="font-size:12px;color:#999;margin-top:4px;line-height:1.4">gin 底层用 httprouter 的 radix tree 做路由匹配。每个 HTTP method 有独立的树。节点压缩...</div>
+              <div style="display:flex;gap:4px;margin-top:8px">
+                <span style="font-size:10px;background:#2d2d4a;color:#8b8bcd;padding:1px 6px;border-radius:8px">路由</span>
+                <span style="font-size:10px;background:#2d2d4a;color:#8b8bcd;padding:1px 6px;border-radius:8px">数据结构</span>
+              </div>
+            </div>
+
+            <div style="background:#12122a;border:1px solid #2a2a4a;border-radius:6px;padding:12px">
+              <div style="display:flex;justify-content:space-between;align-items:start">
+                <div style="font-weight:500;color:#e0e0e0;font-size:14px">中间件链与 Context 复用</div>
+                <div style="font-size:11px;color:#666">3月25日</div>
+              </div>
+              <div style="font-size:12px;color:#999;margin-top:4px;line-height:1.4">中间件本质是 HandlerFunc 数组，通过 c.Next() 链式调用。Context 使用 sync.Pool 复用...</div>
+              <div style="display:flex;gap:4px;margin-top:8px">
+                <span style="font-size:10px;background:#2d2d4a;color:#8b8bcd;padding:1px 6px;border-radius:8px">中间件</span>
+                <span style="font-size:10px;background:#2d2d4a;color:#8b8bcd;padding:1px 6px;border-radius:8px">设计模式</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px">点击卡片查看大图，或直接在终端告诉我反馈</p>
