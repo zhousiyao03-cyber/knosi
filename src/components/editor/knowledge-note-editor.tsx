@@ -110,6 +110,8 @@ export function KnowledgeNoteEditor({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const saveStatusRef = useRef<"saved" | "saving" | "unsaved">("saved");
   const unmountedRef = useRef(false);
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
   const titleRef = useRef(note.title);
   const tagsRef = useRef<string[]>(parseTags(note.tags));
   const [draftRecovery, setDraftRecovery] = useState<DraftData | null>(null);
@@ -138,7 +140,7 @@ export function KnowledgeNoteEditor({
       saveStatusRef.current = "saving";
 
       try {
-        await onSave({
+        await onSaveRef.current({
           id: noteId,
           title: overrides?.title ?? titleRef.current,
           content: contentRef.current.content,
@@ -156,7 +158,7 @@ export function KnowledgeNoteEditor({
         saveStatusRef.current = "unsaved";
       }
     },
-    [noteId, onSave]
+    [noteId]
   );
 
   /** Save local draft to localStorage for crash recovery */
