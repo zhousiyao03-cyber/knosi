@@ -12,78 +12,47 @@ import {
 import {
   EditorContent,
   useEditor,
-  type JSONContent,
   type Editor as TiptapEditorInstance,
 } from "@tiptap/react";
-import type { EditorView } from "@tiptap/pm/view";
 import { NodeSelection } from "@tiptap/pm/state";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import TaskList from "@tiptap/extension-task-list";
-import TaskItem from "@tiptap/extension-task-item";
-import Highlight from "@tiptap/extension-highlight";
-import Image from "@tiptap/extension-image";
-import Typography from "@tiptap/extension-typography";
-import { Table } from "@tiptap/extension-table";
-import TableRow from "@tiptap/extension-table-row";
-import TableCell from "@tiptap/extension-table-cell";
-import TableHeader from "@tiptap/extension-table-header";
-import Color from "@tiptap/extension-color";
-import { TextStyle } from "@tiptap/extension-text-style";
-import { CodeBlockWithLang } from "./code-block-with-lang";
-import {
-  ArrowDown,
-  ArrowUp,
-  Columns2,
-  Copy,
-  GripVertical,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { GripVertical, Plus } from "lucide-react";
 import {
   createSlashCommandExtension,
   SlashCommandMenu,
 } from "./slash-command";
 import { BubbleToolbar } from "./bubble-toolbar";
 import { TableToolbar } from "./table-toolbar";
-import { CalloutBlock, createCalloutBlockNode } from "./callout-block";
+import { createCalloutBlockNode } from "./callout-block";
 import {
   createEditorCommandGroups,
   flattenEditorCommandGroups,
   type EditorCommandItem,
 } from "./editor-commands";
 import {
-  deleteTopLevelBlock,
-  duplicateTopLevelBlock,
-  focusTopLevelBlock,
   getTopLevelBlockContext,
   insertHorizontalRuleRelativeToBlock,
   insertNodeRelativeToBlock,
   insertParagraphRelativeToBlock,
-  moveTopLevelBlock,
   type BlockInsertDirection,
 } from "./editor-block-ops";
-import { ToggleBlock, createToggleBlockNode } from "./toggle-block";
-import { ExcalidrawBlock } from "./excalidraw-block";
-import { ImageRowBlock } from "./image-row-block";
-import { MermaidBlock } from "./mermaid-block";
-import { TocBlock } from "./toc-block";
-import { SearchReplace, SearchBar } from "./search-replace";
-import { MarkdownTablePaste } from "./markdown-table-paste";
+import { createToggleBlockNode } from "./toggle-block";
+import { SearchBar } from "./search-replace";
+import { createEditorExtensions } from "./editor-extensions";
+import { buildBlockActionItems } from "./editor-block-actions";
+import {
+  parseEditorContent,
+  extractPlainTextFromContent,
+  validateImageFile,
+  readFileAsDataUrl,
+  insertImagesIntoView,
+} from "./editor-utils";
 
-const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024;
-const ACCEPTED_IMAGE_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-]);
-const BLOCK_CONTROL_GUTTER_WIDTH = 96;
-const BLOCK_CONTROL_GUTTER_RIGHT_PADDING = 12;
-const BLOCK_CONTROL_BUTTON_SIZE = 24;
 /** Tracks the position of a block being dragged via the grip handle. */
 let gripDragSource: { pos: number; typeName: string; attrs: Record<string, unknown>; nodeSize: number } | null = null;
 
+const BLOCK_CONTROL_GUTTER_WIDTH = 96;
+const BLOCK_CONTROL_GUTTER_RIGHT_PADDING = 12;
+const BLOCK_CONTROL_BUTTON_SIZE = 24;
 const BLOCK_CONTROL_LEFT_OFFSET = 60;
 const BLOCK_SELECTOR =
   "p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr, img, table, [data-callout-block='true'], [data-toggle-block='true'], [data-excalidraw-block='true'], [data-image-row='true'], [data-mermaid-block='true'], [data-toc-block='true']";
@@ -118,142 +87,6 @@ interface BlockActionMenuState {
   targetPos: number;
 }
 
-function parseEditorContent(content?: string): JSONContent | undefined {
-  if (!content) return undefined;
-
-  try {
-    return JSON.parse(content) as JSONContent;
-  } catch {
-    return undefined;
-  }
-}
-
-function extractPlainTextFromContent(content?: JSONContent) {
-  if (!content) return "";
-
-  const lines: string[] = [];
-
-  const collectInlineText = (node: JSONContent): string => {
-    if (node.type === "text") {
-      return node.text ?? "";
-    }
-
-    if (node.type === "hardBreak") {
-      return "\n";
-    }
-
-    return (node.content ?? []).map(collectInlineText).join("");
-  };
-
-  const visitBlock = (node: JSONContent) => {
-    if (node.type === "toggleBlock") {
-      const summary = String(node.attrs?.summary ?? "").trim();
-      if (summary) lines.push(summary);
-      for (const child of node.content ?? []) {
-        visitBlock(child);
-      }
-      return;
-    }
-
-    if (
-      node.type === "doc" ||
-      node.type === "bulletList" ||
-      node.type === "orderedList" ||
-      node.type === "taskList" ||
-      node.type === "listItem" ||
-      node.type === "calloutBlock"
-    ) {
-      for (const child of node.content ?? []) {
-        visitBlock(child);
-      }
-      return;
-    }
-
-    if (node.type === "mermaidBlock") {
-      const code = String(node.attrs?.code ?? "").trim();
-      if (code) lines.push(code);
-      return;
-    }
-
-    if (node.type === "horizontalRule") {
-      lines.push("---");
-      return;
-    }
-
-    const text = collectInlineText(node).trim();
-    if (text) {
-      lines.push(text);
-    }
-  };
-
-  visitBlock(content);
-
-  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-}
-
-function validateImageFile(file: File) {
-  if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
-    return "当前只支持 PNG、JPG、WEBP 和 GIF 图片。";
-  }
-
-  if (file.size > MAX_IMAGE_FILE_SIZE) {
-    return "单张图片不能超过 5MB。";
-  }
-
-  return null;
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-        return;
-      }
-
-      reject(new Error("图片读取失败"));
-    };
-
-    reader.onerror = () => reject(new Error("图片读取失败"));
-    reader.readAsDataURL(file);
-  });
-}
-
-function insertImagesIntoView(
-  view: EditorView,
-  sources: string[],
-  position?: number
-) {
-  const imageNodeType = view.state.schema.nodes.image;
-  const paragraphNodeType = view.state.schema.nodes.paragraph;
-
-  if (!imageNodeType) return;
-
-  let transaction = view.state.tr;
-  let insertPosition = position ?? transaction.selection.from;
-
-  for (const source of sources) {
-    const imageNode = imageNodeType.create({
-      src: source,
-      alt: "插入图片",
-    });
-
-    transaction = transaction.insert(insertPosition, imageNode);
-    insertPosition += imageNode.nodeSize;
-
-    if (paragraphNodeType) {
-      const paragraphNode = paragraphNodeType.create();
-      transaction = transaction.insert(insertPosition, paragraphNode);
-      insertPosition += paragraphNode.nodeSize;
-    }
-  }
-
-  view.dispatch(transaction.scrollIntoView());
-  view.focus();
-}
-
 export function TiptapEditor({
   content,
   onChange,
@@ -273,7 +106,7 @@ export function TiptapEditor({
   );
   const [blockActionMenuState, setBlockActionMenuState] =
     useState<BlockActionMenuState | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [, setIsDragging] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<TiptapEditorInstance | null>(null);
@@ -548,63 +381,19 @@ export function TiptapEditor({
     hoveredBlockRef.current = null;
   }, []);
 
+  const extensions = useMemo(
+    () =>
+      createEditorExtensions({
+        placeholder,
+        slashCommandExtension,
+        onSearchOpen: () => setSearchOpen(true),
+      }),
+    [placeholder, slashCommandExtension]
+  );
+
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3, 4, 5, 6] },
-        codeBlock: false,
-        link: {
-          openOnClick: false,
-          HTMLAttributes: {
-            class: "cursor-pointer underline underline-offset-4 decoration-stone-300",
-          },
-        },
-      }),
-      Placeholder.configure({
-        placeholder: ({ node }) => {
-          if (node.type.name === "heading") {
-            return `标题 ${node.attrs.level}`;
-          }
-
-          return placeholder;
-        },
-      }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Highlight.configure({ multicolor: false }),
-      Image.configure({
-        allowBase64: true,
-        HTMLAttributes: {
-          class: "notion-editor-image",
-        },
-        resize: {
-          enabled: true,
-          minWidth: 180,
-          minHeight: 120,
-          alwaysPreserveAspectRatio: true,
-        },
-      }),
-      CodeBlockWithLang,
-      Typography,
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableCell,
-      TableHeader,
-      TextStyle,
-      Color,
-      CalloutBlock,
-      ToggleBlock,
-      ExcalidrawBlock,
-      ImageRowBlock,
-      MermaidBlock,
-      TocBlock,
-      MarkdownTablePaste,
-      SearchReplace.configure({
-        onOpen: () => setSearchOpen(true),
-      }),
-      slashCommandExtension,
-    ],
+    extensions,
     content: parseEditorContent(content),
     editable,
     onUpdate: ({ editor: currentEditor }) => {
@@ -871,208 +660,8 @@ export function TiptapEditor({
 
   const blockActionItems = useMemo(() => {
     const currentEditor = editorRef.current;
-    const state = blockActionMenuState;
-
-    if (!currentEditor || !state) return [] as EditorCommandItem[];
-
-    const block = getTopLevelBlockContext(currentEditor, state.targetPos);
-    if (!block) return [] as EditorCommandItem[];
-
-    const items: EditorCommandItem[] = [];
-
-    if (block.index > 0) {
-      items.push({
-        id: "move-up",
-        title: "上移",
-        description: "将当前块向上移动一行",
-        keywords: ["move", "up", "上移"],
-        icon: ArrowUp,
-        run: (editor) => {
-          moveTopLevelBlock(editor, state.targetPos, "up");
-        },
-      });
-    }
-
-    if (block.index < currentEditor.state.doc.childCount - 1) {
-      items.push({
-        id: "move-down",
-        title: "下移",
-        description: "将当前块向下移动一行",
-        keywords: ["move", "down", "下移"],
-        icon: ArrowDown,
-        run: (editor) => {
-          moveTopLevelBlock(editor, state.targetPos, "down");
-        },
-      });
-    }
-
-    // "Merge into row" action for image blocks when an adjacent block is also an image or imageRowBlock
-    if (block.node.type.name === "image" || block.node.type.name === "imageRowBlock") {
-      const doc = currentEditor.state.doc;
-      // Check next sibling
-      if (block.index < doc.childCount - 1) {
-        let nextPos = state.targetPos + block.node.nodeSize;
-        const nextNode = doc.nodeAt(nextPos);
-        if (nextNode && (nextNode.type.name === "image" || nextNode.type.name === "imageRowBlock")) {
-          items.push({
-            id: "merge-with-next",
-            title: "与下方图片并排",
-            description: "合并为并排图片行",
-            keywords: ["merge", "row", "并排"],
-            icon: Columns2,
-            run: (editor) => {
-              const curBlock = getTopLevelBlockContext(editor, state.targetPos);
-              if (!curBlock) return;
-              const curNode = curBlock.node;
-              const curEnd = state.targetPos + curNode.nodeSize;
-              const nNode = editor.state.doc.nodeAt(curEnd);
-              if (!nNode) return;
-
-              // Collect images from both blocks
-              const imgs: { src: string; width?: number }[] = [];
-              const collectFromNode = (n: typeof curNode) => {
-                if (n.type.name === "image") {
-                  const src = n.attrs.src as string;
-                  if (src) imgs.push({ src });
-                } else if (n.type.name === "imageRowBlock") {
-                  try {
-                    const parsed = JSON.parse(n.attrs.images as string);
-                    if (Array.isArray(parsed)) imgs.push(...parsed);
-                  } catch { /* empty */ }
-                }
-              };
-              collectFromNode(curNode);
-              collectFromNode(nNode);
-
-              const rowType = editor.state.schema.nodes.imageRowBlock;
-              if (!rowType || imgs.length === 0) return;
-              const newNode = rowType.create({ images: JSON.stringify(imgs) });
-              const { tr } = editor.state;
-              tr.replaceWith(state.targetPos, curEnd + nNode.nodeSize, newNode);
-              editor.view.dispatch(tr);
-            },
-          });
-        }
-      }
-      // Check previous sibling
-      if (block.index > 0) {
-        let prevPos = 0;
-        let prevNode = null as typeof block.node | null;
-        let idx = 0;
-        doc.forEach((node, offset) => {
-          if (idx === block.index - 1) {
-            prevPos = offset;
-            prevNode = node;
-          }
-          idx++;
-        });
-        if (prevNode && (prevNode.type.name === "image" || prevNode.type.name === "imageRowBlock")) {
-          items.push({
-            id: "merge-with-prev",
-            title: "与上方图片并排",
-            description: "合并为并排图片行",
-            keywords: ["merge", "row", "并排"],
-            icon: Columns2,
-            run: (editor) => {
-              // Re-find prev block at run time
-              const curBlock2 = getTopLevelBlockContext(editor, state.targetPos);
-              if (!curBlock2 || curBlock2.index === 0) return;
-              let pPos = 0;
-              let pNode = null as typeof block.node | null;
-              let i2 = 0;
-              editor.state.doc.forEach((node, offset) => {
-                if (i2 === curBlock2.index - 1) {
-                  pPos = offset;
-                  pNode = node;
-                }
-                i2++;
-              });
-              if (!pNode) return;
-
-              const imgs: { src: string; width?: number }[] = [];
-              const collectFromNode = (n: typeof block.node) => {
-                if (n.type.name === "image") {
-                  const src = n.attrs.src as string;
-                  if (src) imgs.push({ src });
-                } else if (n.type.name === "imageRowBlock") {
-                  try {
-                    const parsed = JSON.parse(n.attrs.images as string);
-                    if (Array.isArray(parsed)) imgs.push(...parsed);
-                  } catch { /* empty */ }
-                }
-              };
-              collectFromNode(pNode);
-              collectFromNode(curBlock2.node);
-
-              const rowType = editor.state.schema.nodes.imageRowBlock;
-              if (!rowType || imgs.length === 0) return;
-              const newNode = rowType.create({ images: JSON.stringify(imgs) });
-              const { tr } = editor.state;
-              tr.replaceWith(pPos, state.targetPos + curBlock2.node.nodeSize, newNode);
-              editor.view.dispatch(tr);
-            },
-          });
-        }
-      }
-    }
-
-    items.push(
-      {
-        id: "duplicate-block",
-        title: "复制块",
-        description: "复制当前块内容",
-        keywords: ["duplicate", "copy", "复制"],
-        icon: Copy,
-        run: (editor) => {
-          duplicateTopLevelBlock(editor, state.targetPos);
-        },
-      },
-      {
-        id: "delete-block",
-        title: "删除块",
-        description: "删除当前块",
-        keywords: ["delete", "remove", "删除"],
-        icon: Trash2,
-        run: (editor) => {
-          deleteTopLevelBlock(editor, state.targetPos);
-        },
-        tone: "danger",
-      }
-    );
-
-    const transformable = ![
-      "image",
-      "horizontalRule",
-      "calloutBlock",
-      "toggleBlock",
-      "excalidrawBlock",
-      "imageRowBlock",
-      "mermaidBlock",
-      "tocBlock",
-    ].includes(block.node.type.name);
-
-    if (transformable) {
-      const transformItems = flattenEditorCommandGroups(
-        commandGroups.filter((group) => group.id !== "media")
-      )
-        .filter(
-          (item) => item.id !== "horizontal-rule" && item.transformable !== false
-        )
-        .map((item) => ({
-          ...item,
-          id: `transform-${item.id}`,
-          title: `转为${item.title}`,
-          description: `将当前块转换为${item.title}`,
-          run: (editor: TiptapEditorInstance) => {
-            focusTopLevelBlock(editor, state.targetPos);
-            item.run(editor);
-          },
-        }));
-
-      items.push(...transformItems);
-    }
-
-    return items;
+    if (!currentEditor || !blockActionMenuState) return [];
+    return buildBlockActionItems(currentEditor, blockActionMenuState, commandGroups);
   }, [blockActionMenuState, commandGroups]);
 
   const handleImageInputChange = useCallback(
