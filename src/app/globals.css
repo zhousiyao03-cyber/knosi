@@ -632,6 +632,7 @@ body {
   display: flex;
   gap: 8px;
   align-items: flex-start;
+  justify-content: center;
   flex-wrap: wrap;
 }
 
@@ -846,10 +847,12 @@ body {
 
 .mermaid-fullscreen-content {
   position: relative;
+  width: 90vw;
   max-width: 95vw;
   max-height: 95vh;
   background: white;
   border-radius: 16px;
+  overflow: hidden;
   padding: 2rem;
   overflow: auto;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
@@ -875,9 +878,28 @@ body {
   color: #1c1917;
 }
 
+.mermaid-fullscreen-zoom-badge {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 10;
+  pointer-events: none;
+}
+
 .mermaid-fullscreen-svg {
   display: flex;
   justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  max-height: calc(95vh - 4rem);
+  transition: transform 100ms ease-out;
+  user-select: none;
 }
 
 .mermaid-fullscreen-svg svg {

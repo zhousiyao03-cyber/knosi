@@ -92,6 +92,48 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
     }
   }, [editing]);
 
+  // Fullscreen zoom & pan state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, y: 0 });
+  const panOffset = useRef({ x: 0, y: 0 });
+
+  // Reset zoom/pan when entering fullscreen
+  useEffect(() => {
+    if (fullscreen) {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    }
+  }, [fullscreen]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    setZoom((prev) => {
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      return Math.min(5, Math.max(0.2, prev + delta));
+    });
+  }, []);
+
+  const handlePanStart = useCallback((e: React.MouseEvent) => {
+    // Only pan on middle-click or when holding space, or just drag
+    isPanning.current = true;
+    panStart.current = { x: e.clientX, y: e.clientY };
+    panOffset.current = { ...pan };
+  }, [pan]);
+
+  const handlePanMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning.current) return;
+    setPan({
+      x: panOffset.current.x + (e.clientX - panStart.current.x),
+      y: panOffset.current.y + (e.clientY - panStart.current.y),
+    });
+  }, []);
+
+  const handlePanEnd = useCallback(() => {
+    isPanning.current = false;
+  }, []);
+
   // Close fullscreen on Escape
   useEffect(() => {
     if (!fullscreen) return;
@@ -201,6 +243,12 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
           <div
             className="mermaid-fullscreen-content"
             onClick={(e) => e.stopPropagation()}
+            onWheel={handleWheel}
+            onMouseDown={handlePanStart}
+            onMouseMove={handlePanMove}
+            onMouseUp={handlePanEnd}
+            onMouseLeave={handlePanEnd}
+            style={{ cursor: isPanning.current ? "grabbing" : "grab" }}
           >
             <button
               type="button"
@@ -209,8 +257,15 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
             >
               <X size={20} />
             </button>
+            <div className="mermaid-fullscreen-zoom-badge">
+              {Math.round(zoom * 100)}%
+            </div>
             <div
               className="mermaid-fullscreen-svg"
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: "center center",
+              }}
               dangerouslySetInnerHTML={{ __html: svgHtml }}
             />
           </div>
