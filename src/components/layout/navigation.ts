@@ -16,8 +16,6 @@ export const navigationItems = [
   { href: "/projects", label: "Projects", icon: FolderGit2 },
   { href: "/focus", label: "Focus", icon: Timer },
   { href: "/portfolio", label: "Portfolio", icon: TrendingUp },
-  ...(process.env.NEXT_PUBLIC_ENABLE_TOKEN_USAGE === "true"
-    ? [{ href: "/usage", label: "Token Usage", icon: Activity }]
-    : []),
+  { href: "/usage", label: "Usage", icon: Activity },
   { href: "/ask", label: "Ask AI", icon: MessageCircle },
 ] as const;

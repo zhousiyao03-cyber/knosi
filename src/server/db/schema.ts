@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer, real, blob, uniqueIndex } from "drizzle-orm/sqlite-core";
-import { TOKEN_USAGE_PROVIDERS } from "@/lib/token-usage";
+
 
 // ── Auth.js tables ──────────────────────────────────
 
@@ -196,7 +196,7 @@ export const tokenUsageEntries = sqliteTable("token_usage_entries", {
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  provider: text("provider", { enum: TOKEN_USAGE_PROVIDERS }).notNull(),
+  provider: text("provider", { enum: ["codex", "claude-code", "openai-api", "other"] }).notNull(),
   model: text("model"),
   totalTokens: integer("total_tokens").notNull(),
   inputTokens: integer("input_tokens").default(0),

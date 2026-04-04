@@ -6,7 +6,7 @@ import { learningRouter } from "./learning";
 import { workflowsRouter } from "./workflows";
 import { dashboardRouter } from "./dashboard";
 import { focusRouter } from "./focus";
-import { tokenUsageRouter } from "./token-usage";
+import { usageRouter } from "./usage";
 import { portfolioRouter } from "./portfolio";
 import { learningNotebookRouter } from "./learning-notebook";
 import { ossProjectsRouter } from "./oss-projects";
@@ -21,7 +21,7 @@ export const appRouter = router({
   workflows: workflowsRouter,
   dashboard: dashboardRouter,
   focus: focusRouter,
-  tokenUsage: tokenUsageRouter,
+  usage: usageRouter,
   portfolio: portfolioRouter,
 });
 

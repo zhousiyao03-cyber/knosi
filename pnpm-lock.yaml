@@ -137,6 +137,9 @@ dependencies:
   react-dom:
     specifier: 19.2.4
     version: 19.2.4(react@19.2.4)
+  recharts:
+    specifier: ^3.8.1
+    version: 3.8.1(@types/react@19.2.14)(react-dom@19.2.4)(react-is@16.13.1)(react@19.2.4)(redux@5.0.1)
   superjson:
     specifier: ^2.2.6
     version: 2.2.6
@@ -3043,6 +3046,27 @@ packages:
     resolution: {integrity: sha512-A9+lCBZoaMJlVKcRBz2YByCG+Cp2t6nAnMnNba+XiWxnj6r4JUFqfsgwocMBZU9LPtdxC6wB56ySYpc7LQIoJg==}
     dev: false
 
+  /@reduxjs/toolkit@2.11.2(react-redux@9.2.0)(react@19.2.4):
+    resolution: {integrity: sha512-Kd6kAHTA6/nUpp8mySPqj3en3dm0tdMIgbttnQ1xFMVpufoj+ADi8pXLBsd4xzTRHQa7t/Jv8W5UnCuW4kuWMQ==}
+    peerDependencies:
+      react: ^16.9.0 || ^17.0.0 || ^18 || ^19
+      react-redux: ^7.2.1 || ^8.1.3 || ^9.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-redux:
+        optional: true
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      '@standard-schema/utils': 0.3.0
+      immer: 11.1.4
+      react: 19.2.4
+      react-redux: 9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@5.0.1)
+      redux: 5.0.1
+      redux-thunk: 3.1.0(redux@5.0.1)
+      reselect: 5.1.1
+    dev: false
+
   /@remirror/core-constants@3.0.0:
     resolution: {integrity: sha512-42aWfPrimMfDKDi4YegyS7x+/0tlzaqwPQCULLanv3DMIlu96KTJR0fM5isWX2UViOqlGnX6YFgqWepcX+XMNg==}
     dev: false
@@ -3506,6 +3530,10 @@ packages:
 
   /@standard-schema/spec@1.1.0:
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+    dev: false
+
+  /@standard-schema/utils@0.3.0:
+    resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
     dev: false
 
   /@swc/helpers@0.5.15:
@@ -5660,6 +5688,10 @@ packages:
     dependencies:
       ms: 2.1.3
 
+  /decimal.js-light@2.5.1:
+    resolution: {integrity: sha512-qIMFpTMZmny+MMIitAB6D7iVPEorVw6YQRWkvarTkT4tBeSLLiHzcwj6q0MmYSFCiVpiqPJTJEYIrpcPzVEIvg==}
+    dev: false
+
   /decode-named-character-reference@1.3.0:
     resolution: {integrity: sha512-GtpQYB283KrPp6nRw50q3U9/VfOutZOe103qlN7BPP6Ad27xYnOIWv4lPzo8HCAL+mMZofJ9KEy30fq6MfaK6Q==}
     dependencies:
@@ -6050,6 +6082,10 @@ packages:
       is-date-object: 1.1.0
       is-symbol: 1.1.1
     dev: true
+
+  /es-toolkit@1.45.1:
+    resolution: {integrity: sha512-/jhoOj/Fx+A+IIyDNOvO3TItGmlMKhtX8ISAHKE90c4b/k1tqaqEZ+uUqfpU8DMnW5cgNJv606zS55jGvza0Xw==}
+    dev: false
 
   /es6-promise-pool@2.5.0:
     resolution: {integrity: sha512-VHErXfzR/6r/+yyzPKeBvO0lgjfC5cbDCQWjWwMZWSb6YU39TGIl51OUmCfWCq4ylMdJSB8zkz2vIuIeIxXApA==}
@@ -6478,6 +6514,10 @@ packages:
   /esutils@2.0.3:
     resolution: {integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==}
     engines: {node: '>=0.10.0'}
+
+  /eventemitter3@5.0.4:
+    resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
+    dev: false
 
   /eventsource-parser@3.0.6:
     resolution: {integrity: sha512-Vo1ab+QXPzZ4tCa8SwIHJFaSzy4R6SHf7BY79rFBDf0idraZWAkYrDjDj8uWaSm3S2TK+hJ7/t1CEmZ7jXw+pg==}
@@ -6915,6 +6955,14 @@ packages:
     resolution: {integrity: sha512-/VmmWgIryG/wcn4TVrV7cC4mlfUC/oyiKIfSg5eVM3Ten/c1c34RJhMYKCWTnoSMHSqXLt3tsrBR4Q2HInvN+Q==}
     dependencies:
       pica: 7.1.1
+    dev: false
+
+  /immer@10.2.0:
+    resolution: {integrity: sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw==}
+    dev: false
+
+  /immer@11.1.4:
+    resolution: {integrity: sha512-XREFCPo6ksxVzP4E0ekD5aMdf8WMwmdNaz6vuvxgI40UaEiu6q3p8X52aU6GdyvLY3XXX/8R7JOTXStz/nBbRw==}
     dev: false
 
   /immutable@4.3.8:
@@ -8634,7 +8682,25 @@ packages:
 
   /react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
-    dev: true
+
+  /react-redux@9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@5.0.1):
+    resolution: {integrity: sha512-ROY9fvHhwOD9ySfrF0wmvu//bKCQ6AeZZq1nJNtbDC+kk5DuSuNX/n6YWYF/SYy7bSba4D4FSz8DJeKY/S/r+g==}
+    peerDependencies:
+      '@types/react': ^18.2.25 || ^19
+      react: ^18.0 || ^19
+      redux: ^5.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      redux:
+        optional: true
+    dependencies:
+      '@types/react': 19.2.14
+      '@types/use-sync-external-store': 0.0.6
+      react: 19.2.4
+      redux: 5.0.1
+      use-sync-external-store: 1.6.0(react@19.2.4)
+    dev: false
 
   /react-remove-scroll-bar@2.3.8(@types/react@19.2.14)(react@19.2.4):
     resolution: {integrity: sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==}
@@ -8699,6 +8765,45 @@ packages:
       picomatch: 2.3.1
     dev: false
 
+  /recharts@3.8.1(@types/react@19.2.14)(react-dom@19.2.4)(react-is@16.13.1)(react@19.2.4)(redux@5.0.1):
+    resolution: {integrity: sha512-mwzmO1s9sFL0TduUpwndxCUNoXsBw3u3E/0+A+cLcrSfQitSG62L32N69GhqUrrT5qKcAE3pCGVINC6pqkBBQg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-is: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    dependencies:
+      '@reduxjs/toolkit': 2.11.2(react-redux@9.2.0)(react@19.2.4)
+      clsx: 2.1.1
+      decimal.js-light: 2.5.1
+      es-toolkit: 1.45.1
+      eventemitter3: 5.0.4
+      immer: 10.2.0
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
+      react-is: 16.13.1
+      react-redux: 9.2.0(@types/react@19.2.14)(react@19.2.4)(redux@5.0.1)
+      reselect: 5.1.1
+      tiny-invariant: 1.3.3
+      use-sync-external-store: 1.6.0(react@19.2.4)
+      victory-vendor: 37.3.6
+    transitivePeerDependencies:
+      - '@types/react'
+      - redux
+    dev: false
+
+  /redux-thunk@3.1.0(redux@5.0.1):
+    resolution: {integrity: sha512-NW2r5T6ksUKXCabzhL9z+h206HQw/NJkcLm1GPImRQ8IzfXwRGqjVhKJGauHirT0DAuyy6hjdnMZaRoAcy0Klw==}
+    peerDependencies:
+      redux: ^5.0.0
+    dependencies:
+      redux: 5.0.1
+    dev: false
+
+  /redux@5.0.1:
+    resolution: {integrity: sha512-M9/ELqF6fy8FwmkpnF0S3YKOqMyoWJ4+CS5Efg2ct3oY9daQvd/Pc71FpGZsVsbl3Cpb+IIcjBDUnnyBdQbq4w==}
+    dev: false
+
   /reflect.getprototypeof@1.0.10:
     resolution: {integrity: sha512-00o4I+DVrefhv+nX0ulyi3biSHCPDe+yLv5o/p6d/UVlirijB8E16FtfwSAi4g3tcqrQ4lRAqQSoFEZJehYEcw==}
     engines: {node: '>= 0.4'}
@@ -8728,6 +8833,10 @@ packages:
   /require-from-string@2.0.2:
     resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
     engines: {node: '>=0.10.0'}
+    dev: false
+
+  /reselect@5.1.1:
+    resolution: {integrity: sha512-K/BG6eIky/SBpzfHZv/dd+9JBFiS4SWV7FIujVyJRux6e45+73RaUHXLmIR1f7WOMaQ0U1km6qwklRQxpJJY0w==}
     dev: false
 
   /resolve-from@4.0.0:
@@ -9196,6 +9305,10 @@ packages:
     engines: {node: '>=18'}
     dev: false
 
+  /tiny-invariant@1.3.3:
+    resolution: {integrity: sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==}
+    dev: false
+
   /tinyexec@1.0.4:
     resolution: {integrity: sha512-u9r3uZC0bdpGOXtlxUIdwf9pkmvhqJdrVCH9fapQtgy/OeTTMZ1nqH7agtvEfmGui6e1XxjcdrlxvxJvc3sMqw==}
     engines: {node: '>=18'}
@@ -9481,6 +9594,25 @@ packages:
       diff: 5.2.2
       kleur: 4.1.5
       sade: 1.8.1
+    dev: false
+
+  /victory-vendor@37.3.6:
+    resolution: {integrity: sha512-SbPDPdDBYp+5MJHhBCAyI7wKM3d5ivekigc2Dk2s7pgbZ9wIgIBYGVw4zGHBml/qTFbexrofXW6Gu4noGxrOwQ==}
+    dependencies:
+      '@types/d3-array': 3.2.2
+      '@types/d3-ease': 3.0.2
+      '@types/d3-interpolate': 3.0.4
+      '@types/d3-scale': 4.0.9
+      '@types/d3-shape': 3.1.8
+      '@types/d3-time': 3.0.4
+      '@types/d3-timer': 3.0.2
+      d3-array: 3.2.4
+      d3-ease: 3.0.1
+      d3-interpolate: 3.0.1
+      d3-scale: 4.0.2
+      d3-shape: 3.2.0
+      d3-time: 3.1.0
+      d3-timer: 3.0.1
     dev: false
 
   /vscode-jsonrpc@8.2.0:
