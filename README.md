@@ -21,18 +21,27 @@
 - 想看一个从前端产品感出发、再逐步补齐全栈能力的学习型项目的人
 - 想参考 Next.js 16 + tRPC + Auth.js + AI SDK + SQLite/Turso 组合的人
 
-## 现在能做什么
-
-## 功能（V1）
+## 功能
 
 - **认证** — Auth.js v5 + GitHub / Google OAuth + 邮箱密码注册 / 登录，支持在账号设置页修改昵称、邮箱和本地密码，多用户数据完全隔离；补齐了 PWA / iOS Web App metadata，主屏安装后登录态更稳定
-- **笔记** — Notion 风格块编辑器，支持通栏 280px 头图与内置背景图库、轻量类型/标签 metadata 行、行级悬浮插入、324 × 385 分区插入面板、块菜单（上移/下移/复制/删除/转为）、Slash 命令、Todo/列表、Callout / Toggle、图片上传/拖拽/粘贴、自动保存，以及首页和笔记页一键打开今日日报；日报标题现在会写成“日期 + 星期几”，默认带 `今天的 todo / 今日的复盘 / 明日计划` 三块，并可继承最近一篇日报里的未完成明日计划
-- **Learning Notebook** — 以 topic 组织学习内容，支持主题卡片、主题内笔记列表、标签筛选、AI draft 起草、知识大纲 / 盲点分析 / 复习题生成，以及基于主题笔记上下文的 Ask AI
+- **笔记** — Notion 风格块编辑器，功能包括：
+  - 通栏 280px 头图与内置背景图库、轻量类型/标签 metadata 行
+  - 行级悬浮插入、324 × 385 分区插入面板、块菜单（上移/下移/复制/删除/转为）、Slash 命令
+  - 拖拽排序块、Todo/列表、Callout / Toggle、H1–H6 标题
+  - 表格（含工具栏）、文字颜色、Mermaid 图表、Excalidraw 画板
+  - 图片上传/拖拽/粘贴、图片缩放、拖拽合并并排图片行
+  - 代码块语言选择器、搜索替换、键盘快捷键提示
+  - TOC 目录块 + 可折叠 TOC 侧边栏
+  - Markdown 混合粘贴（自动识别 Mermaid 块和表格）
+  - 自动保存 + 内容防丢失机制
+  - 首页和笔记页一键打开今日日报；日报标题写成”日期 + 星期几”，默认带三块模板，并可继承最近日报的未完成计划
+- **Learning Notebook** — 以 topic 组织学习内容，支持主题卡片（可编辑/删除）、主题内笔记列表、标签筛选、AI draft 起草、知识大纲 / 盲点分析 / 复习题生成，以及基于主题笔记上下文的 Ask AI
 - **Open Source Projects** — 以项目维度沉淀开源代码阅读笔记，支持 repo 元信息、项目内笔记编辑、标签筛选和长期分析归档
+- **Portfolio** — 投资组合追踪，支持持仓管理（股票/加密货币）、Yahoo Finance + CoinGecko 实时价格、AI 持仓分析、GPT 新闻聚合（Marketaux / Google News RSS）与 Vercel Cron 自动刷新
 - **搜索** — Cmd+K 全局搜索笔记，关键词高亮
 - **Ask AI** — 基于知识库的 chunk 级 hybrid RAG 问答，支持语义检索、关键词召回、邻近段落扩展和可点击引用来源
 - **Token Usage** — 自动读取本机里的 Codex / Claude Code 本地 session（含 Claude subagents，跨工作区聚合），用于展示真实 token 用量；也支持手动补录 OpenAI API / 其他来源，统一在 Dashboard 和独立页面聚合（线上环境默认禁用，本地开发可开启）
-- **Focus Tracker（进行中）** — 服务端 ingestion、Tauri collector、dashboard focus card 和 `/focus` 页面都已落地；当前已完成 V2 的服务端标签系统、富信号 ingest/status API 和 schema 迁移，`/focus` 侧已切到 tags + browser URL 数据模型；桌面端 collector 也已切到 enriched sample / pure-append outbox / server-first metrics，并通过 `cargo test` + `cargo build`，但 AX URL 抓取和多屏窗口识别还缺一次真实桌面手测收口。Web 端 `/focus` 现在会默认折叠 `<10m` 的原始 session，避免短碎片把主视图刷满；折叠只影响展示，不影响统计和入库。活动块聚合和浏览器语义识别仍保留在服务端数据层，但 Web 展示已经收敛成更直白的累计 app time：dashboard 和 `/focus` 直接按当天原始 session 累计每个 app 的使用时长，减少 `focused/span` 这类推导口径带来的偏差。
+- **Focus Tracker** — 服务端 ingestion、dashboard focus card 和 `/focus` 页面；Web 端按当天原始 session 累计每个 app 的使用时长，默认折叠 <10m 的短 session；支持设备配对（pairing code → per-device token）、手动刷新分类和 daily summary。桌面端 Tauri collector 已迁移到[独立仓库](https://github.com/zhousiyao03-cyber/focus-tracker)
 - **Dashboard** — 统计概览 + 最近条目 + token usage 聚合概览
 - **暗色模式** — 全局可切换
 
@@ -41,9 +50,10 @@
 ## 产品预览
 
 - 主页：聚合最近笔记和 token usage，先看全局状态
-- 笔记：以编辑体验为中心，支持快速记录和结构化整理
+- 笔记：以编辑体验为中心，支持快速记录和结构化整理（Mermaid、Excalidraw、表格、并排图片、TOC 等）
 - Learning Notebook：围绕某个学习主题持续写、持续问、持续复盘
 - Open Source Projects：按项目保存代码阅读结论和架构摘录
+- Portfolio：追踪持仓、实时价格和相关新闻
 - Ask AI：对知识库发问，返回答案和引用来源
 - Search：用 `Cmd+K` 快速找回笔记
 
@@ -60,6 +70,7 @@
 - Drizzle ORM + SQLite (libsql / Turso)
 - Auth.js v5 (GitHub / Google OAuth)
 - Vercel AI SDK v6 + OpenClaw / Codex OAuth（默认 `gpt-5.4`）/ OpenAI API / 本地 OpenAI-compatible 模型服务
+- @excalidraw/excalidraw + mermaid（编辑器画板和图表）
 - @mozilla/readability + linkedom
 - Playwright (E2E)
 
@@ -183,38 +194,22 @@ NEXT_PUBLIC_TOKEN_USAGE_REFRESH_INTERVAL_MS=15000
 
 如果这两个目录不存在，页面会显示“未发现”，但手动录入仍然可用。
 
-Focus Tracker collector 的本地原型也已经放在仓库里，当前用于先打通“macOS 采样 -> ingestion API -> 数据库入库”的链路。个人部署时可以给服务端配置：
+Focus Tracker 的服务端 ingestion 和 `/focus` Web 页面保留在本仓库。桌面端 Tauri collector 已迁移到[独立仓库](https://github.com/zhousiyao03-cyber/focus-tracker)。
+
+个人部署时可以给服务端配置：
 
 ```bash
 FOCUS_INGEST_API_KEY=your-focus-ingest-api-key
 FOCUS_INGEST_USER_ID=your-user-id
 ```
 
-然后本地运行 collector：
+Web 端 `/focus` 页面功能：
 
-```bash
-FOCUS_COLLECTOR_BASE_URL=http://127.0.0.1:3200 \
-FOCUS_COLLECTOR_API_KEY=your-focus-ingest-api-key \
-pnpm focus:collector
-```
-
-如果只想做一次 fixture / dry-run 验证：
-
-```bash
-pnpm focus:collector --fixture tools/focus-collector/fixtures/demo-sessions.json --dry-run
-```
-
-现在仓库里还新增了一个独立的 Tauri collector 目录 `focus-tracker/`，用于把 collector 从 Node prototype 迁到真实桌面 runtime。当前已经能 `cargo test`、`cargo check`、`pnpm build`，并可用 `pnpm tauri dev --no-watch` 启动 tray + 后台采样原型；面板已经收成标准 menubar popover，点击 tray icon 会贴着状态栏图标弹出，菜单栏顶栏会直接显示 `Working Hours · 8h progress`，面板内则保留一条更紧凑的 canonical timeline 和 `/focus` 入口，并直接对齐 `/focus` 的服务端日统计。
-
-注意：`focus-tracker/` 是独立桌面工程。根目录的 `pnpm build` 只构建 Web 应用；桌面端需要进入 `focus-tracker/` 单独构建。
-
-在 Web 端，`/focus` 页面现在已经可用：
-
-- dashboard 上有 Focus card，可直接进入 `/focus`
-- `/focus` 现在是 App-first 页面：先看当天累计时长的 top apps，再看选中 app 的 session 明细和 mini timeline，最后用全局 day timeline 辅助确认时间分布
-- `/focus` 与 dashboard 现在默认展示当天累计记录时长，并把 `Working Hours` 作为辅助口径单独说明；`Working Hours` 按当天原始 session 累计时长减去 `social-media / entertainment / gaming` 等 non-work tags 计算，display merge 只影响展示，不再影响统计
-- `/focus` 支持手动刷新 session 分类和 daily summary
-- `/focus` 支持为桌面端生成一次性 pairing code，桌面 collector 输入 code 后会自动换成 per-device token；设备列表会显示 `Connected / Recent / Revoked / Last seen`，配对与连接失败也会给出重连指引
+- Dashboard 上有 Focus card，可直接进入 `/focus`
+- App-first 页面：先看当天累计时长的 top apps，再看选中 app 的 session 明细和 mini timeline，全局 day timeline 辅助确认时间分布
+- Working Hours 辅助口径：按累计时长减去 non-work tags（social-media / entertainment / gaming）计算
+- 支持手动刷新 session 分类和 daily summary
+- 支持为桌面端生成一次性 pairing code，桌面 collector 输入 code 后自动换成 per-device token
 
 ## 常用命令
 
@@ -223,7 +218,6 @@ pnpm dev            # 开发服务器
 pnpm build          # 生产构建（含 TypeScript 检查）
 pnpm lint           # ESLint 检查
 pnpm test:e2e       # E2E 测试（使用独立测试库，不污染 data/second-brain.db）
-pnpm focus:collector # 运行 Focus Tracker collector 原型
 pnpm run browser:install  # 可选：下载 Chrome for Testing，供 agent-browser 使用
 pnpm db:generate    # 生成数据库迁移
 pnpm db:push        # 应用迁移到数据库
@@ -253,32 +247,36 @@ src/
   lib/              客户端工具函数和 tRPC client
   server/
     db/             数据库连接和 schema
-    routers/        tRPC routers
+    routers/        tRPC routers（notes、learning-notebook、oss-projects、portfolio 等）
     focus/          Focus Tracker 的区间切片与聚合逻辑
     ai/             AI 相关逻辑（chunking、indexer、hybrid RAG、本地/云端 provider、URL 内容抓取）
 e2e/                Playwright E2E 测试
-focus-tracker/      Tauri 桌面端 collector（tray、采样、sessionize、上传）
 docs/
   v1-plan.md        V1 收敛执行计划
   changelog/        变更记录
 ```
 
-新增的学习与项目模块主要落在：
+各功能模块主要落在：
 
-- `src/app/(app)/learn/**`
-- `src/app/(app)/projects/**`
-- `src/server/routers/learning-notebook.ts`
-- `src/server/routers/oss-projects.ts`
-- `src/app/api/learn/draft/route.ts`
+- 学习：`src/app/(app)/learn/**` + `src/server/routers/learning-notebook.ts` + `src/app/api/learn/draft/route.ts`
+- 开源项目：`src/app/(app)/projects/**` + `src/server/routers/oss-projects.ts`
+- 投资组合：`src/app/(app)/portfolio/**` + `src/server/routers/portfolio.ts`
+- 编辑器扩展：`src/components/editor/`（mermaid-block、excalidraw-block、image-row-block、toc-block、toc-sidebar 等）
 
-## V1 收敛进度
+## 开发进度
 
-- [x] Pass 1: 产品收敛（隐藏 Workflows/Learn）
-- [x] Pass 2: Bookmark 内容抓取 + AI 摘要修复
-- [x] Pass 3: Ask AI RAG 实现
-- [x] Pass 4: Search 增强 + API 加固
-- [x] Pass 5: UX/UI 打磨 + 暗色模式
-- [x] Pass 6: E2E 收尾 + 工程文档收口
+### V1 收敛（已完成）
+
+- [x] Pass 1–6: 产品收敛、Bookmark 抓取 + AI 摘要、Ask AI RAG、Search 增强、UX/UI 打磨 + 暗色模式、E2E 收尾
 - [x] Vercel 部署准备：Auth.js 认证 + Turso 数据库 + 数据隔离
+
+### V1 后续迭代
+
+- [x] Focus Tracker：服务端 ingestion + Web `/focus` 页面 + 桌面端 Tauri collector（已迁至独立仓库）
+- [x] Portfolio：持仓管理 + 实时价格 + AI 分析 + 新闻聚合
+- [x] Learning Notebook & Open Source Projects：主题/项目维度的笔记 + AI 辅助
+- [x] 编辑器增强：Mermaid 图表、Excalidraw 画板、表格工具栏、并排图片、TOC 侧边栏、拖拽排序、搜索替换、H1–H6 标题
+- [x] 性能优化：路由切换 loading skeleton、动态 import、查询缓存
+- [ ] Meeting Assistant：Tauri v2 桌面端会议助手（规划中）
 
 详见 `docs/v1-plan.md` 和 `docs/changelog/`。
