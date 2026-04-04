@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { useWorkspaceIdentity } from "@/components/layout/workspace-identity-provider";
 import {
+  buildTopApps,
+  FocusTimeline,
   formatFocusDuration,
   getLocalDateString,
 } from "@/components/focus/focus-shared";
@@ -37,6 +39,8 @@ export default function DashboardPage() {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", []);
   const today = useMemo(() => getLocalDateString(), []);
   const focusStats = trpc.focus.dailyStats.useQuery({ date: today, timeZone });
+  const focusSessions = trpc.focus.dailySessions.useQuery({ date: today, timeZone });
+  const topApps = useMemo(() => buildTopApps(focusSessions.data ?? []), [focusSessions.data]);
   const utils = trpc.useUtils();
   const greetingLabel = getGreetingLabel(new Date().getHours());
   const displayName = getUserDisplayName(identity.name, identity.email);
@@ -87,27 +91,52 @@ export default function DashboardPage() {
       {/* Focus Tracking */}
       <Link
         href="/focus"
-        className="flex items-center gap-4 rounded-2xl border border-sky-200 bg-sky-50/80 px-5 py-4 transition-colors hover:border-sky-300 hover:bg-sky-50 dark:border-sky-900/50 dark:bg-sky-950/20 dark:hover:border-sky-800 dark:hover:bg-sky-950/30"
+        className="block rounded-2xl border border-sky-200 bg-sky-50/80 p-5 transition-colors hover:border-sky-300 hover:bg-sky-50 dark:border-sky-900/50 dark:bg-sky-950/20 dark:hover:border-sky-800 dark:hover:bg-sky-950/30"
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/80 text-sky-600 shadow-sm dark:bg-stone-900 dark:text-sky-300">
-          <Activity className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-3">
-            <span className="text-lg font-semibold text-stone-900 dark:text-stone-50">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-widest text-sky-600 dark:text-sky-300/80">
+              今日专注
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-stone-900 dark:text-stone-50">
               {focusStats.data ? formatFocusDuration(focusStats.data.totalSecs) : "--"}
-            </span>
-            <span className="text-xs text-stone-500 dark:text-stone-400">今日专注</span>
+            </div>
           </div>
-          <div className="mt-1.5 h-1.5 rounded-full bg-white/80 dark:bg-stone-800">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-teal-400 to-sky-400 transition-all"
-              style={{ width: `${Math.max(4, focusGoalPct)}%` }}
-            />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/80 text-sky-600 shadow-sm dark:bg-stone-900 dark:text-sky-300">
+            <Activity className="h-4 w-4" />
           </div>
         </div>
-        <span className="shrink-0 text-xs text-stone-400 dark:text-stone-500">{focusGoalPct}% / 8h</span>
-        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+
+        <div className="mt-3 h-2 rounded-full bg-white/80 dark:bg-stone-900">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-teal-400 to-sky-400 transition-all"
+            style={{ width: `${Math.max(6, focusGoalPct)}%` }}
+          />
+        </div>
+        <div className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
+          {focusGoalPct}% / 8h 目标
+        </div>
+
+        <div className="mt-4">
+          <FocusTimeline sessions={focusSessions.data ?? []} compact />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2 text-xs text-stone-600 dark:text-stone-300">
+          {topApps.length ? (
+            topApps.map((app) => (
+              <span
+                key={app.appName}
+                className="rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 dark:border-stone-700 dark:bg-stone-900"
+              >
+                {app.appName} · {formatFocusDuration(app.durationSecs)}
+              </span>
+            ))
+          ) : (
+            <span className="text-stone-400 dark:text-stone-500">
+              暂无专注数据
+            </span>
+          )}
+        </div>
       </Link>
 
       {/* Main Grid: Recent Notes + Learn + Projects */}
