@@ -160,6 +160,9 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
   });
   const coverPickerRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorInstanceRef = useRef<any>(null);
 
   const doSave = useCallback(
     (overrides?: SaveOverrides) => {
@@ -244,9 +247,16 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
     if (event.key !== "Enter") return;
 
     event.preventDefault();
-    const editorEl = document.querySelector(".notion-editor") as HTMLElement | null;
-    editorEl?.focus();
+    const editor = editorInstanceRef.current;
+    if (editor) {
+      editor.commands.focus("start");
+    }
   };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEditorReady = useCallback((editor: any) => {
+    editorInstanceRef.current = editor;
+  }, []);
 
   const handleTypeChange = (newType: "note" | "journal" | "summary") => {
     setType(newType);
@@ -496,6 +506,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
 
         <div className="mt-8 mb-6 px-1">
           <textarea
+            ref={titleRef}
             value={title}
             onChange={(event) => handleTitleChange(event.target.value)}
             onKeyDown={handleTitleKeyDown}
@@ -516,6 +527,14 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
             content={note.content ?? undefined}
             onChange={handleContentChange}
             onError={(message) => toast(message, "error")}
+            onEditorReady={handleEditorReady}
+            onFocusTitle={() => {
+              const el = titleRef.current;
+              if (el) {
+                el.focus();
+                el.setSelectionRange(el.value.length, el.value.length);
+              }
+            }}
           />
         </div>
       </div>

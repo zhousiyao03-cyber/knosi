@@ -62,6 +62,7 @@ interface TiptapEditorProps {
   onChange?: (content: string, plainText: string) => void;
   onError?: (message: string) => void;
   onEditorReady?: (editor: TiptapEditorInstance) => void;
+  onFocusTitle?: () => void;
   editable?: boolean;
   placeholder?: string;
 }
@@ -92,6 +93,7 @@ export function TiptapEditor({
   onChange,
   onError,
   onEditorReady,
+  onFocusTitle,
   editable = true,
   placeholder = "输入 / 以插入命令...",
 }: TiptapEditorProps) {
@@ -111,6 +113,8 @@ export function TiptapEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<TiptapEditorInstance | null>(null);
   const editorSurfaceRef = useRef<HTMLDivElement>(null);
+  const onFocusTitleRef = useRef(onFocusTitle);
+  onFocusTitleRef.current = onFocusTitle;
   const hoveredBlockRef = useRef<HoveredBlock | null>(null);
   const pendingImageInsertPositionRef = useRef<number | null>(null);
 
@@ -405,6 +409,15 @@ export function TiptapEditor({
       attributes: {
         class:
           "notion-editor focus:outline-none min-h-[60vh] px-1 py-2 data-[placeholder]:text-stone-400",
+      },
+      handleKeyDown(view, event) {
+        if (event.key !== "Backspace") return false;
+        const { from, empty } = view.state.selection;
+        if (empty && from === 0 && onFocusTitleRef.current) {
+          onFocusTitleRef.current();
+          return true;
+        }
+        return false;
       },
       // Paste priority: image files (here) > markdown structures (MarkdownTablePaste plugin).
       // This handler only fires for clipboard items with image/* files.
