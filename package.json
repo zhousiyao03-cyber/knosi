@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "focus:collector": "node tools/focus-collector/collector.mjs",
     "usage:report": "node tools/usage-reporter/report.mjs",
+    "usage:daemon": "node tools/usage-reporter/report.mjs --daemon",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
