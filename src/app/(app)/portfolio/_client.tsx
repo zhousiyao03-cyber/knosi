@@ -12,96 +12,16 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-
-// ── Types ──────────────────────────────────────────────────────────────────
-
-type AssetType = "stock" | "crypto";
-type Sentiment = "bullish" | "bearish" | "neutral";
-
-interface Holding {
-  id: string;
-  symbol: string;
-  name: string;
-  assetType: AssetType | null;
-  quantity: number;
-  costPrice: number;
-  createdAt: Date | null;
-  updatedAt: Date | null;
-}
-
-interface PriceData {
-  price: number | null;
-  changePercent: number | null;
-}
-
-interface NewsItem {
-  id: string;
-  symbol: string;
-  summary: string;
-  sentiment: Sentiment | null;
-  generatedAt: Date | null;
-}
-
-interface AddHoldingDraft {
-  symbol: string;
-  name: string;
-  assetType: AssetType;
-  quantity: string;
-  costPrice: string;
-}
-
-interface EditHoldingDraft {
-  quantity: string;
-  costPrice: string;
-}
-
-interface HoldingSnapshot {
-  holding: Holding;
-  priceData: PriceData | undefined;
-  currentPrice: number | null;
-  changePercent: number | null;
-  currentValue: number | null;
-  costValue: number;
-  displayValue: number;
-  pnl: number | null;
-  pnlPercent: number | null;
-  dailyChange: number | null;
-  portfolioWeight: number | null;
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function formatUSD(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatPercent(value: number) {
-  const sign = value >= 0 ? "+" : "";
-  return `${sign}${value.toFixed(2)}%`;
-}
-
-function calculateDailyChangeAmount(
-  currentPrice: number | null,
-  changePercent: number | null,
-  quantity: number
-) {
-  if (currentPrice === null || changePercent === null) {
-    return null;
-  }
-
-  const ratio = 1 + changePercent / 100;
-  if (ratio <= 0) {
-    return null;
-  }
-
-  const previousClose = currentPrice / ratio;
-  return (currentPrice - previousClose) * quantity;
-}
+import type {
+  AssetType,
+  Holding,
+  PriceData,
+  NewsItem,
+  AddHoldingDraft,
+  EditHoldingDraft,
+  HoldingSnapshot,
+} from "./types";
+import { formatUSD, formatPercent, calculateDailyChangeAmount } from "./utils";
 
 // ── Empty State ────────────────────────────────────────────────────────────
 
