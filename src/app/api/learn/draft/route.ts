@@ -147,6 +147,36 @@ function markdownToTiptap(markdown: string): TiptapNode {
       continue;
     }
 
+    // Markdown table
+    if (line.includes("|") && i + 1 < lines.length && /^\|?\s*[-:]+[-|\s:]*$/.test(lines[i + 1]!.trim())) {
+      // Collect header row
+      const parseLine = (l: string): string[] =>
+        l.replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+      const headers = parseLine(line);
+      i += 2; // skip header and separator rows
+      const bodyRows: string[][] = [];
+      while (i < lines.length && lines[i]!.includes("|") && lines[i]!.trim() !== "") {
+        bodyRows.push(parseLine(lines[i]!));
+        i++;
+      }
+      const headerRow: TiptapNode = {
+        type: "tableRow",
+        content: headers.map((cell) => ({
+          type: "tableHeader",
+          content: [{ type: "paragraph", content: cell ? parseInlineMarkdown(cell) : [] }],
+        })),
+      };
+      const dataRows: TiptapNode[] = bodyRows.map((row) => ({
+        type: "tableRow",
+        content: headers.map((_, idx) => ({
+          type: "tableCell",
+          content: [{ type: "paragraph", content: row[idx] ? parseInlineMarkdown(row[idx]!) : [] }],
+        })),
+      }));
+      content.push({ type: "table", content: [headerRow, ...dataRows] });
+      continue;
+    }
+
     // Horizontal rule
     if (/^---+$/.test(line.trim())) {
       content.push({ type: "horizontalRule" });

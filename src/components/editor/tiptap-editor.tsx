@@ -64,8 +64,10 @@ import {
 } from "./editor-block-ops";
 import { ToggleBlock, createToggleBlockNode } from "./toggle-block";
 import { ExcalidrawBlock } from "./excalidraw-block";
+import { MermaidBlock } from "./mermaid-block";
 import { TocBlock } from "./toc-block";
 import { SearchReplace, SearchBar } from "./search-replace";
+import { MarkdownTablePaste } from "./markdown-table-paste";
 
 const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set([
@@ -79,7 +81,7 @@ const BLOCK_CONTROL_GUTTER_RIGHT_PADDING = 12;
 const BLOCK_CONTROL_BUTTON_SIZE = 24;
 const BLOCK_CONTROL_LEFT_OFFSET = 60;
 const BLOCK_SELECTOR =
-  "p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr, img, table, [data-callout-block='true'], [data-toggle-block='true'], [data-excalidraw-block='true'], [data-toc-block='true']";
+  "p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr, img, table, [data-callout-block='true'], [data-toggle-block='true'], [data-excalidraw-block='true'], [data-mermaid-block='true'], [data-toc-block='true']";
 
 interface TiptapEditorProps {
   content?: string;
@@ -159,6 +161,12 @@ function extractPlainTextFromContent(content?: JSONContent) {
       for (const child of node.content ?? []) {
         visitBlock(child);
       }
+      return;
+    }
+
+    if (node.type === "mermaidBlock") {
+      const code = String(node.attrs?.code ?? "").trim();
+      if (code) lines.push(code);
       return;
     }
 
@@ -574,7 +582,9 @@ export function TiptapEditor({
       CalloutBlock,
       ToggleBlock,
       ExcalidrawBlock,
+      MermaidBlock,
       TocBlock,
+      MarkdownTablePaste,
       SearchReplace.configure({
         onOpen: () => setSearchOpen(true),
       }),

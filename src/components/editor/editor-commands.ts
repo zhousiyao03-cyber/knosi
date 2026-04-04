@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   CheckSquare,
   Code2,
+  GitBranch,
   Heading1,
   Heading2,
   Heading3,
@@ -281,6 +282,17 @@ export function createEditorCommandGroups(
           icon: PenTool,
           run: (editor) => {
             editor.chain().focus().insertContent({ type: "excalidrawBlock" }).run();
+          },
+          transformable: false,
+        },
+        {
+          id: "mermaid",
+          title: "Mermaid 图表",
+          description: "插入 Mermaid 图表（流程图/序列图/甘特图）",
+          keywords: ["mermaid", "diagram", "flowchart", "sequence", "gantt", "图表", "流程图", "序列图", "甘特图", "时序图"],
+          icon: GitBranch,
+          run: (editor) => {
+            editor.chain().focus().insertContent({ type: "mermaidBlock" }).run();
           },
           transformable: false,
         },
