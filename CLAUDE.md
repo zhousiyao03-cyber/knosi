@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-个人知识管理平台，替代 Notion，集成 AI 能力。技术栈：Next.js 15 + React 19 + Tailwind CSS v4 + Tiptap + tRPC v11 + SQLite + Drizzle ORM + Claude API。
+个人知识管理平台，替代 Notion，集成 AI 能力。技术栈：Next.js 16 + React 19 + Tailwind CSS v4 + Tiptap v3 + tRPC v11 + SQLite (libsql/Turso) + Drizzle ORM + Vercel AI SDK v6。
 
 ## 开发流程约束
 
@@ -92,15 +92,35 @@ pnpm db:studio      # 打开 Drizzle Studio
 
 ```
 src/
-├── app/              # Next.js App Router 页面
+├── app/              # Next.js App Router 页面和 API 路由
+│   └── (app)/        # 认证后的主路由组（notes, learn, projects, portfolio, ask, focus, usage 等）
 ├── components/       # React 组件
-│   ├── ui/           # 通用 UI 组件
-│   └── layout/       # 布局组件
+│   ├── ui/           # 通用 UI 组件（toast, search-dialog 等）
+│   ├── layout/       # 布局组件（sidebar, mobile-nav）
+│   └── editor/       # Tiptap 编辑器（核心组件 + 扩展块）
+│       ├── tiptap-editor.tsx       # 主编辑器（扩展注册、block 操作、拖拽、粘贴处理）
+│       ├── editor-commands.ts      # Slash 命令定义
+│       ├── editor-block-ops.ts     # 块级操作（移动、复制、删除、插入）
+│       ├── slash-command.tsx        # Slash 命令菜单 UI
+│       ├── bubble-toolbar.tsx       # 文本选中浮动工具栏
+│       ├── table-toolbar.tsx        # 表格操作工具栏
+│       ├── search-replace.tsx       # 搜索替换
+│       ├── callout-block.tsx        # Callout 提示块
+│       ├── toggle-block.tsx         # 折叠/展开块
+│       ├── code-block-with-lang.tsx # 代码块（语言选择器）
+│       ├── mermaid-block.tsx        # Mermaid 图表块（全屏查看 + 编辑）
+│       ├── excalidraw-block.tsx     # Excalidraw 画板块
+│       ├── image-row-block.tsx      # 并排图片行（拖拽排序、resize、拖出提取）
+│       ├── toc-block.tsx            # 目录块
+│       ├── toc-sidebar.tsx          # 侧边目录导航
+│       ├── markdown-table-paste.ts  # 混合 Markdown 粘贴（Mermaid + 表格自动转换）
+│       └── knowledge-note-editor.tsx # 笔记编辑器封装
 ├── server/
-│   ├── db/           # 数据库连接和 schema
-│   ├── routers/      # tRPC routers
-│   └── ai/           # AI 相关逻辑
-└── lib/              # 工具函数和客户端配置
+│   ├── db/           # 数据库连接和 schema（Drizzle ORM + libsql）
+│   ├── routers/      # tRPC routers（notes, learning-notebook, oss-projects, portfolio 等）
+│   ├── ai/           # AI 逻辑（chunking, indexer, hybrid RAG, provider 抽象, URL 抓取）
+│   └── focus/        # Focus Tracker 区间切片与聚合
+└── lib/              # 工具函数和客户端配置（tRPC client, cn(), note-templates）
 e2e/                  # Playwright E2E 测试
 docs/changelog/       # Phase 完成留档
 ```
@@ -113,6 +133,17 @@ docs/changelog/       # Phase 完成留档
 - 样式使用 Tailwind CSS，工具函数 `cn()` 位于 `src/lib/utils.ts`
 - 客户端组件必须标记 `"use client"`
 - 不要留下脚手架默认文档或占位文件
+
+### 编辑器开发规范
+
+- 编辑器基于 Tiptap v3（ProseMirror），自定义块统一用 `Node.create` + `ReactNodeViewRenderer`
+- 自定义块必须设置 `data-editor-block="true"` 和对应的 `data-xxx-block="true"` 属性
+- 新增块类型必须：注册到 `tiptap-editor.tsx` 的 extensions 列表、加到 `BLOCK_SELECTOR`、加到非 transformable 列表
+- Slash 命令在 `editor-commands.ts` 中定义，分组为 basic / lists / blocks / media
+- 块的 CSS 统一写在 `globals.css`，必须包含 dark mode 样式
+- 粘贴处理优先级：图片文件（editorProps.handlePaste）> Markdown 结构（MarkdownTablePaste 插件）
+- 图片拖拽合并使用模块级变量 `gripDragSource` 跟踪拖拽源，在 `handleDrop` 中检测合并
+- Mermaid 使用 `securityLevel: "strict"`（禁止 `"loose"`，防止 XSS）
 
 ## 技术备忘与恢复指南
 

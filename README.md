@@ -29,10 +29,11 @@
   - 行级悬浮插入、324 × 385 分区插入面板、块菜单（上移/下移/复制/删除/转为）、Slash 命令
   - 拖拽排序块、Todo/列表、Callout / Toggle、H1–H6 标题
   - 表格（含工具栏）、文字颜色、Mermaid 图表、Excalidraw 画板
-  - 图片上传/拖拽/粘贴、图片缩放、拖拽合并并排图片行
+  - 图片上传/拖拽/粘贴、四角手柄缩放、拖拽合并并排图片行（拖出可拆分）
   - 代码块语言选择器、搜索替换、键盘快捷键提示
   - TOC 目录块 + 可折叠 TOC 侧边栏
-  - Markdown 混合粘贴（自动识别 Mermaid 块和表格）
+  - Mermaid 图表全屏查看 + 内联编辑（实时预览）
+  - Markdown 混合粘贴（自动识别 Mermaid 代码块和 Markdown 表格并转为富文本）
   - 自动保存 + 内容防丢失机制
   - 首页和笔记页一键打开今日日报；日报标题写成”日期 + 星期几”，默认带三块模板，并可继承最近日报的未完成计划
 - **Learning Notebook** — 以 topic 组织学习内容，支持主题卡片（可编辑/删除）、主题内笔记列表、标签筛选、AI draft 起草、知识大纲 / 盲点分析 / 复习题生成，以及基于主题笔记上下文的 Ask AI
@@ -261,7 +262,7 @@ docs/
 - 学习：`src/app/(app)/learn/**` + `src/server/routers/learning-notebook.ts` + `src/app/api/learn/draft/route.ts`
 - 开源项目：`src/app/(app)/projects/**` + `src/server/routers/oss-projects.ts`
 - 投资组合：`src/app/(app)/portfolio/**` + `src/server/routers/portfolio.ts`
-- 编辑器扩展：`src/components/editor/`（mermaid-block、excalidraw-block、image-row-block、toc-block、toc-sidebar 等）
+- 编辑器扩展：`src/components/editor/`（mermaid-block、excalidraw-block、image-row-block、toc-block、toc-sidebar、markdown-table-paste、callout-block、toggle-block 等）
 
 ## 开发进度
 
