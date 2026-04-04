@@ -464,6 +464,11 @@ export const osProjects = sqliteTable("os_projects", {
   description: text("description"),
   language: text("language"),
   aiSummary: text("ai_summary"),
+  // Source-code analysis fields
+  analysisStatus: text("analysis_status"), // null | pending | analyzing | completed | failed
+  analysisError: text("analysis_error"),
+  starsCount: integer("stars_count"),
+  trendingDate: text("trending_date"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
@@ -480,6 +485,7 @@ export const osProjectNotes = sqliteTable("os_project_notes", {
   content: text("content"),
   plainText: text("plain_text"),
   tags: text("tags"),
+  noteType: text("note_type").default("manual"), // manual | analysis | followup
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });

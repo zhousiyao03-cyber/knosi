@@ -1,0 +1,331 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ExternalLink, Loader2, Search, Star, TrendingUp } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+
+/** GitHub languages available in the trending filter. */
+const LANGUAGES = [
+  "",
+  "typescript",
+  "javascript",
+  "python",
+  "rust",
+  "go",
+  "java",
+  "c++",
+  "swift",
+  "kotlin",
+];
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  "": "All Languages",
+  typescript: "TypeScript",
+  javascript: "JavaScript",
+  python: "Python",
+  rust: "Rust",
+  go: "Go",
+  java: "Java",
+  "c++": "C++",
+  swift: "Swift",
+  kotlin: "Kotlin",
+};
+
+type Since = "daily" | "weekly" | "monthly";
+
+const SINCE_LABELS: Record<Since, string> = {
+  daily: "Today",
+  weekly: "This Week",
+  monthly: "This Month",
+};
+
+/** Shape returned by the trending query for a single repo entry. */
+interface TrendingRepo {
+  fullName: string;
+  url: string;
+  description: string;
+  language: string | null;
+  stars: number;
+  periodStars: number;
+}
+
+export function DiscoverTab() {
+  const router = useRouter();
+
+  // Time range and language filter state
+  const [since, setSince] = useState<Since>("daily");
+  const [language, setLanguage] = useState<string>("");
+
+  // URL input for direct repo analysis
+  const [urlInput, setUrlInput] = useState<string>("");
+
+  // Track which repo card is currently being analysed (by fullName or url)
+  const [analysingKey, setAnalysingKey] = useState<string | null>(null);
+
+  // ── Queries ──────────────────────────────────────────────────────────────
+
+  const trendingQuery = trpc.ossProjects.trending.useQuery(
+    { since, language: language || undefined },
+    { staleTime: 5 * 60 * 1000 }
+  );
+
+  const urlPreviewQuery = trpc.ossProjects.fetchRepoInfo.useQuery(
+    { url: urlInput },
+    {
+      enabled: urlInput.includes("github.com/"),
+      staleTime: 60 * 1000,
+    }
+  );
+
+  // ── Mutation ─────────────────────────────────────────────────────────────
+
+  const startAnalysis = trpc.ossProjects.startAnalysis.useMutation({
+    onSuccess: (data) => {
+      router.push(`/projects/${data.projectId}`);
+    },
+    onSettled: () => {
+      setAnalysingKey(null);
+    },
+  });
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+
+  /** Trigger analysis for the URL typed in the input bar. */
+  function handleAnalyseUrl() {
+    const trimmed = urlInput.trim();
+    if (!trimmed.includes("github.com/")) return;
+
+    const preview = urlPreviewQuery.data;
+    setAnalysingKey(trimmed);
+    startAnalysis.mutate({
+      repoUrl: trimmed,
+      name: preview?.name ?? undefined,
+      description: preview?.description ?? undefined,
+      language: preview?.language ?? undefined,
+      starsCount: preview?.stars ?? undefined,
+    });
+  }
+
+  /** Trigger analysis for a trending repo card. */
+  function handleAnalyseTrending(repo: TrendingRepo) {
+    setAnalysingKey(repo.fullName);
+    startAnalysis.mutate({
+      repoUrl: repo.url,
+      name: repo.fullName,
+      description: repo.description ?? undefined,
+      language: repo.language ?? undefined,
+      starsCount: repo.stars,
+    });
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const isUrlValid = urlInput.includes("github.com/");
+  const urlPreview = urlPreviewQuery.data;
+
+  return (
+    <div className="space-y-6">
+      {/* ── URL input section ─────────────────────────────────────────── */}
+      <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-stone-950">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-stone-700 dark:text-stone-300">
+          <Search size={15} />
+          Analyse any GitHub repository
+        </h2>
+
+        <div className="flex gap-2">
+          <input
+            type="url"
+            aria-label="GitHub repository URL"
+            placeholder="https://github.com/owner/repo"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && isUrlValid) handleAnalyseUrl();
+            }}
+            className="flex-1 rounded-xl border border-stone-200 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-stone-400 focus:border-blue-400 dark:border-stone-700 dark:placeholder:text-stone-600"
+          />
+          <button
+            type="button"
+            disabled={!isUrlValid || analysingKey === urlInput.trim()}
+            onClick={handleAnalyseUrl}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {analysingKey === urlInput.trim() ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : null}
+            Add &amp; Analyse
+          </button>
+        </div>
+
+        {/* URL preview card */}
+        {isUrlValid && urlPreview && (
+          <div className="mt-3 rounded-xl border border-stone-100 bg-stone-50 px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-stone-800 dark:text-stone-200">
+                  {urlPreview.fullName ?? urlPreview.name}
+                </p>
+                {urlPreview.description && (
+                  <p className="mt-0.5 line-clamp-2 text-xs text-stone-500 dark:text-stone-400">
+                    {urlPreview.description}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-1 text-xs text-stone-500 dark:text-stone-400">
+                <Star size={12} className="text-amber-400" />
+                {urlPreview.stars?.toLocaleString() ?? "—"}
+              </div>
+            </div>
+            {urlPreview.language && (
+              <span className="mt-2 inline-block rounded-full bg-stone-200 px-2 py-0.5 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+                {urlPreview.language}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Loading indicator for URL preview */}
+        {isUrlValid && urlPreviewQuery.isLoading && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-stone-400 dark:text-stone-500">
+            <Loader2 size={12} className="animate-spin" />
+            Fetching repository info…
+          </p>
+        )}
+      </div>
+
+      {/* ── Trending section ──────────────────────────────────────────── */}
+      <div>
+        {/* Header with time range toggle and language filter */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-stone-700 dark:text-stone-300">
+            <TrendingUp size={15} />
+            Trending on GitHub
+          </h2>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Time range toggle */}
+            <div className="flex rounded-xl border border-stone-200 bg-stone-50 p-0.5 text-xs dark:border-stone-800 dark:bg-stone-900">
+              {(Object.keys(SINCE_LABELS) as Since[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSince(key)}
+                  className={[
+                    "rounded-[10px] px-3 py-1.5 font-medium transition-colors",
+                    since === key
+                      ? "bg-white text-stone-900 shadow-sm dark:bg-stone-800 dark:text-stone-100"
+                      : "text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200",
+                  ].join(" ")}
+                >
+                  {SINCE_LABELS[key]}
+                </button>
+              ))}
+            </div>
+
+            {/* Language filter */}
+            <select
+              aria-label="Filter by language"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs text-stone-700 outline-none focus:border-blue-400 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300"
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang} value={lang}>
+                  {LANGUAGE_LABELS[lang]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Trending repo list */}
+        {trendingQuery.isLoading ? (
+          <div className="flex items-center gap-2 py-12 text-sm text-stone-400 dark:text-stone-500">
+            <Loader2 size={16} className="animate-spin" />
+            Loading trending repositories…
+          </div>
+        ) : trendingQuery.isError ? (
+          <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
+            Failed to load trending repositories. Please try again later.
+          </div>
+        ) : !trendingQuery.data || trendingQuery.data.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-stone-200 bg-white/70 px-6 py-12 text-center text-sm text-stone-400 dark:border-stone-800 dark:bg-stone-950/50 dark:text-stone-500">
+            No trending repositories found for the selected filters.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {trendingQuery.data.map((repo) => {
+              const isAnalysing = analysingKey === repo.fullName;
+
+              return (
+                <div
+                  key={repo.fullName}
+                  className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-stone-800 dark:bg-stone-950"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Repo name + description */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-stone-900 dark:text-stone-100">
+                          {repo.fullName}
+                        </span>
+                        {repo.language && (
+                          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+                            {repo.language}
+                          </span>
+                        )}
+                      </div>
+                      {repo.description && (
+                        <p className="mt-1 line-clamp-2 text-sm text-stone-500 dark:text-stone-400">
+                          {repo.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Stars */}
+                    <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+                      <span className="flex items-center gap-1 text-sm text-stone-700 dark:text-stone-300">
+                        <Star size={14} className="text-amber-400" />
+                        {repo.stars.toLocaleString()}
+                      </span>
+                      {repo.periodStars > 0 && (
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                          +{repo.periodStars.toLocaleString()} {SINCE_LABELS[since].toLowerCase()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="mt-4 flex items-center gap-2">
+                    <a
+                      href={repo.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-800 dark:border-stone-700 dark:text-stone-400 dark:hover:border-stone-600 dark:hover:text-stone-200"
+                    >
+                      <ExternalLink size={12} />
+                      GitHub
+                    </a>
+                    <button
+                      type="button"
+                      disabled={isAnalysing}
+                      onClick={() => handleAnalyseTrending(repo)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isAnalysing ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : null}
+                      Add &amp; Analyse
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -4,6 +4,9 @@ import { z } from "zod/v4";
 import { db } from "../db";
 import { osProjectNotes, osProjects } from "../db/schema";
 import { protectedProcedure, router } from "../trpc";
+import { fetchTrending } from "../analysis/trending";
+import { fetchRepoInfo } from "../analysis/github";
+import { startAnalysis, runFollowup } from "../analysis/analyzer";
 
 const projectSchema = z.object({
   name: z.string().trim().min(1),
@@ -224,5 +227,118 @@ export const ossProjectsRouter = router({
         );
 
       return { success: true };
+    }),
+
+  trending: protectedProcedure
+    .input(
+      z.object({
+        since: z.enum(["daily", "weekly", "monthly"]).default("daily"),
+        language: z.string().trim().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      return fetchTrending(input.since, input.language ?? "");
+    }),
+
+  fetchRepoInfo: protectedProcedure
+    .input(z.object({ url: z.string().trim().min(1) }))
+    .query(async ({ input }) => {
+      return fetchRepoInfo(input.url);
+    }),
+
+  startAnalysis: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string().optional(),
+        repoUrl: z.string().trim().url().optional(),
+        name: z.string().trim().optional(),
+        description: z.string().trim().optional(),
+        language: z.string().trim().optional(),
+        starsCount: z.number().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      let projectId = input.projectId;
+
+      if (!projectId && input.repoUrl) {
+        projectId = crypto.randomUUID();
+        await db.insert(osProjects).values({
+          id: projectId,
+          userId: ctx.userId,
+          name: input.name || input.repoUrl,
+          repoUrl: input.repoUrl,
+          description: input.description,
+          language: input.language,
+          starsCount: input.starsCount,
+          trendingDate: new Date().toISOString().slice(0, 10),
+        });
+      }
+
+      if (!projectId) {
+        throw new Error("Either projectId or repoUrl is required");
+      }
+
+      const [project] = await db
+        .select()
+        .from(osProjects)
+        .where(and(eq(osProjects.id, projectId), eq(osProjects.userId, ctx.userId)));
+
+      if (!project?.repoUrl) {
+        throw new Error("Project not found or missing repo URL");
+      }
+
+      const result = await startAnalysis(projectId, project.repoUrl, ctx.userId);
+      return { projectId, ...result };
+    }),
+
+  analysisStatus: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const [project] = await db
+        .select({
+          analysisStatus: osProjects.analysisStatus,
+          analysisError: osProjects.analysisError,
+        })
+        .from(osProjects)
+        .where(and(eq(osProjects.id, input.projectId), eq(osProjects.userId, ctx.userId)));
+
+      return project ?? { analysisStatus: null, analysisError: null };
+    }),
+
+  askFollowup: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        question: z.string().trim().min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const [project] = await db
+        .select()
+        .from(osProjects)
+        .where(and(eq(osProjects.id, input.projectId), eq(osProjects.userId, ctx.userId)));
+
+      if (!project) throw new Error("Project not found");
+
+      const [analysisNote] = await db
+        .select({ plainText: osProjectNotes.plainText })
+        .from(osProjectNotes)
+        .where(
+          and(
+            eq(osProjectNotes.projectId, input.projectId),
+            eq(osProjectNotes.noteType, "analysis")
+          )
+        )
+        .orderBy(osProjectNotes.createdAt)
+        .limit(1);
+
+      const originalAnalysis = analysisNote?.plainText ?? "";
+      return runFollowup(
+        input.projectId,
+        ctx.userId,
+        input.question,
+        originalAnalysis,
+        project.repoUrl ?? ""
+      );
     }),
 });

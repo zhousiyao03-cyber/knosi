@@ -38,4 +38,51 @@ test.describe("OSS projects", () => {
     await page.getByRole("button", { name: tag }).click();
     await expect(page.getByText(noteTitle)).toBeVisible();
   });
+
+  test.describe("Discover tab", () => {
+    test("can switch to Discover tab and see trending repos", async ({
+      page,
+    }) => {
+      await page.goto("/projects");
+      await expect(
+        page.getByRole("heading", { name: "Open source projects" })
+      ).toBeVisible();
+
+      // Switch to Discover tab
+      await page.getByRole("button", { name: "Discover" }).click();
+
+      // Should see trending section
+      await expect(page.getByText("Trending")).toBeVisible();
+
+      // Should see time range toggles
+      await expect(page.getByRole("button", { name: "Today" })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "This Week" })
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "This Month" })
+      ).toBeVisible();
+
+      // Should see URL input
+      await expect(
+        page.getByPlaceholder(/Paste a GitHub repo URL/)
+      ).toBeVisible();
+    });
+
+    test("can switch between My Projects and Discover tabs", async ({
+      page,
+    }) => {
+      await page.goto("/projects");
+
+      // Switch to Discover
+      await page.getByRole("button", { name: "Discover" }).click();
+      await expect(page.getByText("Trending")).toBeVisible();
+
+      // Switch back to My Projects
+      await page.getByRole("button", { name: "My Projects" }).click();
+      await expect(
+        page.getByRole("button", { name: "Add project" })
+      ).toBeVisible();
+    });
+  });
 });

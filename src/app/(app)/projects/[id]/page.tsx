@@ -1,10 +1,20 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Loader2, Plus, Send } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatDate } from "@/lib/utils";
+
+// Map noteType to display label and icon
+const NOTE_TYPE_LABELS: Record<string, { label: string; icon: string }> = {
+  analysis: { label: "Source Analysis", icon: "📊" },
+  followup: { label: "Follow-up", icon: "💬" },
+  manual: { label: "Notes", icon: "✍️" },
+};
+
+// Render groups in this fixed order
+const NOTE_TYPE_ORDER = ["analysis", "followup", "manual"];
 
 export default function ProjectDetailPage({
   params,
@@ -15,17 +25,62 @@ export default function ProjectDetailPage({
   const router = useRouter();
   const utils = trpc.useUtils();
   const [selectedTag, setSelectedTag] = useState<string | undefined>();
+  const [followupQuestion, setFollowupQuestion] = useState("");
+
+  // ---------- Queries ----------
 
   const { data: project, isLoading: projectLoading } =
     trpc.ossProjects.getProject.useQuery({ id });
+
   const { data: notes = [], isLoading: notesLoading } =
     trpc.ossProjects.listNotes.useQuery({ projectId: id, tag: selectedTag });
+
+  // Poll every 5 s while status is "analyzing" or "pending"
+  const { data: analysisInfo } = trpc.ossProjects.analysisStatus.useQuery(
+    { projectId: id },
+    {
+      refetchInterval: (query) => {
+        const status = query.state.data?.analysisStatus;
+        return status === "analyzing" || status === "pending" ? 5000 : false;
+      },
+    }
+  );
+
+  const analysisStatus = analysisInfo?.analysisStatus ?? null;
+  const analysisError = analysisInfo?.analysisError ?? null;
+
+  // When analysis transitions to completed, refresh notes and project data
+  useEffect(() => {
+    if (analysisStatus === "completed") {
+      void utils.ossProjects.listNotes.invalidate({ projectId: id });
+      void utils.ossProjects.getProject.invalidate({ id });
+    }
+  }, [analysisStatus, id, utils]);
+
+  // ---------- Mutations ----------
+
   const createNote = trpc.ossProjects.createNote.useMutation({
     onSuccess: async (data) => {
       await utils.ossProjects.listNotes.invalidate({ projectId: id });
       router.push(`/projects/${id}/notes/${data.id}`);
     },
   });
+
+  const startAnalysis = trpc.ossProjects.startAnalysis.useMutation({
+    onSuccess: () => {
+      void utils.ossProjects.analysisStatus.invalidate({ projectId: id });
+      void utils.ossProjects.getProject.invalidate({ id });
+    },
+  });
+
+  const askFollowup = trpc.ossProjects.askFollowup.useMutation({
+    onSuccess: async () => {
+      setFollowupQuestion("");
+      await utils.ossProjects.listNotes.invalidate({ projectId: id });
+    },
+  });
+
+  // ---------- Derived data ----------
 
   const availableTags = useMemo(() => {
     const set = new Set<string>();
@@ -42,16 +97,44 @@ export default function ProjectDetailPage({
     return [...set];
   }, [notes]);
 
+  // Group notes by noteType; fall back to "manual" for notes without a type
+  const groupedNotes = useMemo(() => {
+    const groups: Record<string, typeof notes> = {};
+    for (const note of notes) {
+      const type = (note as { noteType?: string }).noteType ?? "manual";
+      if (!groups[type]) groups[type] = [];
+      groups[type].push(note);
+    }
+    return groups;
+  }, [notes]);
+
+  // Whether this project can be analysed but hasn't been yet
+  const canStartAnalysis =
+    project?.repoUrl && !analysisStatus && !startAnalysis.isPending;
+
+  // ---------- Handlers ----------
+
+  function handleFollowupSubmit() {
+    const q = followupQuestion.trim();
+    if (!q || askFollowup.isPending) return;
+    askFollowup.mutate({ projectId: id, question: q });
+  }
+
+  // ---------- Render ----------
+
   if (projectLoading) {
     return <div className="py-12 text-sm text-stone-500">Loading project...</div>;
   }
 
   if (!project) {
-    return <div className="py-12 text-center text-stone-500">Project not found.</div>;
+    return (
+      <div className="py-12 text-center text-stone-500">Project not found.</div>
+    );
   }
 
   return (
     <div className="space-y-6">
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold text-stone-900 dark:text-stone-100">
@@ -66,6 +149,15 @@ export default function ProjectDetailPage({
                 {project.language}
               </span>
             )}
+            {/* Stars count */}
+            {(project as { starsCount?: number | null }).starsCount != null && (
+              <span className="flex items-center gap-1">
+                ⭐{" "}
+                {(
+                  project as { starsCount?: number | null }
+                ).starsCount?.toLocaleString()}
+              </span>
+            )}
             {project.repoUrl && (
               <a
                 href={project.repoUrl}
@@ -78,23 +170,126 @@ export default function ProjectDetailPage({
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => createNote.mutate({ projectId: id, title: "" })}
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-        >
-          <Plus size={16} />
-          Add note
-        </button>
+
+        <div className="flex items-center gap-2">
+          {/* Analyze button — shown when there is a repo URL but no analysis yet */}
+          {canStartAnalysis && (
+            <button
+              type="button"
+              onClick={() =>
+                startAnalysis.mutate({
+                  projectId: id,
+                  repoUrl: project.repoUrl!,
+                  name: project.name,
+                  description: project.description ?? undefined,
+                  language: project.language ?? undefined,
+                  starsCount:
+                    (project as { starsCount?: number | null }).starsCount ??
+                    undefined,
+                })
+              }
+              className="inline-flex items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
+            >
+              Analyze
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => createNote.mutate({ projectId: id, title: "" })}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus size={16} />
+            Add note
+          </button>
+        </div>
       </div>
 
+      {/* ── Analysis status banner ─────────────────────────────────────────── */}
+      {(analysisStatus === "analyzing" || analysisStatus === "pending") && (
+        <div className="flex items-center gap-3 rounded-2xl bg-blue-50 px-5 py-4 text-sm text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+          <Loader2 size={16} className="animate-spin shrink-0" />
+          <span>
+            {analysisStatus === "pending"
+              ? "Analysis queued — will start shortly…"
+              : "Analysing repository with Claude — this may take a few minutes…"}
+          </span>
+        </div>
+      )}
+
+      {analysisStatus === "failed" && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-red-50 px-5 py-4 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+          <span className="grow">
+            Analysis failed
+            {analysisError ? `: ${analysisError}` : "."}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              startAnalysis.mutate({
+                projectId: id,
+                repoUrl: project.repoUrl!,
+                name: project.name,
+                description: project.description ?? undefined,
+                language: project.language ?? undefined,
+                starsCount:
+                  (project as { starsCount?: number | null }).starsCount ??
+                  undefined,
+              })
+            }
+            disabled={startAnalysis.isPending}
+            className="shrink-0 rounded-lg bg-red-100 px-3 py-1 font-medium transition-colors hover:bg-red-200 disabled:opacity-50 dark:bg-red-900 dark:hover:bg-red-800"
+          >
+            {startAnalysis.isPending ? "Retrying…" : "Retry"}
+          </button>
+        </div>
+      )}
+
+      {/* ── Follow-up input — only when analysis has completed ─────────────── */}
+      {analysisStatus === "completed" && (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={followupQuestion}
+            onChange={(e) => setFollowupQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleFollowupSubmit();
+            }}
+            placeholder="Ask a follow-up question about this project…"
+            disabled={askFollowup.isPending}
+            className="flex-1 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm outline-none placeholder:text-stone-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:opacity-60 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-blue-600 dark:focus:ring-blue-900"
+          />
+          <button
+            type="button"
+            onClick={handleFollowupSubmit}
+            disabled={!followupQuestion.trim() || askFollowup.isPending}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          >
+            {askFollowup.isPending ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Claude is reading…
+              </>
+            ) : (
+              <>
+                <Send size={14} />
+                Send
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* ── Tag filter ───────────────────────────────────────────────────────── */}
       {availableTags.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {availableTags.map((tag) => (
             <button
               key={tag}
               type="button"
-              onClick={() => setSelectedTag((current) => (current === tag ? undefined : tag))}
+              onClick={() =>
+                setSelectedTag((current) => (current === tag ? undefined : tag))
+              }
               className={`rounded-full px-2.5 py-1 text-xs ${
                 selectedTag === tag
                   ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-950"
@@ -107,6 +302,7 @@ export default function ProjectDetailPage({
         </div>
       )}
 
+      {/* ── Notes list ───────────────────────────────────────────────────────── */}
       {notesLoading ? (
         <div className="py-12 text-sm text-stone-500">Loading notes...</div>
       ) : notes.length === 0 ? (
@@ -114,29 +310,95 @@ export default function ProjectDetailPage({
           No project notes yet.
         </div>
       ) : (
-        <div className="space-y-3">
-          {notes.map((note) => (
-            <button
-              key={note.id}
-              type="button"
-              onClick={() => router.push(`/projects/${id}/notes/${note.id}`)}
-              className="w-full rounded-[24px] border border-stone-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:hover:bg-stone-900"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="font-medium text-stone-900 dark:text-stone-100">
-                    {note.title || "New page"}
-                  </h2>
-                  <p className="mt-1 line-clamp-2 text-sm text-stone-500 dark:text-stone-400">
-                    {note.plainText || "Empty note"}
-                  </p>
+        <div className="space-y-6">
+          {NOTE_TYPE_ORDER.map((type) => {
+            const group = groupedNotes[type];
+            if (!group || group.length === 0) return null;
+            const meta = NOTE_TYPE_LABELS[type] ?? { label: type, icon: "📄" };
+            return (
+              <div key={type} className="space-y-3">
+                {/* Group header */}
+                <div className="flex items-center gap-2 text-sm font-medium text-stone-500 dark:text-stone-400">
+                  <span>{meta.icon}</span>
+                  <span>{meta.label}</span>
+                  <span className="text-xs text-stone-400 dark:text-stone-600">
+                    ({group.length})
+                  </span>
                 </div>
-                <span className="shrink-0 text-xs text-stone-400">
-                  {formatDate(note.updatedAt)}
-                </span>
+
+                {/* Notes in this group */}
+                {group.map((note) => (
+                  <button
+                    key={note.id}
+                    type="button"
+                    onClick={() =>
+                      router.push(`/projects/${id}/notes/${note.id}`)
+                    }
+                    className="w-full rounded-[20px] border border-stone-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:hover:bg-stone-900"
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h2 className="font-medium text-stone-900 dark:text-stone-100">
+                          {note.title || "New page"}
+                        </h2>
+                        <p className="mt-1 line-clamp-2 text-sm text-stone-500 dark:text-stone-400">
+                          {note.plainText || "Empty note"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs text-stone-400">
+                        {formatDate(note.updatedAt)}
+                      </span>
+                    </div>
+                  </button>
+                ))}
               </div>
-            </button>
-          ))}
+            );
+          })}
+
+          {/* Render any noteTypes that aren't in NOTE_TYPE_ORDER (future-proof) */}
+          {Object.entries(groupedNotes)
+            .filter(([type]) => !NOTE_TYPE_ORDER.includes(type))
+            .map(([type, group]) => {
+              const meta = NOTE_TYPE_LABELS[type] ?? {
+                label: type,
+                icon: "📄",
+              };
+              return (
+                <div key={type} className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-stone-500 dark:text-stone-400">
+                    <span>{meta.icon}</span>
+                    <span>{meta.label}</span>
+                    <span className="text-xs text-stone-400 dark:text-stone-600">
+                      ({group.length})
+                    </span>
+                  </div>
+                  {group.map((note) => (
+                    <button
+                      key={note.id}
+                      type="button"
+                      onClick={() =>
+                        router.push(`/projects/${id}/notes/${note.id}`)
+                      }
+                      className="w-full rounded-[20px] border border-stone-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:hover:bg-stone-900"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <h2 className="font-medium text-stone-900 dark:text-stone-100">
+                            {note.title || "New page"}
+                          </h2>
+                          <p className="mt-1 line-clamp-2 text-sm text-stone-500 dark:text-stone-400">
+                            {note.plainText || "Empty note"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs text-stone-400">
+                          {formatDate(note.updatedAt)}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
         </div>
       )}
     </div>
