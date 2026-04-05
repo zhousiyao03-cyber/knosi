@@ -51,7 +51,7 @@ export default function ProjectDetailPage({
   const activeTaskId = analysisInfo?.activeTaskId ?? null;
   const [messages, setMessages] = useState<Array<{ seq: number; type: string; tool?: string; summary?: string }>>([]);
   const lastSeqRef = useRef(0);
-  const timelineEndRef = useRef<HTMLDivElement>(undefined);
+  const timelineEndRef = useRef<HTMLDivElement | null>(null);
 
   // Poll messages every 2s while running
   useEffect(() => {
