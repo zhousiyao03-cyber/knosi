@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Send } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -48,6 +48,50 @@ export default function ProjectDetailPage({
 
   const analysisStatus = analysisInfo?.analysisStatus ?? null;
   const analysisError = analysisInfo?.analysisError ?? null;
+  const activeTaskId = analysisInfo?.activeTaskId ?? null;
+  const [messages, setMessages] = useState<Array<{ seq: number; type: string; tool?: string; summary?: string }>>([]);
+  const lastSeqRef = useRef(0);
+  const timelineEndRef = useRef<HTMLDivElement>(undefined);
+
+  // Poll messages every 2s while running
+  useEffect(() => {
+    if (!activeTaskId || (analysisStatus !== "queued" && analysisStatus !== "running")) {
+      return;
+    }
+
+    const poll = async () => {
+      try {
+        const res = await fetch(
+          `/api/analysis/messages?taskId=${activeTaskId}&afterSeq=${lastSeqRef.current}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.messages?.length) {
+          setMessages((prev) => [...prev, ...data.messages]);
+          lastSeqRef.current = data.messages[data.messages.length - 1].seq;
+        }
+      } catch {
+        // skip
+      }
+    };
+
+    poll(); // initial fetch
+    const interval = setInterval(poll, 2000);
+    return () => clearInterval(interval);
+  }, [activeTaskId, analysisStatus]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  // Reset messages when analysis completes
+  useEffect(() => {
+    if (analysisStatus === "completed" || analysisStatus === "failed") {
+      setMessages([]);
+      lastSeqRef.current = 0;
+    }
+  }, [analysisStatus]);
 
   // When analysis transitions to completed, refresh notes and project data
   useEffect(() => {
@@ -207,13 +251,43 @@ export default function ProjectDetailPage({
 
       {/* ── Analysis status banner ─────────────────────────────────────────── */}
       {(analysisStatus === "queued" || analysisStatus === "running") && (
-        <div className="flex items-center gap-3 rounded-2xl bg-blue-50 px-5 py-4 text-sm text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-          <Loader2 size={16} className="animate-spin shrink-0" />
-          <span>
-            {analysisStatus === "queued"
-              ? "Analysis queued — waiting for local daemon to pick it up…"
-              : "Analysing repository with Claude — this may take a few minutes…"}
-          </span>
+        <div className="overflow-hidden rounded-2xl border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-5 py-3 text-sm font-medium text-blue-700 dark:text-blue-300">
+            <Loader2 size={16} className="animate-spin shrink-0" />
+            <span className="grow">
+              {analysisStatus === "queued"
+                ? "Analysis queued — waiting for local daemon…"
+                : "Analysing repository with Claude…"}
+            </span>
+          </div>
+
+          {/* Message timeline */}
+          {messages.length > 0 && (
+            <div className="max-h-[300px] overflow-y-auto border-t border-blue-200 bg-white/50 px-5 py-3 font-mono text-xs leading-relaxed text-stone-600 dark:border-blue-800 dark:bg-stone-950/50 dark:text-stone-400">
+              {messages.map((msg) => (
+                <div key={msg.seq} className="py-0.5">
+                  {msg.type === "tool_use" && (
+                    <span>
+                      <span className="text-blue-600 dark:text-blue-400">
+                        {msg.tool}
+                      </span>{" "}
+                      {msg.summary}
+                    </span>
+                  )}
+                  {msg.type === "text" && (
+                    <span className="text-stone-500 italic">{msg.summary}</span>
+                  )}
+                  {msg.type === "error" && (
+                    <span className="text-red-600 dark:text-red-400">
+                      {msg.summary}
+                    </span>
+                  )}
+                </div>
+              ))}
+              <div ref={timelineEndRef} />
+            </div>
+          )}
         </div>
       )}
 
