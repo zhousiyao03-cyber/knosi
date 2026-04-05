@@ -79,11 +79,18 @@ export function markdownToTiptap(markdown: string): TiptapNode {
         i++;
       }
       i++;
-      content.push({
-        type: "codeBlock",
-        attrs: { language: lang },
-        content: [{ type: "text", text: codeLines.join("\n") }],
-      });
+      if (lang === "mermaid") {
+        content.push({
+          type: "mermaidBlock",
+          attrs: { code: codeLines.join("\n") },
+        });
+      } else {
+        content.push({
+          type: "codeBlock",
+          attrs: { language: lang },
+          content: [{ type: "text", text: codeLines.join("\n") }],
+        });
+      }
       continue;
     }
 
