@@ -47,10 +47,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Success path — persist note + update statuses
-  const noteTitle =
-    task.taskType === "analysis"
-      ? "源码阅读笔记"
-      : (task.question ?? "Follow-up").slice(0, 100);
+  let noteTitle: string;
+  if (task.taskType === "analysis") {
+    // Extract title from first "# ..." line in the result, fallback to generic
+    const h1Match = (body.result ?? "").match(/^#\s+(.+)$/m);
+    noteTitle = h1Match ? h1Match[1].trim() : "源码阅读笔记";
+  } else {
+    noteTitle = (task.question ?? "Follow-up").slice(0, 100);
+  }
 
   const tiptapDoc = markdownToTiptap(body.result ?? "");
 
