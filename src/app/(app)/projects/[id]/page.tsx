@@ -41,7 +41,7 @@ export default function ProjectDetailPage({
     {
       refetchInterval: (query) => {
         const status = query.state.data?.analysisStatus;
-        return status === "analyzing" || status === "pending" ? 5000 : false;
+        return status === "queued" || status === "running" ? 5000 : false;
       },
     }
   );
@@ -206,12 +206,12 @@ export default function ProjectDetailPage({
       </div>
 
       {/* ── Analysis status banner ─────────────────────────────────────────── */}
-      {(analysisStatus === "analyzing" || analysisStatus === "pending") && (
+      {(analysisStatus === "queued" || analysisStatus === "running") && (
         <div className="flex items-center gap-3 rounded-2xl bg-blue-50 px-5 py-4 text-sm text-blue-700 dark:bg-blue-950 dark:text-blue-300">
           <Loader2 size={16} className="animate-spin shrink-0" />
           <span>
-            {analysisStatus === "pending"
-              ? "Analysis queued — will start shortly…"
+            {analysisStatus === "queued"
+              ? "Analysis queued — waiting for local daemon to pick it up…"
               : "Analysing repository with Claude — this may take a few minutes…"}
           </span>
         </div>
