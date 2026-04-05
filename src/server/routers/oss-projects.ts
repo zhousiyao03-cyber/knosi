@@ -2,11 +2,10 @@ import crypto from "crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db";
-import { osProjectNotes, osProjects } from "../db/schema";
+import { osProjectNotes, osProjects, analysisTasks } from "../db/schema";
 import { protectedProcedure, router } from "../trpc";
 import { fetchTrending } from "../analysis/trending";
 import { fetchRepoInfo } from "../analysis/github";
-import { startAnalysis, runFollowup } from "../analysis/analyzer";
 
 const projectSchema = z.object({
   name: z.string().trim().min(1),
@@ -287,8 +286,22 @@ export const ossProjectsRouter = router({
         throw new Error("Project not found or missing repo URL");
       }
 
-      const result = await startAnalysis(projectId, project.repoUrl, ctx.userId);
-      return { projectId, ...result };
+      // Enqueue analysis task
+      await db.insert(analysisTasks).values({
+        projectId,
+        userId: ctx.userId,
+        taskType: "analysis",
+        status: "queued",
+        repoUrl: project.repoUrl,
+      });
+
+      // Update project status for frontend polling
+      await db
+        .update(osProjects)
+        .set({ analysisStatus: "queued", updatedAt: new Date() })
+        .where(eq(osProjects.id, projectId));
+
+      return { projectId };
     }),
 
   analysisStatus: protectedProcedure
@@ -332,13 +345,21 @@ export const ossProjectsRouter = router({
         .orderBy(osProjectNotes.createdAt)
         .limit(1);
 
-      const originalAnalysis = analysisNote?.plainText ?? "";
-      return runFollowup(
-        input.projectId,
-        ctx.userId,
-        input.question,
-        originalAnalysis,
-        project.repoUrl ?? ""
-      );
+      // Enqueue followup task
+      await db.insert(analysisTasks).values({
+        projectId: input.projectId,
+        userId: ctx.userId,
+        taskType: "followup",
+        status: "queued",
+        repoUrl: project.repoUrl ?? "",
+        question: input.question,
+        originalAnalysis: analysisNote?.plainText ?? "",
+      });
+
+      // Update project status for frontend polling
+      await db
+        .update(osProjects)
+        .set({ analysisStatus: "queued", updatedAt: new Date() })
+        .where(eq(osProjects.id, input.projectId));
     }),
 });
