@@ -12,12 +12,18 @@
  */
 
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, unlinkSync } from "fs";
-import { homedir } from "os";
+import { execSync, spawn as cpSpawn } from "child_process";
+import { homedir, tmpdir } from "os";
 import { join } from "path";
 
 const SERVER_URL = process.env.SECOND_BRAIN_URL || "https://second-brain-self-alpha.vercel.app";
 const SCAN_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const IS_ONCE = process.argv.includes("--once");
+
+const ANALYSIS_POLL_INTERVAL_MS = 10 * 1000; // 10 seconds
+const MAX_CONCURRENT_ANALYSIS = 3;
+let analysisRunning = 0;
+const ANALYSIS_BASE_DIR = join(tmpdir(), "source-readings");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -164,6 +170,227 @@ async function syncOnce() {
 }
 
 // ---------------------------------------------------------------------------
+// Analysis — Helpers
+// ---------------------------------------------------------------------------
+
+function repoSlug(repoUrl) {
+  try {
+    const url = new URL(repoUrl);
+    return url.pathname
+      .replace(/^\//, "")
+      .replace(/\//g, "__")
+      .replace(/[^a-zA-Z0-9._-]/g, "_");
+  } catch {
+    return repoUrl.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+  }
+}
+
+function cloneRepo(repoUrl) {
+  const dest = join(ANALYSIS_BASE_DIR, repoSlug(repoUrl));
+  if (!existsSync(dest)) {
+    execSync(`mkdir -p "${ANALYSIS_BASE_DIR}"`);
+    execSync(`git clone --depth=1 "${repoUrl}" "${dest}"`, {
+      timeout: 120_000,
+      stdio: "pipe",
+    });
+  }
+  return dest;
+}
+
+function spawnClaude(prompt, cwd) {
+  return new Promise((resolve, reject) => {
+    const child = cpSpawn(
+      "claude",
+      ["-p", prompt, "--allowedTools", "Read,Grep,Glob,Bash", "--output-format", "text"],
+      { cwd, detached: true, stdio: ["ignore", "pipe", "pipe"] }
+    );
+
+    const stdoutChunks = [];
+    const stderrChunks = [];
+
+    child.stdout.on("data", (chunk) => stdoutChunks.push(chunk));
+    child.stderr.on("data", (chunk) => stderrChunks.push(chunk));
+
+    child.on("error", (err) => reject(err));
+    child.on("close", (code) => {
+      if (code !== 0) {
+        const stderr = Buffer.concat(stderrChunks).toString("utf8");
+        reject(new Error(`claude exited with code ${code}${stderr ? `: ${stderr}` : ""}`));
+        return;
+      }
+      resolve(Buffer.concat(stdoutChunks).toString("utf8"));
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Analysis — Prompts
+// ---------------------------------------------------------------------------
+
+function buildAnalysisPrompt(repoUrl) {
+  return `对本目录中的开源项目（${repoUrl}）进行系统性源码阅读，产出一篇结构化的学习笔记。
+
+## 阅读流程
+
+按以下顺序逐层深入：
+
+### 第一层：项目全貌
+1. 读 README、CONTRIBUTING、ARCHITECTURE（如有）
+2. 读依赖清单，识别核心依赖和技术选型
+3. 画出顶层目录树（2-3 层深度），标注每个目录的职责
+4. 回答：这个项目解决什么问题？面向谁？核心入口在哪？
+
+### 第二层：架构与数据流
+1. 找到程序入口，追踪启动流程
+2. 识别核心抽象（关键 interface / trait / class / type），画出依赖关系
+3. 追踪一个最典型的用户操作，完整走通数据流
+4. 识别分层策略：哪些是对外 API、哪些是内部模块
+5. 回答：架构上最重要的设计决策是什么？
+
+### 第三层：核心模块深挖
+针对 2-3 个最核心的模块：
+1. 逐文件阅读，理解内部实现
+2. 标注巧妙的设计模式、性能优化手法、错误处理策略
+3. 分析 trade-off：为什么这样写而不是更简单的写法
+4. 识别防御性编程、边界处理、并发控制等细节
+
+### 第四层：测试与工程化
+1. 测试策略：单元 / 集成 / E2E 比例
+2. CI/CD 和发布流程
+3. 代码质量工具和规范
+
+## 输出格式
+
+输出一篇 Markdown 文章，结构如下：
+
+# [项目名] 源码阅读笔记
+
+## 一句话总结
+> 用一句话概括这个项目的本质
+
+## 项目画像
+- 解决的问题：
+- 目标用户：
+- 技术栈：
+- 仓库规模：约 X 文件 / X 行代码
+
+## 架构概览
+（附目录结构图 + 核心模块关系图，用 mermaid）
+
+## 核心数据流
+（追踪一个典型操作的完整路径，附代码引用）
+
+## 难点与亮点
+
+### 难点 1：[标题]
+- 问题是什么
+- 他们怎么解决的
+- 关键代码位置
+
+### 亮点 1：[标题]
+- 这个设计好在哪
+- 对比常规做法的优势
+
+（难点和亮点各列 3-5 个）
+
+## 设计决策清单
+| 决策 | 选择 | 备选方案 | 为什么选这个 |
+|------|------|----------|-------------|
+
+## 值得偷师的模式
+（可迁移的具体 pattern，附代码片段）
+
+## 疑问
+（没想通的点，留待研究）
+
+## 阅读原则
+- 每个结论附带具体文件路径和行号
+- 重 Why 轻 What
+- 没看懂的标注为疑问，不编造`;
+}
+
+function buildFollowupPrompt(originalAnalysis, question) {
+  return `你之前对这个项目生成了以下源码分析文章：
+
+---
+${originalAnalysis}
+---
+
+用户的追问：${question}
+
+请基于项目源码回答这个问题。直接阅读源码文件来给出准确回答，附带具体文件路径和行号。输出 Markdown 格式。`;
+}
+
+// ---------------------------------------------------------------------------
+// Analysis — Task handler
+// ---------------------------------------------------------------------------
+
+async function handleAnalysisTask(task) {
+  console.log(`[${timestamp()}] 🔬 开始分析: ${task.repoUrl} (${task.taskType})`);
+
+  try {
+    const repoDir = cloneRepo(task.repoUrl);
+
+    const prompt =
+      task.taskType === "analysis"
+        ? buildAnalysisPrompt(task.repoUrl)
+        : buildFollowupPrompt(task.originalAnalysis || "", task.question || "");
+
+    const result = await spawnClaude(prompt, repoDir);
+
+    // Report success
+    const res = await fetch(`${SERVER_URL}/api/analysis/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: task.id, result }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Complete API returned ${res.status}: ${await res.text()}`);
+    }
+
+    console.log(`[${timestamp()}] ✅ 分析完成: ${task.repoUrl}`);
+  } catch (err) {
+    console.error(`[${timestamp()}] ❌ 分析失败: ${task.repoUrl}`, err.message);
+
+    // Report failure
+    await fetch(`${SERVER_URL}/api/analysis/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: task.id, error: err.message }),
+    }).catch(() => {});
+  } finally {
+    analysisRunning--;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Analysis — Poll loop
+// ---------------------------------------------------------------------------
+
+async function pollAnalysisTasks() {
+  if (analysisRunning >= MAX_CONCURRENT_ANALYSIS) return;
+
+  try {
+    const res = await fetch(`${SERVER_URL}/api/analysis/claim`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (!data.task) return;
+
+    analysisRunning++;
+    // Fire and forget — don't block the poll loop
+    handleAnalysisTask(data.task).catch(() => {});
+  } catch {
+    // Silently skip — server may be unreachable
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -179,6 +406,7 @@ if (IS_ONCE) {
   console.log(`🚀 Usage daemon 已启动 (PID: ${process.pid})`);
   console.log(`   服务器: ${SERVER_URL}`);
   console.log(`   同步间隔: ${SCAN_INTERVAL_MS / 1000}s`);
+  console.log(`   分析任务轮询间隔: ${ANALYSIS_POLL_INTERVAL_MS / 1000}s`);
   console.log("");
 
   // Initial sync
@@ -188,6 +416,11 @@ if (IS_ONCE) {
   setInterval(async () => {
     await syncOnce().catch((err) => console.error(`[${timestamp()}] ❌`, err.message));
   }, SCAN_INTERVAL_MS);
+
+  // Analysis task polling
+  setInterval(async () => {
+    await pollAnalysisTasks();
+  }, ANALYSIS_POLL_INTERVAL_MS);
 
   // Graceful shutdown
   for (const sig of ["SIGINT", "SIGTERM"]) {
