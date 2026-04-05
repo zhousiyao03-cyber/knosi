@@ -35,6 +35,7 @@ export async function POST() {
       userId: task.userId,
       repoUrl: task.repoUrl,
       taskType: task.taskType,
+      provider: task.provider,
       question: task.question,
       originalAnalysis: task.originalAnalysis,
     },

@@ -1,0 +1,1 @@
+ALTER TABLE `analysis_tasks` ADD `provider` text DEFAULT 'claude' NOT NULL;

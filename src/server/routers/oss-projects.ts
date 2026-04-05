@@ -254,6 +254,7 @@ export const ossProjectsRouter = router({
         description: z.string().trim().optional(),
         language: z.string().trim().optional(),
         starsCount: z.number().optional(),
+        provider: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -292,6 +293,7 @@ export const ossProjectsRouter = router({
         userId: ctx.userId,
         taskType: "analysis",
         status: "queued",
+        provider: input.provider || "claude",
         repoUrl: project.repoUrl,
       });
 
@@ -342,6 +344,7 @@ export const ossProjectsRouter = router({
       z.object({
         projectId: z.string(),
         question: z.string().trim().min(1),
+        provider: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -370,6 +373,7 @@ export const ossProjectsRouter = router({
         userId: ctx.userId,
         taskType: "followup",
         status: "queued",
+        provider: input.provider || "claude",
         repoUrl: project.repoUrl ?? "",
         question: input.question,
         originalAnalysis: analysisNote?.plainText ?? "",

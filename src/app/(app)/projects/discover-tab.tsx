@@ -63,6 +63,9 @@ export function DiscoverTab() {
   // Track which repo card is currently being analysed (by fullName or url)
   const [analysingKey, setAnalysingKey] = useState<string | null>(null);
 
+  // Provider selection
+  const [provider, setProvider] = useState<string>("codex");
+
   // ── Queries ──────────────────────────────────────────────────────────────
 
   const trendingQuery = trpc.ossProjects.trending.useQuery(
@@ -104,6 +107,7 @@ export function DiscoverTab() {
       description: preview?.description ?? undefined,
       language: preview?.language ?? undefined,
       starsCount: preview?.stars ?? undefined,
+      provider,
     });
   }
 
@@ -116,6 +120,7 @@ export function DiscoverTab() {
       description: repo.description ?? undefined,
       language: repo.language ?? undefined,
       starsCount: repo.stars,
+      provider,
     });
   }
 
@@ -145,6 +150,14 @@ export function DiscoverTab() {
             }}
             className="flex-1 rounded-xl border border-stone-200 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-stone-400 focus:border-blue-400 dark:border-stone-700 dark:placeholder:text-stone-600"
           />
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+            className="rounded-xl border border-stone-200 bg-transparent px-3 py-2 text-sm text-stone-700 outline-none focus:border-blue-400 dark:border-stone-700 dark:text-stone-300"
+          >
+            <option value="codex">Codex</option>
+            <option value="claude">Claude</option>
+          </select>
           <button
             type="button"
             disabled={!isUrlValid || analysingKey === urlInput.trim()}

@@ -24,6 +24,7 @@ const ANALYSIS_POLL_INTERVAL_MS = 10 * 1000; // 10 seconds
 const MAX_CONCURRENT_ANALYSIS = 3;
 let analysisRunning = 0;
 const ANALYSIS_BASE_DIR = join(tmpdir(), "source-readings");
+const ANALYSIS_PROVIDER = process.env.ANALYSIS_PROVIDER || "claude"; // "claude" | "codex"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -215,10 +216,18 @@ function getToolSummary(tool, input) {
   return tool;
 }
 
-function spawnClaude(prompt, cwd, onMessage) {
+function spawnAgent(prompt, cwd, onMessage, provider) {
+  if (provider === "codex") {
+    return spawnCodex(prompt, cwd, onMessage);
+  }
+  return spawnClaudeCli(prompt, cwd, onMessage);
+}
+
+function spawnClaudeCli(prompt, cwd, onMessage) {
   return new Promise((resolve, reject) => {
+    const claudeBin = process.env.CLAUDE_BIN || "claude";
     const child = cpSpawn(
-      "claude",
+      claudeBin,
       ["-p", prompt, "--allowedTools", "Read,Grep,Glob,Bash", "--output-format", "stream-json", "--verbose"],
       { cwd, detached: true, stdio: ["ignore", "pipe", "pipe"] }
     );
@@ -230,14 +239,13 @@ function spawnClaude(prompt, cwd, onMessage) {
     child.stdout.on("data", (chunk) => {
       lineBuf += chunk.toString("utf8");
       const lines = lineBuf.split("\n");
-      lineBuf = lines.pop(); // keep incomplete line in buffer
+      lineBuf = lines.pop();
 
       for (const line of lines) {
         if (!line.trim()) continue;
         try {
           const event = JSON.parse(line);
 
-          // Extract tool_use messages
           if (event.type === "assistant" && event.message?.content) {
             for (const block of event.message.content) {
               if (block.type === "tool_use") {
@@ -255,7 +263,6 @@ function spawnClaude(prompt, cwd, onMessage) {
             }
           }
 
-          // Extract final result
           if (event.type === "result" && event.result) {
             finalResult = event.result;
           }
@@ -266,7 +273,6 @@ function spawnClaude(prompt, cwd, onMessage) {
     });
 
     child.stderr.on("data", (chunk) => stderrChunks.push(chunk));
-
     child.on("error", (err) => reject(err));
     child.on("close", (code) => {
       if (code !== 0) {
@@ -275,6 +281,66 @@ function spawnClaude(prompt, cwd, onMessage) {
         return;
       }
       resolve(finalResult);
+    });
+  });
+}
+
+function spawnCodex(prompt, cwd, onMessage) {
+  return new Promise((resolve, reject) => {
+    const codexBin = process.env.CODEX_BIN || "codex";
+    const child = cpSpawn(
+      codexBin,
+      ["exec", "--json", "-s", "read-only", "-C", cwd, prompt],
+      { detached: true, stdio: ["ignore", "pipe", "pipe"] }
+    );
+
+    const stderrChunks = [];
+    let lastAgentMessage = "";
+    let lineBuf = "";
+
+    child.stdout.on("data", (chunk) => {
+      lineBuf += chunk.toString("utf8");
+      const lines = lineBuf.split("\n");
+      lineBuf = lines.pop();
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const event = JSON.parse(line);
+
+          if (event.type === "item.completed" && event.item) {
+            if (event.item.type === "command_execution") {
+              const cmd = event.item.command || "";
+              // Extract the actual command from "/bin/zsh -lc ..."
+              const match = cmd.match(/"(.+)"/);
+              onMessage({
+                type: "tool_use",
+                tool: "Bash",
+                summary: (match ? match[1] : cmd).slice(0, 80),
+              });
+            } else if (event.item.type === "agent_message" && event.item.text) {
+              lastAgentMessage = event.item.text;
+              onMessage({
+                type: "text",
+                summary: event.item.text.slice(0, 120),
+              });
+            }
+          }
+        } catch {
+          // skip unparseable lines
+        }
+      }
+    });
+
+    child.stderr.on("data", (chunk) => stderrChunks.push(chunk));
+    child.on("error", (err) => reject(err));
+    child.on("close", (code) => {
+      if (code !== 0) {
+        const stderr = Buffer.concat(stderrChunks).toString("utf8");
+        reject(new Error(`codex exited with code ${code}${stderr ? `: ${stderr}` : ""}`));
+        return;
+      }
+      resolve(lastAgentMessage);
     });
   });
 }
@@ -382,7 +448,7 @@ ${originalAnalysis}
 // ---------------------------------------------------------------------------
 
 async function handleAnalysisTask(task) {
-  console.log(`[${timestamp()}] 🔬 开始分析: ${task.repoUrl} (${task.taskType})`);
+  console.log(`[${timestamp()}] 🔬 开始分析: ${task.repoUrl} (${task.taskType}, ${task.provider || "claude"})`);
 
   try {
     const repoDir = cloneRepo(task.repoUrl);
@@ -425,7 +491,8 @@ async function handleAnalysisTask(task) {
       }
     }
 
-    const result = await spawnClaude(prompt, repoDir, onMessage);
+    const provider = task.provider || ANALYSIS_PROVIDER;
+    const result = await spawnAgent(prompt, repoDir, onMessage, provider);
 
     // Final flush
     if (flushTimer) clearTimeout(flushTimer);
@@ -499,6 +566,7 @@ if (IS_ONCE) {
   console.log(`   服务器: ${SERVER_URL}`);
   console.log(`   同步间隔: ${SCAN_INTERVAL_MS / 1000}s`);
   console.log(`   分析任务轮询间隔: ${ANALYSIS_POLL_INTERVAL_MS / 1000}s`);
+  console.log(`   分析 Provider: ${ANALYSIS_PROVIDER}`);
   console.log("");
 
   // Initial sync

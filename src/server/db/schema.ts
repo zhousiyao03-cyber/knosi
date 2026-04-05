@@ -502,6 +502,7 @@ export const analysisTasks = sqliteTable("analysis_tasks", {
   status: text("status", { enum: ["queued", "running", "completed", "failed"] })
     .notNull()
     .default("queued"),
+  provider: text("provider").notNull().default("claude"), // claude | codex | ...
   repoUrl: text("repo_url").notNull(),
   question: text("question"),
   originalAnalysis: text("original_analysis"),
