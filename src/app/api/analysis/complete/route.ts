@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { analysisTasks, osProjectNotes, osProjects } from "@/server/db/schema";
+import { markdownToTiptap } from "@/lib/markdown-to-tiptap";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as {
@@ -51,12 +52,14 @@ export async function POST(request: NextRequest) {
       ? "源码阅读笔记"
       : (task.question ?? "Follow-up").slice(0, 100);
 
+  const tiptapDoc = markdownToTiptap(body.result ?? "");
+
   await db.insert(osProjectNotes).values({
     id: crypto.randomUUID(),
     projectId: task.projectId,
     userId: task.userId,
     title: noteTitle,
-    content: body.result ?? "",
+    content: JSON.stringify(tiptapDoc),
     plainText: body.result ?? "",
     tags: JSON.stringify(
       task.taskType === "analysis" ? ["source-analysis"] : ["followup"]
