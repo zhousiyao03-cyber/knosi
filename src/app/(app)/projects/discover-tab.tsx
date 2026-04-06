@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ExternalLink, Loader2, Search, Star, TrendingUp } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckCircle2, ExternalLink, Loader2, Search, Star, TrendingUp } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 /** GitHub languages available in the trending filter. */
@@ -50,9 +49,18 @@ interface TrendingRepo {
   periodStars: number;
 }
 
-export function DiscoverTab() {
-  const router = useRouter();
+/** Normalize a GitHub URL for comparison: lowercase, strip protocol/trailing slash/.git */
+function normalizeRepoUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  return url
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\.git$/, "")
+    .replace(/\/$/, "");
+}
 
+export function DiscoverTab() {
   // Time range and language filter state
   const [since, setSince] = useState<Since>("daily");
   const [language, setLanguage] = useState<string>("");
@@ -73,6 +81,20 @@ export function DiscoverTab() {
     { staleTime: 5 * 60 * 1000 }
   );
 
+  // Existing analysed projects → map normalized repoUrl → projectId
+  const projectsQuery = trpc.ossProjects.listProjects.useQuery(undefined, {
+    staleTime: 60 * 1000,
+  });
+
+  const analysedMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of projectsQuery.data ?? []) {
+      const key = normalizeRepoUrl(p.repoUrl);
+      if (key) map.set(key, p.id);
+    }
+    return map;
+  }, [projectsQuery.data]);
+
   const urlPreviewQuery = trpc.ossProjects.fetchRepoInfo.useQuery(
     { url: urlInput },
     {
@@ -85,7 +107,9 @@ export function DiscoverTab() {
 
   const startAnalysis = trpc.ossProjects.startAnalysis.useMutation({
     onSuccess: (data) => {
-      router.push(`/projects/${data.projectId}`);
+      // Open the project in a new tab so the user keeps their place in Discover
+      window.open(`/projects/${data.projectId}`, "_blank", "noopener,noreferrer");
+      void projectsQuery.refetch();
     },
     onSettled: () => {
       setAnalysingKey(null);
@@ -128,6 +152,7 @@ export function DiscoverTab() {
 
   const isUrlValid = urlInput.includes("github.com/");
   const urlPreview = urlPreviewQuery.data;
+  const urlAnalysedId = isUrlValid ? analysedMap.get(normalizeRepoUrl(urlInput)) : undefined;
 
   return (
     <div className="space-y-6">
@@ -158,17 +183,29 @@ export function DiscoverTab() {
             <option value="codex">Codex</option>
             <option value="claude">Claude</option>
           </select>
-          <button
-            type="button"
-            disabled={!isUrlValid || analysingKey === urlInput.trim()}
-            onClick={handleAnalyseUrl}
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {analysingKey === urlInput.trim() ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : null}
-            Add &amp; Analyse
-          </button>
+          {urlAnalysedId ? (
+            <a
+              href={`/projects/${urlAnalysedId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+            >
+              <CheckCircle2 size={14} />
+              Already analysed — Open
+            </a>
+          ) : (
+            <button
+              type="button"
+              disabled={!isUrlValid || analysingKey === urlInput.trim()}
+              onClick={handleAnalyseUrl}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {analysingKey === urlInput.trim() ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : null}
+              Add &amp; Analyse
+            </button>
+          )}
         </div>
 
         {/* URL preview card */}
@@ -270,6 +307,7 @@ export function DiscoverTab() {
           <div className="space-y-3">
             {trendingQuery.data.map((repo) => {
               const isAnalysing = analysingKey === repo.fullName;
+              const analysedId = analysedMap.get(normalizeRepoUrl(repo.url));
 
               return (
                 <div
@@ -286,6 +324,12 @@ export function DiscoverTab() {
                         {repo.language && (
                           <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300">
                             {repo.language}
+                          </span>
+                        )}
+                        {analysedId && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                            <CheckCircle2 size={11} />
+                            Analysed
                           </span>
                         )}
                       </div>
@@ -321,17 +365,29 @@ export function DiscoverTab() {
                       <ExternalLink size={12} />
                       GitHub
                     </a>
-                    <button
-                      type="button"
-                      disabled={isAnalysing}
-                      onClick={() => handleAnalyseTrending(repo)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isAnalysing ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : null}
-                      Add &amp; Analyse
-                    </button>
+                    {analysedId ? (
+                      <a
+                        href={`/projects/${analysedId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                      >
+                        <CheckCircle2 size={12} />
+                        Open analysis
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isAnalysing}
+                        onClick={() => handleAnalyseTrending(repo)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isAnalysing ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : null}
+                        Add &amp; Analyse
+                      </button>
+                    )}
                   </div>
                 </div>
               );
