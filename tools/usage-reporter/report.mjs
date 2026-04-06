@@ -21,7 +21,7 @@ const SCAN_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const IS_ONCE = process.argv.includes("--once");
 
 const ANALYSIS_POLL_INTERVAL_MS = 10 * 1000; // 10 seconds
-const MAX_CONCURRENT_ANALYSIS = 3;
+const MAX_CONCURRENT_ANALYSIS = 5;
 let analysisRunning = 0;
 const ANALYSIS_BASE_DIR = join(tmpdir(), "source-readings");
 const ANALYSIS_PROVIDER = process.env.ANALYSIS_PROVIDER || "claude"; // "claude" | "codex"
