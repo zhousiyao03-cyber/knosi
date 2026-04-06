@@ -42,13 +42,15 @@ Analysed at: {{ANALYSED_AT}}
 </repo>
 
 <reading_strategy>
-Work in four progressive layers. Do NOT skip layers — each builds on the previous.
+Work in four progressive layers. Do NOT skip layers — each builds on the previous. At the end of every layer, write a one-paragraph "Layer N takeaway" capturing the single most important thing you learned. These takeaways act as your working memory: if your context fills up later, the takeaways are what you carry forward.
 
 ### Layer 1 — Project portrait (cheap, must do first)
 1. Read README, CONTRIBUTING, ARCHITECTURE / DESIGN docs if present.
 2. Read the dependency manifest (package.json / Cargo.toml / pyproject.toml / go.mod / pom.xml ...). Identify the core dependencies and what they imply about the tech choices.
 3. List the top 2–3 levels of the directory tree. For each top-level dir, write one sentence on its responsibility.
 4. Answer: what problem does this solve? Who is the target user? Where is the entry point?
+
+**End-of-layer takeaway:** one paragraph summarizing what this project IS.
 
 ### Layer 2 — Architecture & data flow
 1. Find the program entry point(s) and trace the startup sequence.
@@ -57,6 +59,8 @@ Work in four progressive layers. Do NOT skip layers — each builds on the previ
 4. Identify the layering: which modules are public API, which are internal, where are the boundaries?
 5. Answer: what is the single most important architectural decision in this project?
 
+**End-of-layer takeaway:** one paragraph naming the single most important architectural decision and why it matters.
+
 ### Layer 3 — Core module deep dive
 Pick the 2–3 most important modules. For each:
 1. Read every meaningful file inside.
@@ -64,19 +68,30 @@ Pick the 2–3 most important modules. For each:
 3. Analyse trade-offs: why this approach instead of the more obvious one?
 4. Note edge-case handling that surprised you.
 
+**End-of-layer takeaway:** one paragraph per module — what's the one thing a future contributor must understand about it.
+
 ### Layer 4 — Tests & engineering
 1. Test strategy: what is the unit / integration / e2e mix?
 2. CI / CD setup, release process.
 3. Code quality tooling (linters, formatters, type checkers).
+
+**End-of-layer takeaway:** one paragraph on engineering maturity and what it tells you about the project's stage.
 </reading_strategy>
 
+<evidence_rules>
+These rules are non-negotiable. Output that violates them is wrong, no matter how plausible it sounds.
+
+1. **TRACE ACTUAL CODE PATHS.** Do not guess from file names, directory names, or imports alone. Open the file. Read the function. Confirm the behavior.
+2. **EVERY CONCRETE CLAIM NEEDS A SOURCE.** Format: \`path/to/file.ext:LINE\` (or \`:START-END\` for ranges). The citation must point to code that *directly* proves the claim — not a nearby file, not "see the X module".
+3. **DISTINGUISH VERIFIED FROM INFERRED.** If you read the code and confirmed something, state it as fact. If you're inferring from naming, types, or context, say "appears to" or "likely" and explain the inference.
+4. **WHY BEFORE WHAT.** Don't describe what the code does line by line. Explain *why* it's structured that way. The reader can read the code themselves — they need the reasoning that isn't in the source.
+5. **NO SPECULATIVE LANGUAGE WITHOUT EVIDENCE.** Banned phrases unless backed by a citation: "well-designed", "uses best practices", "industry standard", "elegant", "clean architecture". Show the specific lines that prove the claim, or cut the claim.
+</evidence_rules>
+
 <rules>
-1. **Cite everything.** Every concrete claim about the code must reference \`path/to/file.ext:LINE\` (or \`path/to/file.ext:START-END\` for ranges). Claims without a citation are not allowed.
-2. **Why over what.** Don't describe what the code does line by line — explain why it's structured that way.
-3. **Honest about gaps.** If you didn't read something or didn't understand it, say so in the "Open Questions" section. Do NOT fabricate.
-4. **Explore before reading.** Use Glob/Grep to map the territory before opening files. Don't try to read every file — prioritize high-signal ones (entry points, core abstractions, the file other files import most).
-5. **No hand-waving.** Avoid "this is well-designed" / "uses best practices" without evidence. Show the specific lines that prove the claim.
-6. **Snapshot discipline.** This analysis is anchored to commit \`{{COMMIT_SHORT}}\`. The project will change after this. Note anywhere the code looked in-flux (TODOs, deprecated paths, half-finished refactors).
+1. **Honest about gaps.** If you didn't read something or didn't understand it, say so in the "Open Questions" section. Do NOT fabricate.
+2. **Explore before reading.** Use Glob/Grep to map the territory before opening files. Prioritize high-signal targets: entry points, core abstractions, the files other files import most.
+3. **Snapshot discipline.** This analysis is anchored to commit \`{{COMMIT_SHORT}}\`. The project will change after this. Note anywhere the code looked in-flux (TODOs, deprecated paths, half-finished refactors).
 </rules>
 
 <output_format>
@@ -107,6 +122,8 @@ A short prose summary, followed by:
 \`\`\`mermaid
 [graph TD or flowchart showing the core modules and their dependencies]
 \`\`\`
+
+> **Diagram requirement:** this note must contain at least 2 Mermaid diagrams of *different types*. The Module relationships diagram above (a graph/flowchart) is one. The Core Data Flow section below must use a different type — \`sequenceDiagram\` is preferred for tracing an operation, but \`stateDiagram-v2\` is also acceptable when the operation is state-driven. A single flowchart is not enough.
 
 ## Core Data Flow
 Pick one canonical user operation. Walk through it step by step, citing each file you touch. End with a Mermaid sequence or flow diagram.
@@ -140,6 +157,14 @@ Non-obvious gotchas a new contributor would step on. Each item must cite the cod
 
 ## Patterns Worth Stealing
 Concrete, transferable patterns with short code snippets and \`file:line\` citations. These are the "I want to use this in my own project" findings.
+
+## Layer Takeaways
+The four end-of-layer takeaways from your reading process, in order. This section is the TL;DR — someone reading only this should understand what the project is, its key architectural decision, what each core module is for, and the engineering maturity.
+
+1. **What it is:** [Layer 1 takeaway]
+2. **Key architectural decision:** [Layer 2 takeaway]
+3. **Core modules:** [Layer 3 takeaways, one per module]
+4. **Engineering maturity:** [Layer 4 takeaway]
 
 ## Open Questions
 Things you didn't fully understand or didn't have time to read. Be specific — "I didn't read the X module" is fine, "this codebase is complex" is not.
