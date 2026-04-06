@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Plus, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, GitCommit, Loader2, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatDate } from "@/lib/utils";
 
@@ -170,6 +170,18 @@ export default function ProjectDetailPage({
   const canStartAnalysis =
     project?.repoUrl && !analysisStatus && !startAnalysis.isPending;
 
+  // Whether a re-analysis can be triggered (already analysed once, not currently running)
+  const canReanalyse =
+    project?.repoUrl &&
+    analysisStatus === "completed" &&
+    !startAnalysis.isPending;
+
+  // Surface analysis snapshot info from the project record. These fields are
+  // populated by the daemon → /api/analysis/complete after a successful run.
+  const analysisCommit = (project as { analysisCommit?: string | null } | null)?.analysisCommit ?? null;
+  const analysisCommitDate = (project as { analysisCommitDate?: Date | null } | null)?.analysisCommitDate ?? null;
+  const analysisFinishedAt = (project as { analysisFinishedAt?: Date | null } | null)?.analysisFinishedAt ?? null;
+
   // ---------- Handlers ----------
 
   function handleFollowupSubmit() {
@@ -236,6 +248,36 @@ export default function ProjectDetailPage({
               </a>
             )}
           </div>
+
+          {/* Analysis snapshot row — exact commit + when it was analysed.
+              Open source projects keep evolving, so this tells the reader
+              how stale the existing analysis might be. */}
+          {analysisCommit && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+              <GitCommit size={12} />
+              <span>Analysed at commit</span>
+              {project.repoUrl ? (
+                <a
+                  href={`${project.repoUrl}/commit/${analysisCommit}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[11px] text-stone-700 hover:bg-stone-200 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
+                >
+                  {analysisCommit.slice(0, 7)}
+                </a>
+              ) : (
+                <span className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[11px] text-stone-700 dark:bg-stone-900 dark:text-stone-300">
+                  {analysisCommit.slice(0, 7)}
+                </span>
+              )}
+              {analysisCommitDate && (
+                <span>· committed {formatDate(analysisCommitDate)}</span>
+              )}
+              {analysisFinishedAt && (
+                <span>· run {formatDate(analysisFinishedAt)}</span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -258,6 +300,36 @@ export default function ProjectDetailPage({
               className="inline-flex items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
             >
               Analyze
+            </button>
+          )}
+
+          {/* Re-analyse button — open source projects move fast, so we let
+              users pick up the latest commit and produce a fresh note. */}
+          {canReanalyse && (
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  confirm(
+                    "Re-analyse this project against the latest commit? A new analysis note will be added — the existing one is preserved."
+                  )
+                ) {
+                  startAnalysis.mutate({
+                    projectId: id,
+                    repoUrl: project.repoUrl!,
+                    name: project.name,
+                    description: project.description ?? undefined,
+                    language: project.language ?? undefined,
+                    starsCount:
+                      (project as { starsCount?: number | null }).starsCount ??
+                      undefined,
+                  });
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-stone-900"
+            >
+              <RefreshCw size={14} />
+              Re-analyse
             </button>
           )}
 

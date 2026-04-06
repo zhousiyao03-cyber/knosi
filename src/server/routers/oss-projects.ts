@@ -2,10 +2,14 @@ import crypto from "crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db";
-import { osProjectNotes, osProjects, analysisTasks } from "../db/schema";
+import { analysisPrompts, osProjectNotes, osProjects, analysisTasks } from "../db/schema";
 import { protectedProcedure, router } from "../trpc";
 import { fetchTrending } from "../analysis/trending";
 import { fetchRepoInfo } from "../analysis/github";
+import {
+  DEFAULT_ANALYSIS_PROMPT,
+  DEFAULT_FOLLOWUP_PROMPT,
+} from "../ai/default-analysis-prompts";
 
 const projectSchema = z.object({
   name: z.string().trim().min(1),
@@ -386,5 +390,79 @@ export const ossProjectsRouter = router({
         .update(osProjects)
         .set({ analysisStatus: "queued", updatedAt: new Date() })
         .where(eq(osProjects.id, input.projectId));
+    }),
+
+  // ── Analysis prompt customization ──────────────────────────────────────
+  // Returns the user's customized prompts (if any) plus the bundled defaults,
+  // so the Settings UI can show "current vs default" and offer a reset.
+
+  getAnalysisPrompts: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await db
+      .select()
+      .from(analysisPrompts)
+      .where(eq(analysisPrompts.userId, ctx.userId));
+
+    const byKind = new Map(rows.map((r) => [r.kind, r.content]));
+
+    return {
+      analysis: {
+        content: byKind.get("analysis") ?? DEFAULT_ANALYSIS_PROMPT,
+        isCustom: byKind.has("analysis"),
+        default: DEFAULT_ANALYSIS_PROMPT,
+      },
+      followup: {
+        content: byKind.get("followup") ?? DEFAULT_FOLLOWUP_PROMPT,
+        isCustom: byKind.has("followup"),
+        default: DEFAULT_FOLLOWUP_PROMPT,
+      },
+    };
+  }),
+
+  upsertAnalysisPrompt: protectedProcedure
+    .input(
+      z.object({
+        kind: z.enum(["analysis", "followup"]),
+        content: z.string().trim().min(10),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const [existing] = await db
+        .select({ id: analysisPrompts.id })
+        .from(analysisPrompts)
+        .where(
+          and(
+            eq(analysisPrompts.userId, ctx.userId),
+            eq(analysisPrompts.kind, input.kind)
+          )
+        );
+
+      if (existing) {
+        await db
+          .update(analysisPrompts)
+          .set({ content: input.content, updatedAt: new Date() })
+          .where(eq(analysisPrompts.id, existing.id));
+      } else {
+        await db.insert(analysisPrompts).values({
+          id: crypto.randomUUID(),
+          userId: ctx.userId,
+          kind: input.kind,
+          content: input.content,
+        });
+      }
+      return { success: true };
+    }),
+
+  resetAnalysisPrompt: protectedProcedure
+    .input(z.object({ kind: z.enum(["analysis", "followup"]) }))
+    .mutation(async ({ input, ctx }) => {
+      await db
+        .delete(analysisPrompts)
+        .where(
+          and(
+            eq(analysisPrompts.userId, ctx.userId),
+            eq(analysisPrompts.kind, input.kind)
+          )
+        );
+      return { success: true };
     }),
 });

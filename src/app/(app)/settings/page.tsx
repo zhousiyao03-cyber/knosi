@@ -5,6 +5,7 @@ import { db } from "@/server/db";
 import { hasTable } from "@/server/db/metadata";
 import { userCredentials, users } from "@/server/db/schema";
 import { updateAccountPassword, updateAccountProfile } from "./actions";
+import { AnalysisPromptsSection } from "./analysis-prompts-section";
 
 const profileErrorMessages: Record<string, string> = {
   invalid: "Check your name and email, then try again.",
@@ -241,6 +242,8 @@ export default async function SettingsPage({
           </div>
         )}
       </section>
+
+      <AnalysisPromptsSection />
     </div>
   );
 }

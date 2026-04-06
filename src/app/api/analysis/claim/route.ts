@@ -1,8 +1,25 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/server/db";
-import { analysisTasks, osProjects } from "@/server/db/schema";
+import { analysisPrompts, analysisTasks, osProjects } from "@/server/db/schema";
+import {
+  DEFAULT_ANALYSIS_PROMPT,
+  DEFAULT_FOLLOWUP_PROMPT,
+  renderPrompt,
+} from "@/server/ai/default-analysis-prompts";
 
+/**
+ * The local daemon polls this endpoint to claim queued analysis tasks.
+ *
+ * Server-side responsibilities:
+ *   - Atomically transition the oldest queued task to "running".
+ *   - Stamp `analysisStartedAt` on the project.
+ *   - Resolve the user's customized prompt template (or fall back to the bundled
+ *     default), substitute repo metadata, and ship the fully-rendered prompt
+ *     down to the daemon. The daemon never sees the template — it just runs the
+ *     final string. This means prompt edits in Settings take effect on the very
+ *     next claim with no daemon restart.
+ */
 export async function POST() {
   // Find the oldest queued task
   const [task] = await db
@@ -16,17 +33,54 @@ export async function POST() {
     return NextResponse.json({ task: null });
   }
 
+  const now = new Date();
+
   // Atomically claim it
   await db
     .update(analysisTasks)
-    .set({ status: "running", startedAt: new Date() })
+    .set({ status: "running", startedAt: now })
     .where(eq(analysisTasks.id, task.id));
 
   // Sync project status so frontend sees "running"
   await db
     .update(osProjects)
-    .set({ analysisStatus: "running", updatedAt: new Date() })
+    .set({
+      analysisStatus: "running",
+      analysisStartedAt: now,
+      updatedAt: now,
+    })
     .where(eq(osProjects.id, task.projectId));
+
+  // Resolve the user's prompt template (custom override or default)
+  const kind = task.taskType === "analysis" ? "analysis" : "followup";
+  const [override] = await db
+    .select({ content: analysisPrompts.content })
+    .from(analysisPrompts)
+    .where(
+      and(
+        eq(analysisPrompts.userId, task.userId),
+        eq(analysisPrompts.kind, kind)
+      )
+    );
+
+  const template =
+    override?.content ??
+    (kind === "analysis" ? DEFAULT_ANALYSIS_PROMPT : DEFAULT_FOLLOWUP_PROMPT);
+
+  // Render the template with placeholders. The daemon will re-render it
+  // *again* after cloning to fill in the commit fields, since those aren't
+  // known until git clone completes. We send a half-rendered template here:
+  // REPO_URL is filled, commit fields stay as placeholders.
+  const rendered = renderPrompt(template, {
+    repoUrl: task.repoUrl,
+    analysedAt: now.toISOString(),
+    question: task.question ?? "",
+    originalAnalysis: task.originalAnalysis ?? "",
+    // commit fields intentionally omitted — daemon fills these post-clone
+    commitSha: undefined,
+    commitShort: undefined,
+    commitDate: undefined,
+  });
 
   return NextResponse.json({
     task: {
@@ -38,6 +92,10 @@ export async function POST() {
       provider: task.provider,
       question: task.question,
       originalAnalysis: task.originalAnalysis,
+      // Pre-rendered prompt with REPO_URL filled. Commit placeholders remain
+      // ({{COMMIT_SHA}}, {{COMMIT_SHORT}}, {{COMMIT_DATE}}) for the daemon to
+      // substitute after cloning the repo.
+      promptTemplate: rendered,
     },
   });
 }

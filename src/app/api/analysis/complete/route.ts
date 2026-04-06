@@ -9,6 +9,10 @@ export async function POST(request: NextRequest) {
     taskId: string;
     result?: string;
     error?: string;
+    /** Full git sha that the daemon analysed (set on success). */
+    commitSha?: string;
+    /** ISO timestamp of that commit (committer date). */
+    commitDate?: string;
   };
 
   if (!body.taskId) {
@@ -83,13 +87,18 @@ export async function POST(request: NextRequest) {
     })
     .where(eq(analysisTasks.id, body.taskId));
 
-  // Update project status
+  // Update project status — record commit snapshot so the UI can show
+  // exactly which version of the repo was analysed.
+  const finishedAt = new Date();
   await db
     .update(osProjects)
     .set({
       analysisStatus: "completed",
       analysisError: null,
-      updatedAt: new Date(),
+      analysisCommit: body.commitSha ?? null,
+      analysisCommitDate: body.commitDate ? new Date(body.commitDate) : null,
+      analysisFinishedAt: finishedAt,
+      updatedAt: finishedAt,
     })
     .where(eq(osProjects.id, task.projectId));
 

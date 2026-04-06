@@ -469,11 +469,38 @@ export const osProjects = sqliteTable("os_projects", {
   // Source-code analysis fields
   analysisStatus: text("analysis_status"), // null | pending | analyzing | completed | failed
   analysisError: text("analysis_error"),
+  // Snapshot of the repo at the time of the most recent successful analysis
+  analysisCommit: text("analysis_commit"), // git rev-parse HEAD (full sha)
+  analysisCommitDate: integer("analysis_commit_date", { mode: "timestamp" }), // commit author/committer date
+  analysisStartedAt: integer("analysis_started_at", { mode: "timestamp" }),
+  analysisFinishedAt: integer("analysis_finished_at", { mode: "timestamp" }),
   starsCount: integer("stars_count"),
   trendingDate: text("trending_date"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
+
+/**
+ * User-customizable prompts for source code analysis.
+ *
+ * One row per (userId, kind). Falls back to baked-in defaults from
+ * `src/server/ai/default-analysis-prompts.ts` when no row exists.
+ */
+export const analysisPrompts = sqliteTable(
+  "analysis_prompts",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["analysis", "followup"] }).notNull(),
+    content: text("content").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userKindIdx: uniqueIndex("analysis_prompts_user_kind_idx").on(table.userId, table.kind),
+  })
+);
 
 export const osProjectNotes = sqliteTable("os_project_notes", {
   id: text("id").primaryKey(),

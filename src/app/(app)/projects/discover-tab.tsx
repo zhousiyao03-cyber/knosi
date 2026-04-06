@@ -86,14 +86,42 @@ export function DiscoverTab() {
     staleTime: 60 * 1000,
   });
 
+  type AnalysedInfo = {
+    id: string;
+    commit: string | null;
+    commitDate: Date | string | null;
+    finishedAt: Date | string | null;
+  };
   const analysedMap = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, AnalysedInfo>();
     for (const p of projectsQuery.data ?? []) {
       const key = normalizeRepoUrl(p.repoUrl);
-      if (key) map.set(key, p.id);
+      if (!key) continue;
+      const proj = p as unknown as {
+        id: string;
+        analysisCommit?: string | null;
+        analysisCommitDate?: Date | string | null;
+        analysisFinishedAt?: Date | string | null;
+      };
+      map.set(key, {
+        id: proj.id,
+        commit: proj.analysisCommit ?? null,
+        commitDate: proj.analysisCommitDate ?? null,
+        finishedAt: proj.analysisFinishedAt ?? null,
+      });
     }
     return map;
   }, [projectsQuery.data]);
+
+  function buildAnalysedTooltip(info: AnalysedInfo): string {
+    const parts: string[] = [];
+    if (info.commit) parts.push(`commit ${info.commit.slice(0, 7)}`);
+    if (info.finishedAt) {
+      const d = new Date(info.finishedAt);
+      if (!Number.isNaN(d.getTime())) parts.push(`analysed ${d.toLocaleDateString()}`);
+    }
+    return parts.length ? parts.join(" · ") : "Already analysed";
+  }
 
   const urlPreviewQuery = trpc.ossProjects.fetchRepoInfo.useQuery(
     { url: urlInput },
@@ -152,7 +180,7 @@ export function DiscoverTab() {
 
   const isUrlValid = urlInput.includes("github.com/");
   const urlPreview = urlPreviewQuery.data;
-  const urlAnalysedId = isUrlValid ? analysedMap.get(normalizeRepoUrl(urlInput)) : undefined;
+  const urlAnalysedInfo = isUrlValid ? analysedMap.get(normalizeRepoUrl(urlInput)) : undefined;
 
   return (
     <div className="space-y-6">
@@ -183,11 +211,12 @@ export function DiscoverTab() {
             <option value="codex">Codex</option>
             <option value="claude">Claude</option>
           </select>
-          {urlAnalysedId ? (
+          {urlAnalysedInfo ? (
             <a
-              href={`/projects/${urlAnalysedId}`}
+              href={`/projects/${urlAnalysedInfo.id}`}
               target="_blank"
               rel="noopener noreferrer"
+              title={buildAnalysedTooltip(urlAnalysedInfo)}
               className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
             >
               <CheckCircle2 size={14} />
@@ -307,7 +336,7 @@ export function DiscoverTab() {
           <div className="space-y-3">
             {trendingQuery.data.map((repo) => {
               const isAnalysing = analysingKey === repo.fullName;
-              const analysedId = analysedMap.get(normalizeRepoUrl(repo.url));
+              const analysedInfo = analysedMap.get(normalizeRepoUrl(repo.url));
 
               return (
                 <div
@@ -326,8 +355,11 @@ export function DiscoverTab() {
                             {repo.language}
                           </span>
                         )}
-                        {analysedId && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                        {analysedInfo && (
+                          <span
+                            title={buildAnalysedTooltip(analysedInfo)}
+                            className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                          >
                             <CheckCircle2 size={11} />
                             Analysed
                           </span>
@@ -365,11 +397,12 @@ export function DiscoverTab() {
                       <ExternalLink size={12} />
                       GitHub
                     </a>
-                    {analysedId ? (
+                    {analysedInfo ? (
                       <a
-                        href={`/projects/${analysedId}`}
+                        href={`/projects/${analysedInfo.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        title={buildAnalysedTooltip(analysedInfo)}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
                       >
                         <CheckCircle2 size={12} />

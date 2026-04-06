@@ -186,16 +186,52 @@ function repoSlug(repoUrl) {
   }
 }
 
+/**
+ * Clone (or update) a repo into the analysis cache and return:
+ *   { dir, commitSha, commitDate }
+ *
+ * If the destination already exists, we fetch + hard-reset to the remote HEAD
+ * so re-analysis always sees the latest code rather than a stale snapshot.
+ */
 function cloneRepo(repoUrl) {
   const dest = join(ANALYSIS_BASE_DIR, repoSlug(repoUrl));
   if (!existsSync(dest)) {
     execSync(`mkdir -p "${ANALYSIS_BASE_DIR}"`);
     execSync(`git clone --depth=1 "${repoUrl}" "${dest}"`, {
-      timeout: 120_000,
+      timeout: 180_000,
       stdio: "pipe",
     });
+  } else {
+    // Update to latest. --depth=1 keeps it cheap; we discard local changes.
+    try {
+      execSync(`git -C "${dest}" fetch --depth=1 origin`, {
+        timeout: 120_000,
+        stdio: "pipe",
+      });
+      execSync(`git -C "${dest}" reset --hard FETCH_HEAD`, { stdio: "pipe" });
+    } catch {
+      // If fetch/reset fails (network, deleted branch, etc.) we keep the
+      // existing checkout and continue — better stale than no analysis.
+    }
   }
-  return dest;
+
+  // Capture the exact commit we're about to analyse
+  let commitSha = "";
+  let commitDate = "";
+  try {
+    commitSha = execSync(`git -C "${dest}" rev-parse HEAD`, { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+    commitDate = execSync(`git -C "${dest}" log -1 --format=%cI`, {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    // Not a fatal error — we'll just analyse without a commit stamp
+  }
+
+  return { dir: dest, commitSha, commitDate };
 }
 
 function getToolSummary(tool, input) {
@@ -451,12 +487,26 @@ async function handleAnalysisTask(task) {
   console.log(`[${timestamp()}] 🔬 开始分析: ${task.repoUrl} (${task.taskType}, ${task.provider || "claude"})`);
 
   try {
-    const repoDir = cloneRepo(task.repoUrl);
+    const { dir: repoDir, commitSha, commitDate } = cloneRepo(task.repoUrl);
+    const commitShort = commitSha ? commitSha.slice(0, 7) : "unknown";
 
-    const prompt =
-      task.taskType === "analysis"
-        ? buildAnalysisPrompt(task.repoUrl)
-        : buildFollowupPrompt(task.originalAnalysis || "", task.question || "");
+    // The server pre-renders the prompt template with REPO_URL filled and
+    // ships it inside `task.promptTemplate`. We just substitute the commit
+    // placeholders that weren't known until after `git clone`.
+    // Fall back to the legacy local builders if the server is too old to
+    // send promptTemplate (defensive — shouldn't happen after this rollout).
+    let prompt = task.promptTemplate;
+    if (prompt) {
+      prompt = prompt
+        .replace(/\{\{COMMIT_SHA\}\}/g, commitSha || "unknown")
+        .replace(/\{\{COMMIT_SHORT\}\}/g, commitShort)
+        .replace(/\{\{COMMIT_DATE\}\}/g, commitDate || "unknown");
+    } else {
+      prompt =
+        task.taskType === "analysis"
+          ? buildAnalysisPrompt(task.repoUrl)
+          : buildFollowupPrompt(task.originalAnalysis || "", task.question || "");
+    }
 
     // Collect messages and flush periodically
     let seq = 0;
@@ -498,11 +548,17 @@ async function handleAnalysisTask(task) {
     if (flushTimer) clearTimeout(flushTimer);
     await flushMessages();
 
-    // Report success
+    // Report success — include commit snapshot so the server can stamp the
+    // project with exactly which version of the repo was analysed.
     const res = await fetch(`${SERVER_URL}/api/analysis/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId: task.id, result }),
+      body: JSON.stringify({
+        taskId: task.id,
+        result,
+        commitSha: commitSha || undefined,
+        commitDate: commitDate || undefined,
+      }),
     });
 
     if (!res.ok) {
