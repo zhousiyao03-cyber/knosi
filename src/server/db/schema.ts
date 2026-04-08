@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, blob, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, blob, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
 
 // ── Auth.js tables ──────────────────────────────────
@@ -555,6 +555,9 @@ export const analysisMessages = sqliteTable("analysis_messages", {
 });
 
 // ── Ask AI Daemon Queue ────────────────────────────
+// daemonChatMessages is prefixed to avoid colliding with the legacy v1
+// `chatMessages` conversation table at line 94 above. Different shape,
+// different purpose — both are retained.
 
 export const chatTasks = sqliteTable(
   "chat_tasks",
@@ -568,10 +571,10 @@ export const chatTasks = sqliteTable(
     })
       .notNull()
       .default("queued"),
-    sourceScope: text("source_scope").notNull().default("all"),
+    sourceScope: text("source_scope").notNull().default("all"), // "all" | "notes" | "bookmarks" | "direct" — see src/lib/ask-ai.ts#ASK_AI_SOURCE_SCOPES
     messages: text("messages").notNull(), // JSON-encoded ModelMessage[]
     systemPrompt: text("system_prompt").notNull(),
-    model: text("model").notNull().default("opus"),
+    model: text("model").notNull().default("opus"), // Claude CLI model alias: "opus" | "sonnet" | "haiku" (or full ID)
     totalText: text("total_text"),
     error: text("error"),
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
@@ -579,7 +582,7 @@ export const chatTasks = sqliteTable(
     completedAt: integer("completed_at", { mode: "timestamp" }),
   },
   (table) => ({
-    statusCreatedAtIdx: uniqueIndex("chat_tasks_status_created_idx").on(
+    statusCreatedAtIdx: index("chat_tasks_status_created_idx").on(
       table.status,
       table.createdAt,
       table.id
