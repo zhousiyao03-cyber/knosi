@@ -28,7 +28,7 @@
 - `src/components/ask/daemon-banner.tsx` — "daemon offline" banner component
 
 **Modified files:**
-- `src/server/db/schema.ts` — append `chatTasks`, `chatMessages`, `daemonHeartbeats` tables
+- `src/server/db/schema.ts` — append `chatTasks`, `daemonChatMessages`, `daemonHeartbeats` tables
 - `src/server/ai/provider.ts` — add `"claude-code-daemon"` to `AIProviderMode`; `getProviderMode()` detects it; `getChatAssistantIdentity()` and `getAISetupHint()` add matching copy; `generateStructuredData()` downgrades to codex-or-best-available when in daemon mode
 - `src/app/api/chat/route.ts` — pull helpers out to `chat-system-prompt.ts`, add daemon branch at top of POST handler, return `{ taskId, mode: "daemon" }` JSON when daemon mode active
 - `src/app/(app)/ask/page.tsx` — fetch `/api/config` once on mount, pick `useDaemonChat` vs. existing `useChat` based on `chatMode`, render `DaemonBanner` when offline
@@ -46,7 +46,11 @@ Each file has one clear responsibility; the three-way split (schema / server hel
 
 ---
 
-### Task 1: Add schema for chat_tasks, chat_messages, daemon_heartbeats
+### Task 1: Add schema for chat_tasks, daemon_chat_messages, daemon_heartbeats ✅ COMPLETED (commits a2ef166 + 2b58538)
+
+> **Implementation note — rename during Task 1:** The plan originally named the second table `chatMessages` / `chat_messages`, but that name was already taken by a legacy v1 Ask AI conversation table at `src/server/db/schema.ts:94`. Task 1 renamed the new table to `daemonChatMessages` / `daemon_chat_messages` (both Drizzle export and SQL name and index name carry the `daemon_` prefix). All downstream tasks in this plan have been updated to reference `daemonChatMessages` / `daemon_chat_messages`. Any code and SQL fragments below that reference `chatMessages` have already been rewritten to `daemonChatMessages`.
+>
+> **Implementation note — index type:** The `chat_tasks_status_created_idx` was additionally changed from `uniqueIndex(...)` to `index(...)` during the Task 1 code review, because the trailing `id` PK column makes the uniqueness constraint vacuous. This was captured in the follow-up commit `2b58538` which adds `drizzle/0020_white_kronos.sql` containing a DROP INDEX + CREATE INDEX pair scoped strictly to that one index.
 
 **Files:**
 - Modify: `src/server/db/schema.ts:555` (append after `analysisMessages`)
@@ -81,7 +85,7 @@ export const chatTasks = sqliteTable(
     completedAt: integer("completed_at", { mode: "timestamp" }),
   },
   (table) => ({
-    statusCreatedAtIdx: uniqueIndex("chat_tasks_status_created_idx").on(
+    statusCreatedAtIdx: index("chat_tasks_status_created_idx").on(
       table.status,
       table.createdAt,
       table.id
@@ -89,8 +93,8 @@ export const chatTasks = sqliteTable(
   })
 );
 
-export const chatMessages = sqliteTable(
-  "chat_messages",
+export const daemonChatMessages = sqliteTable(
+  "daemon_chat_messages",
   {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     taskId: text("task_id")
@@ -102,7 +106,7 @@ export const chatMessages = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   },
   (table) => ({
-    taskSeqIdx: uniqueIndex("chat_messages_task_seq_idx").on(table.taskId, table.seq),
+    taskSeqIdx: uniqueIndex("daemon_chat_messages_task_seq_idx").on(table.taskId, table.seq),
   })
 );
 
@@ -122,7 +126,7 @@ Run:
 cd /Users/bytedance/second-brain && pnpm db:generate
 ```
 
-Expected: a new file like `drizzle/0019_<random>.sql` is created with `CREATE TABLE chat_tasks`, `CREATE TABLE chat_messages`, `CREATE TABLE daemon_heartbeats`, plus the two unique indexes. Open the generated SQL and verify it does not touch existing tables.
+Expected: a new file like `drizzle/0019_<random>.sql` is created with `CREATE TABLE chat_tasks`, `CREATE TABLE daemon_chat_messages`, `CREATE TABLE daemon_heartbeats`, plus the two unique indexes. Open the generated SQL and verify it does not touch existing tables.
 
 - [ ] **Step 3: Apply migration to local DB**
 
@@ -137,12 +141,12 @@ Expected: "Changes applied" with the three new tables.
 
 Run:
 ```bash
-cd /Users/bytedance/second-brain && sqlite3 data/second-brain.db ".tables" | tr ' ' '\n' | grep -E '^(chat_tasks|chat_messages|daemon_heartbeats)$'
+cd /Users/bytedance/second-brain && sqlite3 data/second-brain.db ".tables" | tr ' ' '\n' | grep -E '^(chat_tasks|daemon_chat_messages|daemon_heartbeats)$'
 ```
 
 Expected output (three lines):
 ```
-chat_messages
+daemon_chat_messages
 chat_tasks
 daemon_heartbeats
 ```
@@ -151,7 +155,7 @@ daemon_heartbeats
 
 ```bash
 git add src/server/db/schema.ts drizzle/
-git commit -m "feat: add chat_tasks, chat_messages, daemon_heartbeats schema"
+git commit -m "feat: add chat_tasks, daemon_chat_messages, daemon_heartbeats schema"
 ```
 
 ---
@@ -931,7 +935,7 @@ Create `src/app/api/chat/progress/route.ts`:
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { chatMessages } from "@/server/db/schema";
+import { daemonChatMessages } from "@/server/db/schema";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as {
@@ -951,7 +955,7 @@ export async function POST(request: NextRequest) {
   }
 
   for (const msg of body.messages) {
-    await db.insert(chatMessages).values({
+    await db.insert(daemonChatMessages).values({
       taskId: body.taskId,
       seq: msg.seq,
       type: msg.type,
@@ -976,7 +980,7 @@ curl -X POST http://localhost:3200/api/chat/progress \
 Expected: `{"status":"ok","count":2}`. Verify:
 
 ```bash
-sqlite3 data/second-brain.db "SELECT seq, type, delta FROM chat_messages WHERE task_id='test-claim-1' ORDER BY seq"
+sqlite3 data/second-brain.db "SELECT seq, type, delta FROM daemon_chat_messages WHERE task_id='test-claim-1' ORDER BY seq"
 ```
 
 Expected output:
@@ -987,7 +991,7 @@ Expected output:
 
 Cleanup both tables:
 ```bash
-sqlite3 data/second-brain.db "DELETE FROM chat_messages WHERE task_id='test-claim-1'; DELETE FROM chat_tasks WHERE id='test-claim-1';"
+sqlite3 data/second-brain.db "DELETE FROM daemon_chat_messages WHERE task_id='test-claim-1'; DELETE FROM chat_tasks WHERE id='test-claim-1';"
 ```
 
 - [ ] **Step 3: Commit**
@@ -1099,7 +1103,7 @@ Create `src/app/api/chat/tokens/route.ts`:
 import { NextRequest, NextResponse } from "next/server";
 import { and, asc, eq, gt } from "drizzle-orm";
 import { db } from "@/server/db";
-import { chatMessages, chatTasks } from "@/server/db/schema";
+import { daemonChatMessages, chatTasks } from "@/server/db/schema";
 import { auth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
@@ -1137,15 +1141,15 @@ export async function GET(request: NextRequest) {
 
     const messages = await db
       .select({
-        seq: chatMessages.seq,
-        type: chatMessages.type,
-        delta: chatMessages.delta,
+        seq: daemonChatMessages.seq,
+        type: daemonChatMessages.type,
+        delta: daemonChatMessages.delta,
       })
-      .from(chatMessages)
+      .from(daemonChatMessages)
       .where(
-        and(eq(chatMessages.taskId, taskId), gt(chatMessages.seq, afterSeq))
+        and(eq(daemonChatMessages.taskId, taskId), gt(daemonChatMessages.seq, afterSeq))
       )
-      .orderBy(asc(chatMessages.seq))
+      .orderBy(asc(daemonChatMessages.seq))
       .limit(500);
 
     return NextResponse.json({
@@ -1180,13 +1184,13 @@ export async function GET(request: NextRequest) {
 
   const messages = await db
     .select({
-      seq: chatMessages.seq,
-      type: chatMessages.type,
-      delta: chatMessages.delta,
+      seq: daemonChatMessages.seq,
+      type: daemonChatMessages.type,
+      delta: daemonChatMessages.delta,
     })
-    .from(chatMessages)
-    .where(and(eq(chatMessages.taskId, taskId), gt(chatMessages.seq, afterSeq)))
-    .orderBy(asc(chatMessages.seq))
+    .from(daemonChatMessages)
+    .where(and(eq(daemonChatMessages.taskId, taskId), gt(daemonChatMessages.seq, afterSeq)))
+    .orderBy(asc(daemonChatMessages.seq))
     .limit(500);
 
   return NextResponse.json({
@@ -1205,7 +1209,7 @@ Seed data:
 sqlite3 data/second-brain.db <<'SQL'
 INSERT INTO chat_tasks (id, user_id, status, source_scope, messages, system_prompt, model, created_at)
   VALUES ('test-tok-1', (SELECT id FROM users LIMIT 1), 'running', 'all', '[]', 'sys', 'opus', unixepoch());
-INSERT INTO chat_messages (id, task_id, seq, type, delta, created_at)
+INSERT INTO daemon_chat_messages (id, task_id, seq, type, delta, created_at)
   VALUES ('m1','test-tok-1',1,'text_delta','Hello',unixepoch()),
          ('m2','test-tok-1',2,'text_delta','Hello world',unixepoch());
 SQL
@@ -1230,7 +1234,7 @@ Expected: only seq 2.
 
 Cleanup:
 ```bash
-sqlite3 data/second-brain.db "DELETE FROM chat_messages WHERE task_id='test-tok-1'; DELETE FROM chat_tasks WHERE id='test-tok-1';"
+sqlite3 data/second-brain.db "DELETE FROM daemon_chat_messages WHERE task_id='test-tok-1'; DELETE FROM chat_tasks WHERE id='test-tok-1';"
 ```
 
 - [ ] **Step 3: Commit**
@@ -2405,7 +2409,7 @@ Create `docs/changelog/2026-04-08-ask-ai-claude-code-daemon.md` with:
 让 Ask AI 通过用户本机的 Claude 订阅回答问题，即使访问线上 Vercel 网页也一样。
 
 ## 关键改动
-- 新增 schema：`chat_tasks` / `chat_messages` / `daemon_heartbeats`
+- 新增 schema：`chat_tasks` / `daemon_chat_messages` / `daemon_heartbeats`
 - 新增 provider mode `claude-code-daemon`（`src/server/ai/provider.ts`、`daemon-mode.ts`）
 - 新增 API 路由：`/api/chat/claim`、`/api/chat/progress`、`/api/chat/complete`、`/api/chat/tokens`、`/api/daemon/ping`、`/api/daemon/status`、`/api/config`、`/api/cron/cleanup-stale-chat-tasks`
 - 抽出 `src/server/ai/chat-system-prompt.ts` 共享 RAG system prompt 构造
@@ -2470,24 +2474,24 @@ Expected: no errors. If any `CREATE TABLE` fails with "already exists", confirm 
 - [ ] **Step 4: Verify production tables exist**
 
 ```bash
-turso db shell second-brain "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('chat_tasks','chat_messages','daemon_heartbeats') ORDER BY name"
+turso db shell second-brain "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('chat_tasks','daemon_chat_messages','daemon_heartbeats') ORDER BY name"
 ```
 
 Expected output:
 ```
-chat_messages
+daemon_chat_messages
 chat_tasks
 daemon_heartbeats
 ```
 
 Also verify the indexes:
 ```bash
-turso db shell second-brain "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('chat_tasks_status_created_idx','chat_messages_task_seq_idx') ORDER BY name"
+turso db shell second-brain "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('chat_tasks_status_created_idx','daemon_chat_messages_task_seq_idx') ORDER BY name"
 ```
 
 Expected:
 ```
-chat_messages_task_seq_idx
+daemon_chat_messages_task_seq_idx
 chat_tasks_status_created_idx
 ```
 
@@ -2536,8 +2540,8 @@ Edit `docs/changelog/2026-04-08-ask-ai-claude-code-daemon.md` and append:
 ## Production rollout — 2026-04-08
 
 - Applied `scripts/db/2026-04-08-chat-daemon-schema.sql` via `turso db shell second-brain`
-- Verified tables: `chat_tasks`, `chat_messages`, `daemon_heartbeats`
-- Verified indexes: `chat_tasks_status_created_idx`, `chat_messages_task_seq_idx`
+- Verified tables: `chat_tasks`, `daemon_chat_messages`, `daemon_heartbeats`
+- Verified indexes: `chat_tasks_status_created_idx`, `daemon_chat_messages_task_seq_idx`
 - Vercel env set: `AI_PROVIDER=claude-code-daemon`, `CLAUDE_CODE_CHAT_MODEL=opus`
 - Deployed and smoke-tested: asked "请用一句话介绍自己" from the hosted URL → Claude responded via local daemon → banner appeared when daemon stopped
 ```
@@ -2556,7 +2560,7 @@ git commit -m "chore: production rollout for chat daemon schema"
 (Run by the plan author before handoff — these are done.)
 
 **Spec coverage:**
-- Schema (chat_tasks/chat_messages/daemon_heartbeats) — Task 1
+- Schema (chat_tasks/daemon_chat_messages/daemon_heartbeats) — Task 1
 - `AIProviderMode` extension + getProviderMode + guards — Task 3
 - `generateStructuredData` downgrade — Task 3 Step 5
 - `chat-system-prompt.ts` extraction — Task 2
@@ -2578,4 +2582,4 @@ git commit -m "chore: production rollout for chat daemon schema"
 
 **Placeholder scan:** clean; Task 14 Step 2 includes explicit guidance that the JSX must be copied rather than left as a TODO comment.
 
-**Type consistency:** `chatTasks.status` enum matches enqueue insert (`"queued"`), claim transition (`"running"`), complete paths (`"completed"`/`"failed"`). `chat_messages.type` enum matches daemon emits (`"text_delta"`, `"text_final"`) and frontend consumer. `AskAiSourceScope` flows through enqueue → daemon → frontend unchanged. `POST /api/chat` response shape `{taskId, mode}` matches hook consumer.
+**Type consistency:** `chatTasks.status` enum matches enqueue insert (`"queued"`), claim transition (`"running"`), complete paths (`"completed"`/`"failed"`). `daemon_chat_messages.type` enum matches daemon emits (`"text_delta"`, `"text_final"`) and frontend consumer. `AskAiSourceScope` flows through enqueue → daemon → frontend unchanged. `POST /api/chat` response shape `{taskId, mode}` matches hook consumer.
