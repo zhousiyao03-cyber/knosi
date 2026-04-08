@@ -65,7 +65,7 @@ test.describe("OSS projects", () => {
 
       // Should see URL input
       await expect(
-        page.getByPlaceholder(/github\.com/)
+        page.getByLabel(/GitHub repository URL/i)
       ).toBeVisible();
     });
 

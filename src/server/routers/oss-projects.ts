@@ -5,7 +5,7 @@ import { db } from "../db";
 import { analysisPrompts, osProjectNotes, osProjects, analysisTasks } from "../db/schema";
 import { protectedProcedure, router } from "../trpc";
 import { fetchTrending } from "../analysis/trending";
-import { fetchRepoInfo } from "../analysis/github";
+import { fetchRepoInfo, searchRepos } from "../analysis/github";
 import {
   DEFAULT_ANALYSIS_PROMPT,
   DEFAULT_FOLLOWUP_PROMPT,
@@ -247,6 +247,12 @@ export const ossProjectsRouter = router({
     .input(z.object({ url: z.string().trim().min(1) }))
     .query(async ({ input }) => {
       return fetchRepoInfo(input.url);
+    }),
+
+  searchGithub: protectedProcedure
+    .input(z.object({ query: z.string().trim().min(1), limit: z.number().int().min(1).max(10).optional() }))
+    .query(async ({ input }) => {
+      return searchRepos(input.query, input.limit ?? 5);
     }),
 
   startAnalysis: protectedProcedure

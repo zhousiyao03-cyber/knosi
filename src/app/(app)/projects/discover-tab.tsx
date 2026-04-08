@@ -60,6 +60,33 @@ function normalizeRepoUrl(url: string | null | undefined): string {
     .replace(/\/$/, "");
 }
 
+/**
+ * Classify user input and return the corresponding full GitHub URL if resolvable.
+ * - full URL (contains "github.com/") → returned as-is
+ * - "owner/repo" shorthand → expanded to https://github.com/owner/repo
+ * - single name (no slash) → null, caller should search
+ */
+function resolveInputToUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("github.com/")) return trimmed;
+  // owner/repo shorthand — exactly two non-empty segments
+  const parts = trimmed.split("/").filter(Boolean);
+  if (parts.length === 2 && !trimmed.includes(" ")) {
+    return `https://github.com/${parts[0]}/${parts[1]}`;
+  }
+  return null;
+}
+
+/** True when the input is a bare search term (single word, no slash). */
+function isBareSearchQuery(input: string): boolean {
+  const trimmed = input.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes("github.com/")) return false;
+  if (trimmed.includes("/")) return false;
+  return trimmed.length >= 2;
+}
+
 export function DiscoverTab() {
   // Time range and language filter state
   const [since, setSince] = useState<Since>("daily");
@@ -123,10 +150,21 @@ export function DiscoverTab() {
     return parts.length ? parts.join(" · ") : "Already analysed";
   }
 
+  const resolvedUrl = resolveInputToUrl(urlInput);
+  const isSearchMode = isBareSearchQuery(urlInput);
+
   const urlPreviewQuery = trpc.ossProjects.fetchRepoInfo.useQuery(
-    { url: urlInput },
+    { url: resolvedUrl ?? "" },
     {
-      enabled: urlInput.includes("github.com/"),
+      enabled: Boolean(resolvedUrl),
+      staleTime: 60 * 1000,
+    }
+  );
+
+  const searchQuery = trpc.ossProjects.searchGithub.useQuery(
+    { query: urlInput.trim() },
+    {
+      enabled: isSearchMode,
       staleTime: 60 * 1000,
     }
   );
@@ -148,14 +186,14 @@ export function DiscoverTab() {
 
   /** Trigger analysis for the URL typed in the input bar. */
   function handleAnalyseUrl() {
-    const trimmed = urlInput.trim();
-    if (!trimmed.includes("github.com/")) return;
+    const repoUrl = resolveInputToUrl(urlInput);
+    if (!repoUrl) return;
 
     const preview = urlPreviewQuery.data;
-    setAnalysingKey(trimmed);
+    setAnalysingKey(repoUrl);
     startAnalysis.mutate({
-      repoUrl: trimmed,
-      name: preview?.name ?? undefined,
+      repoUrl,
+      name: preview?.fullName ?? preview?.name ?? undefined,
       description: preview?.description ?? undefined,
       language: preview?.language ?? undefined,
       starsCount: preview?.stars ?? undefined,
@@ -178,9 +216,9 @@ export function DiscoverTab() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const isUrlValid = urlInput.includes("github.com/");
+  const isUrlValid = Boolean(resolvedUrl);
   const urlPreview = urlPreviewQuery.data;
-  const urlAnalysedInfo = isUrlValid ? analysedMap.get(normalizeRepoUrl(urlInput)) : undefined;
+  const urlAnalysedInfo = resolvedUrl ? analysedMap.get(normalizeRepoUrl(resolvedUrl)) : undefined;
 
   return (
     <div className="space-y-6">
@@ -193,9 +231,9 @@ export function DiscoverTab() {
 
         <div className="flex gap-2">
           <input
-            type="url"
-            aria-label="GitHub repository URL"
-            placeholder="https://github.com/owner/repo"
+            type="text"
+            aria-label="GitHub repository URL, owner/repo, or search term"
+            placeholder="URL, owner/repo, or repo name (e.g. react)"
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
             onKeyDown={(e) => {
@@ -225,11 +263,11 @@ export function DiscoverTab() {
           ) : (
             <button
               type="button"
-              disabled={!isUrlValid || analysingKey === urlInput.trim()}
+              disabled={!isUrlValid || analysingKey === resolvedUrl}
               onClick={handleAnalyseUrl}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {analysingKey === urlInput.trim() ? (
+              {analysingKey === resolvedUrl ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : null}
               Add &amp; Analyse
@@ -270,6 +308,69 @@ export function DiscoverTab() {
             <Loader2 size={12} className="animate-spin" />
             Fetching repository info…
           </p>
+        )}
+
+        {/* Search candidates (bare name input) */}
+        {isSearchMode && (
+          <div className="mt-3">
+            {searchQuery.isLoading ? (
+              <p className="flex items-center gap-1.5 text-xs text-stone-400 dark:text-stone-500">
+                <Loader2 size={12} className="animate-spin" />
+                Searching GitHub for &ldquo;{urlInput.trim()}&rdquo;…
+              </p>
+            ) : searchQuery.isError ? (
+              <p className="text-xs text-red-500">Search failed. Try again.</p>
+            ) : searchQuery.data && searchQuery.data.length > 0 ? (
+              <div className="space-y-2" data-testid="github-search-results">
+                <p className="text-xs text-stone-500 dark:text-stone-400">
+                  Top matches for &ldquo;{urlInput.trim()}&rdquo; — click to select:
+                </p>
+                {searchQuery.data.map((item) => {
+                  const analysed = analysedMap.get(normalizeRepoUrl(item.url));
+                  return (
+                    <button
+                      key={item.fullName}
+                      type="button"
+                      onClick={() => setUrlInput(item.url)}
+                      className="flex w-full items-start justify-between gap-3 rounded-xl border border-stone-100 bg-stone-50 px-4 py-3 text-left transition-colors hover:border-blue-300 hover:bg-blue-50 dark:border-stone-800 dark:bg-stone-900 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-semibold text-stone-800 dark:text-stone-200">
+                            {item.fullName}
+                          </span>
+                          {item.language && (
+                            <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+                              {item.language}
+                            </span>
+                          )}
+                          {analysed && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                              <CheckCircle2 size={11} />
+                              Analysed
+                            </span>
+                          )}
+                        </div>
+                        {item.description && (
+                          <p className="mt-1 line-clamp-2 text-xs text-stone-500 dark:text-stone-400">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+                      <span className="flex shrink-0 items-center gap-1 text-xs text-stone-500 dark:text-stone-400">
+                        <Star size={12} className="text-amber-400" />
+                        {item.stars.toLocaleString()}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-stone-400 dark:text-stone-500">
+                No repositories found.
+              </p>
+            )}
+          </div>
         )}
       </div>
 
