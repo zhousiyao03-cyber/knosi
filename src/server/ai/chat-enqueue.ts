@@ -35,8 +35,10 @@ export async function enqueueChatTask({
   let context: RetrievedKnowledgeItem[] = [];
 
   if (!skipRag) {
+    // SECURITY: scope RAG to this user. Fail-closed inside the helpers.
     const agenticContext = await retrieveAgenticContext(userQuery, {
       scope: sourceScope,
+      userId,
     });
 
     if (agenticContext.length > 0) {
@@ -52,6 +54,7 @@ export async function enqueueChatTask({
     } else {
       const fallbackContext = await retrieveContext(userQuery, {
         scope: sourceScope,
+        userId,
       });
       context = fallbackContext.map((item) => ({
         content: item.content,

@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { bookmarks, notes } from "../db/schema";
 import type { AskAiSourceScope } from "@/lib/ask-ai";
@@ -30,6 +31,12 @@ interface QueryProfile {
 
 interface RetrieveContextOptions {
   scope?: AskAiSourceScope;
+  /**
+   * User whose knowledge base we are searching. **Required for correctness /
+   * safety** — RAG must never leak another user's notes or bookmarks. If
+   * omitted, retrieval returns an empty array (fail-closed).
+   */
+  userId?: string | null;
 }
 
 const MAX_RESULTS = 5;
@@ -282,11 +289,22 @@ export async function retrieveContext(
   query: string,
   options: RetrieveContextOptions = {}
 ): Promise<RetrievalResult[]> {
+  // Fail-closed: without a userId we cannot scope results safely.
+  if (!options.userId) {
+    return [];
+  }
+
   const profile = buildQueryProfile(query);
   const preferredType = resolvePreferredType(profile, options.scope);
 
-  const allNotes = await db.select().from(notes);
-  const allBookmarks = await db.select().from(bookmarks);
+  const allNotes = await db
+    .select()
+    .from(notes)
+    .where(eq(notes.userId, options.userId));
+  const allBookmarks = await db
+    .select()
+    .from(bookmarks)
+    .where(eq(bookmarks.userId, options.userId));
 
   const records: SearchRecord[] = [
     ...allNotes.map((note) => {

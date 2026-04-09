@@ -1,7 +1,12 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { AskAiSourceScope } from "@/lib/ask-ai";
 import { db } from "../db";
-import { knowledgeChunkEmbeddings, knowledgeChunks } from "../db/schema";
+import {
+  bookmarks,
+  knowledgeChunkEmbeddings,
+  knowledgeChunks,
+  notes,
+} from "../db/schema";
 import { dotProduct, embedTexts, vectorBufferToArray } from "./embeddings";
 import { ensureKnowledgeBaseSeeded } from "./indexer";
 
@@ -252,13 +257,41 @@ function toResult(
 
 export async function retrieveAgenticContext(
   query: string,
-  options: { scope?: AskAiSourceScope } = {}
+  options: { scope?: AskAiSourceScope; userId?: string | null } = {}
 ) {
+  // Fail-closed: without a userId we cannot scope results safely.
+  // `knowledge_chunks` currently lacks a user_id column, so we derive
+  // ownership by joining against notes/bookmarks and intersecting chunk
+  // source ids with the set owned by this user.
+  if (!options.userId) {
+    return [] satisfies AgenticRetrievalResult[];
+  }
+
   await ensureKnowledgeBaseSeeded();
+
+  // Gather the note / bookmark ids that belong to this user so we can
+  // restrict chunks to only those sources.
+  const [userNoteIds, userBookmarkIds] = await Promise.all([
+    db
+      .select({ id: notes.id })
+      .from(notes)
+      .where(eq(notes.userId, options.userId))
+      .then((rows) => new Set(rows.map((row) => row.id))),
+    db
+      .select({ id: bookmarks.id })
+      .from(bookmarks)
+      .where(eq(bookmarks.userId, options.userId))
+      .then((rows) => new Set(rows.map((row) => row.id))),
+  ]);
 
   const profile = buildQueryProfile(query);
   const allChunks = await db.select().from(knowledgeChunks);
-  const scopedChunks = allChunks.filter((chunk) =>
+  const ownedChunks = allChunks.filter((chunk) =>
+    chunk.sourceType === "note"
+      ? userNoteIds.has(chunk.sourceId)
+      : userBookmarkIds.has(chunk.sourceId)
+  );
+  const scopedChunks = ownedChunks.filter((chunk) =>
     matchesScope(chunk.sourceType, options.scope)
   );
 

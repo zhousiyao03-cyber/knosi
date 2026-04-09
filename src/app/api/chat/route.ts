@@ -97,8 +97,12 @@ export async function POST(req: Request) {
     let context: RetrievedKnowledgeItem[] = [];
 
     if (!skipRag) {
+      // SECURITY: RAG must be scoped to the current user. Both
+      // retrieveAgenticContext and retrieveContext are fail-closed and
+      // will return [] if userId is null (e.g. AUTH_BYPASS E2E runs).
       const agenticContext = await retrieveAgenticContext(userQuery, {
         scope: sourceScope,
+        userId,
       });
 
       context =
@@ -112,14 +116,17 @@ export async function POST(req: Request) {
               title: item.sourceTitle,
               type: item.sourceType,
             }))
-          : (await retrieveContext(userQuery, { scope: sourceScope })).map(
-              (item) => ({
-                content: item.content,
-                id: item.id,
-                title: item.title,
-                type: item.type,
+          : (
+              await retrieveContext(userQuery, {
+                scope: sourceScope,
+                userId,
               })
-            );
+            ).map((item) => ({
+              content: item.content,
+              id: item.id,
+              title: item.title,
+              type: item.type,
+            }));
     }
 
     const response = await streamChatResponse({
