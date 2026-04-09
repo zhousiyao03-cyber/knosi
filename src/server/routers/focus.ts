@@ -297,6 +297,52 @@ export const focusRouter = router({
       });
     }),
 
+  rangeStats: protectedProcedure
+    .input(
+      z.object({
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        days: z.number().int().min(1).max(120).default(30),
+        timeZone: z.string().min(1).default("UTC"),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const startDate = addDaysToDateString(input.endDate, -(input.days - 1));
+      const startRange = getLocalDayRange({
+        date: startDate,
+        timeZone: input.timeZone,
+      }).start;
+      const endRange = getLocalDayRange({
+        date: addDaysToDateString(input.endDate, 1),
+        timeZone: input.timeZone,
+      }).start;
+
+      const sessions = await db
+        .select()
+        .from(activitySessions)
+        .where(
+          and(
+            eq(activitySessions.userId, ctx.userId),
+            lt(activitySessions.startedAt, endRange),
+            gt(activitySessions.endedAt, startRange)
+          )
+        )
+        .orderBy(activitySessions.startedAt);
+
+      return Array.from({ length: input.days }, (_, index) => {
+        const date = addDaysToDateString(startDate, index);
+        const daily = buildDailyStats({
+          sessions,
+          date,
+          timeZone: input.timeZone,
+        });
+        return {
+          date,
+          totalSecs: daily.totalSecs,
+          workHoursSecs: daily.workHoursSecs,
+        };
+      });
+    }),
+
   classifySessions: protectedProcedure
     .input(focusDateInput)
     .mutation(async ({ ctx, input }) => {

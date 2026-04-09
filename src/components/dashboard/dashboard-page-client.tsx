@@ -12,6 +12,7 @@ import {
   formatFocusDuration,
   getLocalDateString,
 } from "@/components/focus/focus-shared";
+import { DailyFocusHeatmap } from "@/components/dashboard/daily-focus-heatmap";
 import type { AppRouter } from "@/server/routers/_app";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
@@ -150,6 +151,9 @@ export function DashboardPageClient({
           )}
         </div>
       </Link>
+
+      {/* 最近 30 天工作时长热力图 */}
+      <DailyFocusHeatmap />
 
       {/* Main Grid: Recent Notes + Learn + Projects */}
       <div className="grid gap-6 lg:grid-cols-2">
