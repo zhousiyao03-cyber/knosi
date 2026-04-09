@@ -6,15 +6,22 @@ import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { TextStreamChatTransport } from "ai";
 import {
+  ArrowUp,
   Bookmark,
   Bot,
   FileText,
   Loader2,
+  Mic,
+  Plus,
   RefreshCcw,
   Save,
-  Send,
+  SlidersHorizontal,
+  Sparkles,
   Square,
   Trash2,
+  Wand2,
+  BookOpen,
+  Layers,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -30,27 +37,33 @@ import { DaemonBanner } from "@/components/ask/daemon-banner";
 
 const QUICK_PROMPTS: Array<{
   title: string;
-  hint: string;
+  icon: typeof Sparkles;
   prompt: string;
   scope: AskAiSourceScope;
 }> = [
   {
-    title: "Summarize recent notes",
-    hint: "Compress what you wrote recently into the key takeaways.",
+    title: "总结最近笔记",
+    icon: Sparkles,
     prompt: "Summarize my recent notes",
     scope: "notes",
   },
   {
-    title: "Review recent bookmarks",
-    hint: "See what is worth revisiting from the materials you saved.",
+    title: "回顾收藏内容",
+    icon: BookOpen,
     prompt: "What is worth revisiting from my recent bookmarks?",
     scope: "bookmarks",
   },
   {
-    title: "Map the current project",
-    hint: "Pull out the current project consensus from your knowledge base.",
+    title: "梳理当前项目",
+    icon: Layers,
     prompt: "What is the current tech stack of this project?",
     scope: "all",
+  },
+  {
+    title: "帮我写点什么",
+    icon: Wand2,
+    prompt: "Help me draft something",
+    scope: "direct",
   },
 ];
 
@@ -168,51 +181,86 @@ function buildSavedPlainText(
   return `Question: ${question}\n\nAnswer:\n${answer}${sourceLines}`;
 }
 
-function ScopeChip({
-  active,
-  label,
-  onClick,
+function ScopeDropdown({
+  scope,
+  onChange,
 }: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
+  scope: AskAiSourceScope;
+  onChange: (next: AskAiSourceScope) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = ASK_AI_SCOPE_OPTIONS.find((o) => o.value === scope)!;
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [open]);
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-full border px-3.5 py-2 text-sm transition-all",
-        active
-          ? "border-stone-900 bg-stone-900 text-white shadow-sm dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950"
-          : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:border-stone-700 dark:hover:bg-stone-900"
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title={`范围：${current.label}`}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+      >
+        <SlidersHorizontal size={16} />
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 z-20 mb-2 w-56 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg dark:border-stone-800 dark:bg-stone-950">
+          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+            知识范围
+          </div>
+          {VISIBLE_SCOPE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+              className={cn(
+                "block w-full px-3 py-2 text-left text-sm transition-colors",
+                scope === option.value
+                  ? "bg-stone-100 text-stone-900 dark:bg-stone-900 dark:text-stone-100"
+                  : "text-stone-700 hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-stone-900"
+              )}
+            >
+              <div className="font-medium">{option.label}</div>
+              <div className="mt-0.5 text-[11px] leading-4 text-stone-500 dark:text-stone-400">
+                {option.description}
+              </div>
+            </button>
+          ))}
+        </div>
       )}
-    >
-      {label}
-    </button>
+    </div>
   );
 }
 
 function QuickPromptCard({
   title,
-  hint,
+  icon: Icon,
   onClick,
 }: {
   title: string;
-  hint: string;
+  icon: typeof Sparkles;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-[28px] border border-stone-200 bg-white/85 px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:border-stone-300 hover:bg-white dark:border-stone-800 dark:bg-stone-950/80 dark:hover:border-stone-700 dark:hover:bg-stone-950"
+      className="flex flex-col items-start gap-2 rounded-lg bg-white px-3 py-2.5 text-left transition-all hover:bg-stone-100 dark:bg-stone-950 dark:hover:bg-stone-900"
     >
-      <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
+      <Icon size={16} className="text-stone-500 dark:text-stone-400" />
+      <div className="text-[12px] font-medium text-stone-700 dark:text-stone-300">
         {title}
-      </div>
-      <div className="mt-2 text-sm leading-6 text-stone-500 dark:text-stone-400">
-        {hint}
       </div>
     </button>
   );
@@ -391,17 +439,14 @@ function AskPageStream() {
           )}
         >
           {messages.length === 0 ? (
-            <section className="flex flex-col items-center px-4 pb-8 pt-10 text-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-sm dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200">
-                <Bot size={32} />
+            <section className="flex flex-col items-center px-4 pb-6 pt-[18vh] text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-stone-200 bg-white shadow-sm dark:border-stone-800 dark:bg-stone-950">
+                <Sparkles size={24} className="text-stone-700 dark:text-stone-200" />
               </div>
 
-              <h2 className="mt-8 text-[clamp(2rem,4vw,3.25rem)] font-semibold tracking-tight text-stone-900 dark:text-stone-100">
-                What do you want to work on today?
-              </h2>
-              <p className="mt-4 max-w-2xl text-base leading-8 text-stone-500 dark:text-stone-400">
-                Choose where to look first, then let answers, sources, and follow-up actions connect naturally.
-              </p>
+              <h1 className="mt-6 text-3xl font-semibold tracking-tight text-stone-900 dark:text-stone-100 sm:text-[2.5rem]">
+                今日事，我来帮。
+              </h1>
             </section>
           ) : (
             <section className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-2 pb-10 pt-6 sm:px-4">
@@ -509,31 +554,25 @@ function AskPageStream() {
             "z-10",
             messages.length > 0
               ? "sticky bottom-0 bg-gradient-to-t from-stone-50 via-stone-50/98 to-transparent pb-3 pt-4 backdrop-blur dark:from-stone-950 dark:via-stone-950/98"
-              : "mt-10 pb-8 pt-2"
+              : "-mt-4 pb-12"
           )}
         >
-          <div className="mx-auto w-full max-w-4xl">
+          <div
+            className={cn(
+              "mx-auto w-full px-4",
+              messages.length > 0 ? "max-w-4xl" : "max-w-2xl"
+            )}
+          >
             <form
               onSubmit={handleSubmit}
               className={cn(
-                "rounded-[34px] border bg-white/94 p-4 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.5)] backdrop-blur transition-all dark:bg-stone-950/92",
+                "rounded-2xl border bg-white transition-all dark:bg-stone-950",
                 isComposerFocused
-                  ? "border-blue-500 shadow-[0_26px_70px_-40px_rgba(59,130,246,0.55)] dark:border-blue-500"
-                  : "border-stone-200 dark:border-stone-800"
+                  ? "border-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.12)] dark:border-blue-500"
+                  : "border-stone-200 shadow-sm hover:border-stone-300 dark:border-stone-800 dark:hover:border-stone-700"
               )}
             >
-              <div className="flex flex-wrap gap-2">
-                {VISIBLE_SCOPE_OPTIONS.map((option) => (
-                  <ScopeChip
-                    key={option.value}
-                    active={scope === option.value}
-                    label={option.label}
-                    onClick={() => setScope(option.value)}
-                  />
-                ))}
-              </div>
-
-              <div className="mt-4">
+              <div className="px-4 pt-3">
                 <textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
@@ -546,79 +585,102 @@ function AskPageStream() {
                   onCompositionEnd={() => {
                     isComposingRef.current = false;
                   }}
-                  placeholder="Use AI to work through anything..."
-                  rows={2}
-                  className="min-h-[56px] w-full resize-none border-none bg-transparent text-[18px] leading-7 text-stone-900 outline-none placeholder:text-stone-400 dark:text-stone-100 dark:placeholder:text-stone-500"
+                  placeholder="使用 AI 处理各种任务..."
+                  rows={1}
+                  className="min-h-[28px] w-full resize-none border-none bg-transparent text-[15px] leading-7 text-stone-900 outline-none placeholder:text-stone-400 dark:text-stone-100 dark:placeholder:text-stone-500"
                   disabled={isLoading}
                 />
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm text-stone-500 dark:text-stone-400">
-                  <span>{currentScope.description}</span>
-                  <span className="hidden md:inline">
-                    {" "}
-                    · Enter to send, Shift+Enter for a new line
-                  </span>
+              <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    disabled
+                    title="附件（即将推出）"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 disabled:cursor-not-allowed dark:text-stone-600"
+                  >
+                    <Plus size={16} />
+                  </button>
+                  <ScopeDropdown scope={scope} onChange={setScope} />
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {messages.length > 0 && (
+                <div className="flex items-center gap-1">
+                  {messages.length > 0 && !isLoading && (
                     <button
                       type="button"
                       onClick={() => {
                         clearError();
                         setMessages([]);
                       }}
-                      disabled={isLoading}
-                      className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-stone-900"
+                      title="清空对话"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
                     >
-                      <Trash2 size={14} />
-                      Clear chat
+                      <Trash2 size={15} />
                     </button>
                   )}
 
-                  {isLoading && (
+                  <span className="hidden px-1.5 text-xs text-stone-500 dark:text-stone-400 sm:inline">
+                    {currentScope.label}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled
+                    title="语音输入（即将推出）"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 disabled:cursor-not-allowed dark:text-stone-600"
+                  >
+                    <Mic size={15} />
+                  </button>
+
+                  {isLoading ? (
                     <button
                       type="button"
                       onClick={() => stop()}
-                      className="inline-flex items-center gap-2 rounded-full border border-stone-200 px-3 py-2 text-sm text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-900"
+                      title="停止"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-stone-900 text-white hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300"
                     >
-                      <Square size={14} />
-                      Stop
+                      <Square size={13} />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!input.trim()}
+                      aria-label="发送"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-stone-900 text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300 dark:disabled:bg-stone-800 dark:disabled:text-stone-500"
+                    >
+                      <ArrowUp size={15} />
                     </button>
                   )}
-
-                  <button
-                    type="submit"
-                    disabled={isLoading || !input.trim()}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300 dark:disabled:bg-stone-800 dark:disabled:text-stone-500"
-                    aria-label="Send message"
-                  >
-                    <Send size={16} />
-                  </button>
                 </div>
               </div>
             </form>
 
             {messages.length > 0 ? (
               <div className="mt-2 text-center text-xs text-stone-400 dark:text-stone-500">
-                AI can make mistakes. Verify important details.
+                AI 可能出错，请核对关键信息
               </div>
             ) : null}
 
             {messages.length === 0 && (
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {QUICK_PROMPTS.map((prompt) => (
-                  <QuickPromptCard
-                    key={prompt.title}
-                    title={prompt.title}
-                    hint={prompt.hint}
-                    onClick={() =>
-                      launchQuickPrompt(prompt.prompt, prompt.scope)
-                    }
-                  />
-                ))}
+              <div className="mt-4 rounded-xl border border-stone-200 bg-white/60 p-3 dark:border-stone-800 dark:bg-stone-950/60">
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <div className="text-xs text-stone-500 dark:text-stone-400">
+                    立即开始
+                  </div>
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-2 md:grid-cols-4">
+                  {QUICK_PROMPTS.map((prompt) => (
+                    <QuickPromptCard
+                      key={prompt.title}
+                      title={prompt.title}
+                      icon={prompt.icon}
+                      onClick={() =>
+                        launchQuickPrompt(prompt.prompt, prompt.scope)
+                      }
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -701,16 +763,13 @@ function AskPageDaemon() {
             <section className="flex flex-col items-center px-4 pb-8 pt-10 text-center">
               <DaemonBanner />
 
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-sm dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200">
-                <Bot size={32} />
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700 shadow-sm dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200">
+                <Sparkles size={22} />
               </div>
 
-              <h2 className="mt-8 text-[clamp(2rem,4vw,3.25rem)] font-semibold tracking-tight text-stone-900 dark:text-stone-100">
-                What do you want to work on today?
+              <h2 className="mt-6 text-3xl font-semibold tracking-tight text-stone-900 dark:text-stone-100 sm:text-4xl">
+                今日事，我来帮。
               </h2>
-              <p className="mt-4 max-w-2xl text-base leading-8 text-stone-500 dark:text-stone-400">
-                Choose where to look first, then let answers, sources, and follow-up actions connect naturally.
-              </p>
             </section>
           ) : (
             <section className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-2 pb-10 pt-6 sm:px-4">
@@ -816,31 +875,25 @@ function AskPageDaemon() {
             "z-10",
             messages.length > 0
               ? "sticky bottom-0 bg-gradient-to-t from-stone-50 via-stone-50/98 to-transparent pb-3 pt-4 backdrop-blur dark:from-stone-950 dark:via-stone-950/98"
-              : "mt-10 pb-8 pt-2"
+              : "-mt-4 pb-12"
           )}
         >
-          <div className="mx-auto w-full max-w-4xl">
+          <div
+            className={cn(
+              "mx-auto w-full px-4",
+              messages.length > 0 ? "max-w-4xl" : "max-w-2xl"
+            )}
+          >
             <form
               onSubmit={handleSubmit}
               className={cn(
-                "rounded-[34px] border bg-white/94 p-4 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.5)] backdrop-blur transition-all dark:bg-stone-950/92",
+                "rounded-2xl border bg-white transition-all dark:bg-stone-950",
                 isComposerFocused
-                  ? "border-blue-500 shadow-[0_26px_70px_-40px_rgba(59,130,246,0.55)] dark:border-blue-500"
-                  : "border-stone-200 dark:border-stone-800"
+                  ? "border-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.12)] dark:border-blue-500"
+                  : "border-stone-200 shadow-sm hover:border-stone-300 dark:border-stone-800 dark:hover:border-stone-700"
               )}
             >
-              <div className="flex flex-wrap gap-2">
-                {VISIBLE_SCOPE_OPTIONS.map((option) => (
-                  <ScopeChip
-                    key={option.value}
-                    active={scope === option.value}
-                    label={option.label}
-                    onClick={() => setScope(option.value)}
-                  />
-                ))}
-              </div>
-
-              <div className="mt-4">
+              <div className="px-4 pt-3">
                 <textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
@@ -853,76 +906,99 @@ function AskPageDaemon() {
                   onCompositionEnd={() => {
                     isComposingRef.current = false;
                   }}
-                  placeholder="Use AI to work through anything..."
-                  rows={2}
-                  className="min-h-[56px] w-full resize-none border-none bg-transparent text-[18px] leading-7 text-stone-900 outline-none placeholder:text-stone-400 dark:text-stone-100 dark:placeholder:text-stone-500"
+                  placeholder="使用 AI 处理各种任务..."
+                  rows={1}
+                  className="min-h-[28px] w-full resize-none border-none bg-transparent text-[15px] leading-7 text-stone-900 outline-none placeholder:text-stone-400 dark:text-stone-100 dark:placeholder:text-stone-500"
                   disabled={isLoading}
                 />
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm text-stone-500 dark:text-stone-400">
-                  <span>{currentScope.description}</span>
-                  <span className="hidden md:inline">
-                    {" "}
-                    · Enter to send, Shift+Enter for a new line
-                  </span>
+              <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    disabled
+                    title="附件（即将推出）"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 disabled:cursor-not-allowed dark:text-stone-600"
+                  >
+                    <Plus size={16} />
+                  </button>
+                  <ScopeDropdown scope={scope} onChange={setScope} />
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {messages.length > 0 && (
+                <div className="flex items-center gap-1">
+                  {messages.length > 0 && !isLoading && (
                     <button
                       type="button"
                       onClick={() => reset()}
-                      disabled={isLoading}
-                      className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-stone-900"
+                      title="清空对话"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
                     >
-                      <Trash2 size={14} />
-                      Clear chat
+                      <Trash2 size={15} />
                     </button>
                   )}
 
-                  {isLoading && (
+                  <span className="hidden px-1.5 text-xs text-stone-500 dark:text-stone-400 sm:inline">
+                    {currentScope.label}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled
+                    title="语音输入（即将推出）"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 disabled:cursor-not-allowed dark:text-stone-600"
+                  >
+                    <Mic size={15} />
+                  </button>
+
+                  {isLoading ? (
                     <button
                       type="button"
                       onClick={() => stop()}
-                      className="inline-flex items-center gap-2 rounded-full border border-stone-200 px-3 py-2 text-sm text-stone-700 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-900"
+                      title="停止"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-stone-900 text-white hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300"
                     >
-                      <Square size={14} />
-                      Stop
+                      <Square size={13} />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!input.trim()}
+                      aria-label="发送"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-stone-900 text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300 dark:disabled:bg-stone-800 dark:disabled:text-stone-500"
+                    >
+                      <ArrowUp size={15} />
                     </button>
                   )}
-
-                  <button
-                    type="submit"
-                    disabled={isLoading || !input.trim()}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 text-white transition-colors hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300 dark:disabled:bg-stone-800 dark:disabled:text-stone-500"
-                    aria-label="Send message"
-                  >
-                    <Send size={16} />
-                  </button>
                 </div>
               </div>
             </form>
 
             {messages.length > 0 ? (
               <div className="mt-2 text-center text-xs text-stone-400 dark:text-stone-500">
-                AI can make mistakes. Verify important details.
+                AI 可能出错，请核对关键信息
               </div>
             ) : null}
 
             {messages.length === 0 && (
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {QUICK_PROMPTS.map((prompt) => (
-                  <QuickPromptCard
-                    key={prompt.title}
-                    title={prompt.title}
-                    hint={prompt.hint}
-                    onClick={() =>
-                      launchQuickPrompt(prompt.prompt, prompt.scope)
-                    }
-                  />
-                ))}
+              <div className="mt-4 rounded-xl border border-stone-200 bg-white/60 p-3 dark:border-stone-800 dark:bg-stone-950/60">
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <div className="text-xs text-stone-500 dark:text-stone-400">
+                    立即开始
+                  </div>
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-2 md:grid-cols-4">
+                  {QUICK_PROMPTS.map((prompt) => (
+                    <QuickPromptCard
+                      key={prompt.title}
+                      title={prompt.title}
+                      icon={prompt.icon}
+                      onClick={() =>
+                        launchQuickPrompt(prompt.prompt, prompt.scope)
+                      }
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
