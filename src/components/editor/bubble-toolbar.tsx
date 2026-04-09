@@ -12,6 +12,7 @@ import {
   Highlighter,
   Link as LinkIcon,
   Palette,
+  Sparkles,
 } from "lucide-react";
 
 const TEXT_COLORS = [
@@ -138,6 +139,30 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
       )}
       style={{ top: position.top, left: position.left }}
     >
+      <BubbleButton
+        onClick={() => {
+          const { from, to, empty } = editor.state.selection;
+          if (empty) return;
+          const selectedText = editor.state.doc.textBetween(from, to, "\n");
+          const coords = editor.view.coordsAtPos(to);
+          window.dispatchEvent(
+            new CustomEvent("open-inline-ask-ai", {
+              detail: {
+                pos: to,
+                top: coords.bottom + 6,
+                left: coords.left,
+                selectedText,
+                selectionFrom: from,
+                selectionTo: to,
+              },
+            })
+          );
+        }}
+        title="Ask AI"
+      >
+        <Sparkles size={iconSize} className="text-gray-300" />
+      </BubbleButton>
+      <div className="mx-0.5 h-4 w-px bg-stone-700/60" />
       <BubbleButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         isActive={editor.isActive("bold")}
