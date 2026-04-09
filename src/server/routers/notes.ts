@@ -19,6 +19,38 @@ import { normalizeJournalTitlesForUser } from "../notes/journal-titles";
 const noteCoverSchema = z.string().trim().nullable().optional();
 const noteIconSchema = z.string().trim().max(8).nullable().optional();
 
+type TiptapNode = {
+  type?: string;
+  text?: string;
+  content?: TiptapNode[];
+};
+
+/** Lightweight server-side Tiptap doc → plain text extractor. */
+function tiptapDocToPlainText(doc: TiptapNode | null | undefined): string {
+  if (!doc) return "";
+  const blocks: string[] = [];
+  const walk = (node: TiptapNode | undefined, buffer: string[]) => {
+    if (!node) return;
+    if (typeof node.text === "string") {
+      buffer.push(node.text);
+    }
+    if (Array.isArray(node.content)) {
+      for (const child of node.content) walk(child, buffer);
+    }
+  };
+  if (Array.isArray(doc.content)) {
+    for (const child of doc.content) {
+      const buf: string[] = [];
+      walk(child, buf);
+      const line = buf.join("");
+      if (line.trim()) blocks.push(line);
+    }
+  } else {
+    walk(doc, blocks);
+  }
+  return blocks.join("\n");
+}
+
 export const notesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     await normalizeJournalTitlesForUser(ctx.userId);
@@ -188,5 +220,75 @@ export const notesRouter = router({
         .from(notes)
         .where(eq(notes.shareToken, input.token));
       return note ?? null;
+    }),
+
+  /**
+   * Append a Tiptap JSONContent[] payload to the end of an existing note's
+   * document. Scoped to the current user by `userId`. Used by the inline
+   * Ask AI popover's "append to another note" action so the user can park
+   * an answer in a different note without leaving their current editor.
+   */
+  appendBlocks: protectedProcedure
+    .input(
+      z.object({
+        noteId: z.string().min(1),
+        blocks: z
+          .array(z.any())
+          .min(1)
+          .max(200),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const [existing] = await db
+        .select({ content: notes.content })
+        .from(notes)
+        .where(
+          and(eq(notes.id, input.noteId), eq(notes.userId, ctx.userId))
+        )
+        .limit(1);
+
+      if (!existing) {
+        throw new Error("Note not found");
+      }
+
+      let doc: TiptapNode;
+      try {
+        doc = existing.content
+          ? (JSON.parse(existing.content) as TiptapNode)
+          : { type: "doc", content: [] };
+      } catch {
+        doc = { type: "doc", content: [] };
+      }
+      if (!doc.type) doc.type = "doc";
+      const currentContent = Array.isArray(doc.content) ? doc.content : [];
+      doc.content = [...currentContent, ...(input.blocks as TiptapNode[])];
+
+      const nextContent = JSON.stringify(doc);
+      const nextPlainText = tiptapDocToPlainText(doc);
+
+      await db
+        .update(notes)
+        .set({
+          content: nextContent,
+          plainText: nextPlainText,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(eq(notes.id, input.noteId), eq(notes.userId, ctx.userId))
+        );
+
+      const [updatedNote] = await db
+        .select()
+        .from(notes)
+        .where(
+          and(eq(notes.id, input.noteId), eq(notes.userId, ctx.userId))
+        );
+      if (updatedNote) {
+        void syncNoteKnowledgeIndex(updatedNote, "note-update").catch(
+          () => undefined
+        );
+      }
+
+      return { ok: true, blocksAppended: input.blocks.length };
     }),
 });

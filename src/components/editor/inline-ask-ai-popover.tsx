@@ -16,10 +16,12 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 import { aiTextToTiptapJson } from "@/lib/ai-text-to-tiptap";
 import { parseAiBlocks } from "@/lib/parse-ai-blocks";
 import { stripAssistantSourceMetadata } from "@/lib/ask-ai";
 import type { JSONContent } from "@tiptap/react";
+import { InlineAskAiAppendTargetMenu } from "./inline-ask-ai-append-target-menu";
 import {
   InlineAskAiMentionMenu,
   type MentionSource,
@@ -115,6 +117,16 @@ export function InlineAskAiPopover({
     start: number;
   } | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+  const [appendMenuOpen, setAppendMenuOpen] = useState(false);
+  const [appendMenuQuery, setAppendMenuQuery] = useState("");
+  const [appendStatus, setAppendStatus] = useState<
+    | { state: "idle" }
+    | { state: "appending"; title: string }
+    | { state: "appended"; title: string }
+    | { state: "error"; message: string }
+  >({ state: "idle" });
+
+  const appendBlocksMutation = trpc.notes.appendBlocks.useMutation();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
@@ -301,6 +313,31 @@ export function InlineAskAiPopover({
     onClose();
   };
 
+  const handleAppendToOther = async (target: { id: string; title: string }) => {
+    if (!lastAssistantText.trim()) return;
+    const json = answerToBlocks(lastAssistantText);
+    if (json.length === 0) return;
+    setAppendMenuOpen(false);
+    setAppendMenuQuery("");
+    setAppendStatus({ state: "appending", title: target.title });
+    try {
+      await appendBlocksMutation.mutateAsync({
+        noteId: target.id,
+        blocks: json,
+      });
+      setAppendStatus({ state: "appended", title: target.title });
+      setTimeout(
+        () => setAppendStatus({ state: "idle" }),
+        2500
+      );
+    } catch (err) {
+      setAppendStatus({
+        state: "error",
+        message: err instanceof Error ? err.message : "追加失败",
+      });
+    }
+  };
+
   const handleCopy = async () => {
     if (!lastAssistantText.trim()) return;
     const parsed = parseAiBlocks(lastAssistantText);
@@ -439,6 +476,28 @@ export function InlineAskAiPopover({
         </div>
       )}
 
+      {appendStatus.state !== "idle" && (
+        <div
+          data-inline-ask-ai-append-status
+          className={cn(
+            "border-t px-3 py-2 text-xs",
+            appendStatus.state === "error"
+              ? "border-red-100 text-red-600 dark:border-red-900 dark:text-red-400"
+              : "border-stone-100 text-stone-500 dark:border-stone-800 dark:text-stone-400"
+          )}
+        >
+          {appendStatus.state === "appending" && (
+            <>正在追加到「{appendStatus.title}」…</>
+          )}
+          {appendStatus.state === "appended" && (
+            <>已追加到「{appendStatus.title}」✓</>
+          )}
+          {appendStatus.state === "error" && (
+            <>追加失败：{appendStatus.message}</>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2 border-t border-stone-100 px-3 py-2 dark:border-stone-800">
         <div className="text-[11px] text-stone-400 dark:text-stone-500">
           Enter 发送 · Esc 关闭
@@ -486,6 +545,31 @@ export function InlineAskAiPopover({
                 >
                   追加到末尾
                 </button>
+              )}
+              {!isRewrite && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAppendMenuOpen((prev) => !prev);
+                      setAppendMenuQuery("");
+                    }}
+                    data-inline-ask-ai-append-to-other
+                    className="rounded-md border border-stone-200 px-2 py-1 text-xs text-stone-600 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-900"
+                  >
+                    追加到…
+                  </button>
+                  {appendMenuOpen && (
+                    <InlineAskAiAppendTargetMenu
+                      query={appendMenuQuery}
+                      onQueryChange={setAppendMenuQuery}
+                      onSelect={(target) => {
+                        void handleAppendToOther(target);
+                      }}
+                      onClose={() => setAppendMenuOpen(false)}
+                    />
+                  )}
+                </div>
               )}
               <button
                 type="button"

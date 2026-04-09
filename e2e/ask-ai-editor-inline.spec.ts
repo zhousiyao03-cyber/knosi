@@ -133,6 +133,75 @@ test.describe("Ask AI inline in editor", () => {
     await expect(copyBtn).toContainText("已复制");
   });
 
+  test("append to another note fires notes.appendBlocks mutation", async ({
+    page,
+  }) => {
+    // Seed a target note we'll append into.
+    await page.goto("/notes");
+    await page.getByRole("button", { name: "New note" }).click();
+    await expect(page).toHaveURL(/\/notes\/.+/);
+    const targetTitleInput = page.locator("textarea[placeholder='New page']");
+    const targetTitle = `APPEND_TARGET_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    await targetTitleInput.fill(targetTitle);
+    await targetTitleInput.press("Enter");
+    await expect(
+      page.getByText("Saved", { exact: true }).first()
+    ).toBeVisible({ timeout: 10_000 });
+
+    await mockChatStream(page, "APPEND_TO_OTHER_PAYLOAD");
+
+    // Spy on requests matching the mutation endpoint (don't intercept —
+    // let tRPC batch + fetch go through untouched).
+    const appendBlocksCalls: string[] = [];
+    page.on("request", (req) => {
+      if (req.url().includes("/api/trpc/notes.appendBlocks")) {
+        appendBlocksCalls.push(req.url());
+      }
+    });
+
+    // Open a host note and go through inline Ask AI
+    const { editor } = await createNote(page);
+    await editor.click();
+    await editor.press("/");
+    await page
+      .getByTestId("editor-slash-menu")
+      .getByRole("button", { name: "Ask AI" })
+      .click();
+
+    const popover = page.locator("[data-inline-ask-ai]");
+    await expect(popover).toBeVisible();
+    await popover.locator("textarea").fill("prompt");
+    await popover.locator("textarea").press("Enter");
+    await expect(popover).toContainText("APPEND_TO_OTHER_PAYLOAD", {
+      timeout: 10_000,
+    });
+
+    // Open the append-to-other menu
+    const appendToOtherBtn = popover.locator(
+      "[data-inline-ask-ai-append-to-other]"
+    );
+    await expect(appendToOtherBtn).toBeVisible();
+    await appendToOtherBtn.click();
+
+    const appendMenu = popover.locator("[data-inline-ask-ai-append-menu]");
+    await expect(appendMenu).toBeVisible();
+    await appendMenu.locator("input").fill(targetTitle);
+
+    // Pick the seeded target
+    await appendMenu
+      .getByRole("option", { name: new RegExp(targetTitle) })
+      .click();
+
+    // Status banner confirms success
+    const status = popover.locator("[data-inline-ask-ai-append-status]");
+    await expect(status).toContainText("已追加到", { timeout: 10_000 });
+
+    // Sanity check: the mutation endpoint was actually hit
+    expect(appendBlocksCalls.length).toBeGreaterThan(0);
+  });
+
   test("append to end inserts answer at the document tail, not the caret", async ({
     page,
   }) => {
