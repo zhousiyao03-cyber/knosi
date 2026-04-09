@@ -101,6 +101,38 @@ test.describe("Ask AI inline in editor", () => {
     await expect(editor).toContainText("REPLACED_BY_AI");
   });
 
+  test("copy button transitions to 已复制 state after click", async ({
+    browserName,
+    page,
+    context,
+  }) => {
+    // Firefox Playwright doesn't support clipboard-write permission — skip.
+    test.skip(browserName === "firefox");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await mockChatStream(page, "CLIPBOARD_PAYLOAD");
+
+    const { editor } = await createNote(page);
+    await editor.click();
+    await editor.press("/");
+    await page
+      .getByTestId("editor-slash-menu")
+      .getByRole("button", { name: "Ask AI" })
+      .click();
+
+    const popover = page.locator("[data-inline-ask-ai]");
+    await expect(popover).toBeVisible();
+    await popover.locator("textarea").fill("anything");
+    await popover.locator("textarea").press("Enter");
+    await expect(popover).toContainText("CLIPBOARD_PAYLOAD", {
+      timeout: 10_000,
+    });
+
+    const copyBtn = popover.locator("[data-inline-ask-ai-copy]");
+    await expect(copyBtn).toBeVisible();
+    await copyBtn.click();
+    await expect(copyBtn).toContainText("已复制");
+  });
+
   test("append to end inserts answer at the document tail, not the caret", async ({
     page,
   }) => {

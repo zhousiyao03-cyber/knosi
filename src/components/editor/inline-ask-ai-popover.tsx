@@ -7,6 +7,8 @@ import { TextStreamChatTransport } from "ai";
 import {
   ArrowUp,
   Bookmark,
+  Check,
+  Copy,
   FileText,
   Loader2,
   Sparkles,
@@ -16,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { aiTextToTiptapJson } from "@/lib/ai-text-to-tiptap";
 import { parseAiBlocks } from "@/lib/parse-ai-blocks";
+import { stripAssistantSourceMetadata } from "@/lib/ask-ai";
 import type { JSONContent } from "@tiptap/react";
 import {
   InlineAskAiMentionMenu,
@@ -111,6 +114,7 @@ export function InlineAskAiPopover({
     query: string;
     start: number;
   } | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
@@ -294,6 +298,20 @@ export function InlineAskAiPopover({
     onClose();
   };
 
+  const handleCopy = async () => {
+    if (!lastAssistantText.trim()) return;
+    const parsed = parseAiBlocks(lastAssistantText);
+    const textToCopy = stripAssistantSourceMetadata(parsed.cleanText).trim();
+    if (!textToCopy) return;
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setCopyStatus("copied");
+      setTimeout(() => setCopyStatus("idle"), 1500);
+    } catch {
+      // Clipboard may be blocked in some environments; silently ignore.
+    }
+  };
+
   const handleDiscard = () => {
     setMessages([]);
     setInput("");
@@ -434,6 +452,21 @@ export function InlineAskAiPopover({
           )}
           {lastAssistantText && !isLoading && (
             <>
+              <button
+                type="button"
+                onClick={handleCopy}
+                data-inline-ask-ai-copy
+                aria-label="复制"
+                title={copyStatus === "copied" ? "已复制" : "复制"}
+                className="inline-flex items-center gap-1 rounded-md border border-stone-200 px-2 py-1 text-xs text-stone-600 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-900"
+              >
+                {copyStatus === "copied" ? (
+                  <Check size={12} />
+                ) : (
+                  <Copy size={12} />
+                )}
+                <span>{copyStatus === "copied" ? "已复制" : "复制"}</span>
+              </button>
               <button
                 type="button"
                 onClick={handleDiscard}
