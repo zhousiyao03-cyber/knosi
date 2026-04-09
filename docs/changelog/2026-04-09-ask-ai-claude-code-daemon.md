@@ -76,6 +76,63 @@ _待手动填充。_
 - 生产 Vercel 部署 `AI_PROVIDER=claude-code-daemon` 后，如果本机 daemon 没开，所有 chat 请求会永远 queued 直到 cron 标 failed —— 这时用户看到横幅并得知要开 daemon 或切 provider
 
 ## Production rollout — 2026-04-09
-_待手动填充。_
 
-预期步骤见 `scripts/db/2026-04-09-chat-daemon-schema.sql`。
+Code pushed to `main` (commit `7740f17`). Vercel auto-deploy picks up the new build but with existing env vars, so `/api/config` still returns `chatMode: "stream"` and `/ask` keeps using the legacy streaming path until env vars flip. This is intentional — the rollout is safe to stage: code lands first, switch to daemon mode on the box.
+
+### Pending manual steps (user-side, CLI tools not installed on dev box)
+
+Run these from a machine with `turso` and `vercel` CLIs installed and logged in. Install if needed:
+
+```bash
+brew install tursodatabase/tap/turso   # or: curl -sSfL https://get.tur.so/install.sh | bash
+npm install -g vercel
+turso auth login
+vercel login
+```
+
+Then rollout:
+
+```bash
+cd /Users/bytedance/second-brain
+
+# 1. Apply schema to production Turso
+turso db shell <your-db-name> < scripts/db/2026-04-09-chat-daemon-schema.sql
+
+# 2. Verify tables
+turso db shell <your-db-name> "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('chat_tasks','daemon_chat_messages','daemon_heartbeats') ORDER BY name;"
+# Expected: 3 rows
+
+turso db shell <your-db-name> "SELECT sql FROM sqlite_master WHERE name='chat_tasks_status_created_idx';"
+# Expected: "CREATE INDEX ..." (no UNIQUE keyword)
+
+# 3. Set Vercel production env vars
+vercel env add AI_PROVIDER production
+# Paste: claude-code-daemon
+vercel env add CLAUDE_CODE_CHAT_MODEL production
+# Paste: opus
+
+# 4. Trigger a new deploy to pick up the new env vars
+vercel deploy --prod
+# Or: push an empty commit to main if auto-deploy is wired
+
+# 5. Verify the deployed /api/config returns daemon mode
+curl https://second-brain-self-alpha.vercel.app/api/config
+# Expected: {"chatMode":"daemon"}
+
+# 6. Point the local daemon at production and smoke test
+SECOND_BRAIN_URL=https://second-brain-self-alpha.vercel.app pnpm usage:daemon
+
+# In another browser/phone, open https://second-brain-self-alpha.vercel.app/ask,
+# log in, send a question. It should stream back from your local daemon.
+
+# 7. Stop the daemon, wait 90s, refresh /ask — amber banner should appear.
+```
+
+### Results
+
+_After running the steps above, fill in:_
+- Turso rollout: ___
+- Vercel env vars set: ___
+- Deploy URL + commit: ___
+- Hosted smoke test result: ___
+- Daemon offline banner confirmed: ___
