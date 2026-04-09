@@ -1,0 +1,26 @@
+# 2026-04-09 - Project note header mobile pill layout
+
+- date: 2026-04-09
+- task / goal: Fix the cramped mobile header on project note pages so `Shared`, `Edited`, and `Saved` no longer split into awkward separate rows.
+- key changes:
+  - Moved the project-note share trigger back into the editor header action cluster instead of rendering it in a separate outer row.
+  - Made both note editors switch to a stacked header layout on narrow screens so the back button and action pills stop competing for the same horizontal space.
+  - Shortened the edited timestamp display to a compact numeric format (`M/D HH:mm`) and tightened pill sizing on small screens to keep the three pills on one row.
+  - Added a Playwright regression test covering the narrow-screen project-note header after link sharing is enabled.
+- files touched:
+  - `e2e/project-note-header.spec.ts`
+  - `src/app/(app)/notes/[id]/page.tsx`
+  - `src/app/(app)/projects/[id]/notes/[noteId]/page.tsx`
+  - `src/components/editor/knowledge-note-editor.tsx`
+  - `src/lib/utils.ts`
+- verification commands and results:
+  - `pnpm exec playwright test e2e/project-note-header.spec.ts`
+    - First run failed as expected before the fix: the pill row alignment assertion reported a `60.5px` vertical offset between `Shared` and the `Edited/Saved` pills.
+    - Final run passed: `1 passed (12.6s)`.
+  - `pnpm exec eslint e2e/project-note-header.spec.ts src/lib/utils.ts src/components/editor/knowledge-note-editor.tsx 'src/app/(app)/notes/[id]/page.tsx' 'src/app/(app)/projects/[id]/notes/[noteId]/page.tsx'`
+    - Passed with no errors.
+  - `pnpm lint`
+    - Still fails because of pre-existing unrelated lint errors in `src/components/editor/inline-ask-ai-popover.tsx`, `src/components/editor/mermaid-block.tsx`, `src/components/editor/search-replace.tsx`, `src/components/editor/toc-block.tsx`, and `src/components/editor/toc-sidebar.tsx`, plus existing warnings in other files.
+- remaining risks or follow-up items:
+  - Full-repo lint is still red due to unrelated existing editor issues; this task only verified the changed files and the new mobile regression.
+  - The compact timestamp format is now shared by both note editors; if the product later introduces localization, this helper should probably move to a dedicated locale-aware formatter rather than staying as a fixed compact string.

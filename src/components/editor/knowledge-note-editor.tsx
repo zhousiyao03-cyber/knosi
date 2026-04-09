@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { Editor } from "@tiptap/react";
@@ -36,6 +36,7 @@ interface KnowledgeNoteEditorProps {
   note: KnowledgeNoteData;
   backHref: string;
   backLabel: string;
+  headerActions?: ReactNode;
   emptyMessage?: string;
   onSave: (payload: {
     id: string;
@@ -64,6 +65,7 @@ export function KnowledgeNoteEditor({
   note,
   backHref,
   backLabel,
+  headerActions,
   emptyMessage = "Start typing...",
   onSave,
 }: KnowledgeNoteEditorProps) {
@@ -84,11 +86,11 @@ export function KnowledgeNoteEditor({
   });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const onSaveRef = useRef(onSave);
-  onSaveRef.current = onSave;
   const titleRef = useRef(note.title);
   const tagsRef = useRef<string[]>(parseTags(note.tags));
   const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
 
+  useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
   useEffect(() => { titleRef.current = title; }, [title]);
   useEffect(() => { tagsRef.current = tags; }, [tags]);
 
@@ -147,7 +149,7 @@ export function KnowledgeNoteEditor({
 
   return (
     <div className="relative -mx-4 -mt-5 w-auto pb-10 md:-mx-6 md:-mt-6">
-      <div className="mx-auto mb-4 flex w-full max-w-[980px] items-center justify-between gap-4 px-6 pt-5 md:px-10 md:pt-6">
+      <div className="mx-auto mb-4 flex w-full max-w-[980px] flex-col gap-3 px-6 pt-5 md:px-10 md:pt-6 sm:flex-row sm:items-center sm:justify-between">
         <button
           onClick={() => router.push(backHref)}
           data-testid="note-editor-back"
@@ -157,13 +159,13 @@ export function KnowledgeNoteEditor({
           {backLabel}
         </button>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:gap-2">
           {lastEditedAt && (
-            <span className="rounded-full border border-stone-200 bg-white/80 px-3 py-1 text-xs text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400">
+            <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-[11px] text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400 sm:px-3 sm:text-xs">
               Edited {formatDate(lastEditedAt)}
             </span>
           )}
-          <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white/80 px-3 py-1 text-xs text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400">
+          <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-[11px] text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400 sm:gap-2 sm:px-3 sm:text-xs">
             <span
               className={cn(
                 "h-2 w-2 rounded-full",
@@ -180,6 +182,7 @@ export function KnowledgeNoteEditor({
                 ? "Saving..."
                 : "Editing"}
           </span>
+          {headerActions}
         </div>
       </div>
 

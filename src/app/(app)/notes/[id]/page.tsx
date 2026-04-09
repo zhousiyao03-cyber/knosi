@@ -179,7 +179,7 @@ function SharePopover({ noteId, shareToken }: { noteId: string; shareToken: stri
         onClick={() => setOpen((v) => !v)}
         data-testid="note-share-button"
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium shadow-sm transition-colors",
+          "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors sm:px-3 sm:text-xs",
           shareToken
             ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-900/80 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/60"
             : "border-stone-200 bg-white/80 text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-200"
@@ -419,7 +419,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
 
   return (
     <div className="-mx-4 -mt-5 w-auto pb-10 md:-mx-6 md:-mt-6">
-      <div className="mx-auto mb-4 flex w-full max-w-[1360px] items-center justify-between gap-4 px-6 pt-5 md:px-10 md:pt-6">
+      <div className="mx-auto mb-4 flex w-full max-w-[1360px] flex-col gap-3 px-6 pt-5 md:px-10 md:pt-6 sm:flex-row sm:items-center sm:justify-between">
         <button
           onClick={() => router.push("/notes")}
           data-testid="note-editor-back"
@@ -429,13 +429,13 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
           Back to notes
         </button>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:gap-2">
           {lastEditedAt && (
-            <span className="rounded-full border border-stone-200 bg-white/80 px-3 py-1 text-xs text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400">
+            <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-[11px] text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400 sm:px-3 sm:text-xs">
               Edited {formatDate(lastEditedAt)}
             </span>
           )}
-          <span className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white/80 px-3 py-1 text-xs text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400">
+          <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-[11px] text-stone-500 shadow-sm dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400 sm:gap-2 sm:px-3 sm:text-xs">
             <span className={cn("h-2 w-2 rounded-full", statusDot[saveStatus])} />
             {saveStatus === "saved"
               ? "Saved"

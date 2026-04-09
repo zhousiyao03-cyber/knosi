@@ -63,7 +63,7 @@ function ProjectNoteSharePopover({
         data-testid="project-note-share-button"
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium shadow-sm transition-colors",
+          "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors sm:px-3 sm:text-xs",
           shareToken
             ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-900/80 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/60"
             : "border-stone-200 bg-white/80 text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:border-stone-800 dark:bg-stone-950/80 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-200"
@@ -166,20 +166,19 @@ export default function ProjectNotePage({
 
   return (
     <div>
-      <div className="relative z-20 mx-auto flex w-full max-w-[980px] justify-end px-6 pt-5 md:px-10 md:pt-6">
-        <ProjectNoteSharePopover
-          noteId={noteId}
-          shareToken={
-            (note as { shareToken?: string | null }).shareToken ?? null
-          }
-        />
-      </div>
-
       <KnowledgeNoteEditor
         noteId={noteId}
         note={note}
         backHref={`/projects/${id}?view=overview`}
         backLabel="Back to project"
+        headerActions={
+          <ProjectNoteSharePopover
+            noteId={noteId}
+            shareToken={
+              (note as { shareToken?: string | null }).shareToken ?? null
+            }
+          />
+        }
         onSave={async (payload) => {
           await updateNote.mutateAsync({
             id: payload.id,
