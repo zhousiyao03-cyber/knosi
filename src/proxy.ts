@@ -13,6 +13,7 @@ export default auth((req) => {
   const isPublicPath =
     pathname === "/login" ||
     pathname === "/register" ||
+    pathname.startsWith("/share/") ||
     pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/icon") ||
     pathname.startsWith("/apple-icon") ||
@@ -22,6 +23,11 @@ export default auth((req) => {
     pathname.startsWith("/api/focus/pair") ||
     pathname.startsWith("/api/usage") ||
     pathname.startsWith("/api/analysis") ||
+    pathname.startsWith("/api/daemon/") ||
+    pathname === "/api/chat/claim" ||
+    pathname === "/api/chat/progress" ||
+    pathname === "/api/chat/complete" ||
+    pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon");
 
