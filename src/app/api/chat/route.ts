@@ -34,6 +34,7 @@ const chatInputSchema = z.object({
   sourceScope: z.enum(ASK_AI_SOURCE_SCOPES).optional(),
   contextNoteText: z.string().max(32_000).optional(),
   pinnedSources: z.array(pinnedSourceSchema).max(10).optional(),
+  preferStructuredBlocks: z.boolean().optional(),
 });
 
 /**
@@ -220,6 +221,7 @@ export async function POST(req: Request) {
       system: buildSystemPrompt(context, sourceScope, {
         contextNoteText: parsed.data.contextNoteText,
         pinnedSources,
+        preferStructuredBlocks: parsed.data.preferStructuredBlocks,
       }),
     });
 

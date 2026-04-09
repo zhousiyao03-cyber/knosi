@@ -175,6 +175,42 @@ test.describe("Ask AI inline in editor", () => {
     );
   });
 
+  test("structured <ai_blocks> response is inserted as a real heading block", async ({
+    page,
+  }) => {
+    // Ask the mock to return an <ai_blocks> envelope. parseAiBlocks should
+    // pull the heading node out and insertContentAt should mount it as a
+    // proper <h2> instead of a flat paragraph.
+    await mockChatStream(
+      page,
+      `I gathered this for you:\n<ai_blocks>\n[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"STRUCTURED_H2"}]}]\n</ai_blocks>`
+    );
+
+    const { editor } = await createNote(page);
+    await editor.click();
+    await editor.press("/");
+    await page
+      .getByTestId("editor-slash-menu")
+      .getByRole("button", { name: "Ask AI" })
+      .click();
+
+    const popover = page.locator("[data-inline-ask-ai]");
+    await expect(popover).toBeVisible();
+
+    await popover.locator("textarea").fill("give me a header");
+    await popover.locator("textarea").press("Enter");
+
+    // Wait for the streamed mock to arrive. The popover preview shows the
+    // raw text including the <ai_blocks> wrapper.
+    await expect(popover).toContainText("STRUCTURED_H2", { timeout: 10_000 });
+
+    await popover.getByRole("button", { name: "插入" }).click();
+    await expect(popover).toBeHidden();
+
+    // The editor should now contain a real heading element, not just text.
+    await expect(editor.locator("h2")).toContainText("STRUCTURED_H2");
+  });
+
   test("Escape closes popover without modifying the editor", async ({
     page,
   }) => {

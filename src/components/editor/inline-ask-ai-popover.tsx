@@ -189,6 +189,9 @@ export function InlineAskAiPopover({
             id: s.id,
             type: s.type,
           })),
+          // M3: ask the model to emit <ai_blocks> JSON when the answer
+          // has structure. parseAiBlocks() handles both paths.
+          preferStructuredBlocks: true,
         },
       }
     );

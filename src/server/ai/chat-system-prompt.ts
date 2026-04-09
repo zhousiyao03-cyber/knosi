@@ -106,6 +106,15 @@ export interface BuildSystemPromptOptions {
    * by the route handler, so no additional filtering here.
    */
   pinnedSources?: RetrievedKnowledgeItem[];
+  /**
+   * Opt-in flag from the inline Ask AI popover. When true, the system
+   * prompt asks the model to (optionally) wrap rich answers in
+   * <ai_blocks> XML containing a JSON array of Tiptap JSONContent nodes,
+   * so `parseAiBlocks` can insert them as structured blocks instead of
+   * losing fidelity through a plaintext → markdown round trip. Plain
+   * short answers stay as plain text.
+   */
+  preferStructuredBlocks?: boolean;
 }
 
 function withNoteContext(base: string, options?: BuildSystemPromptOptions) {
@@ -142,8 +151,41 @@ ${block}
 </pinned_sources>`;
 }
 
+function withStructuredBlocksInstructions(
+  base: string,
+  options?: BuildSystemPromptOptions
+) {
+  if (!options?.preferStructuredBlocks) return base;
+  return `${base}
+
+---
+
+**结构化输出（首选）**：如果你的回答包含多种块类型（标题、列表、代码块、引用、callout 等），**请优先**把整个回答包在 \`<ai_blocks>\` XML 标签里，内容是一个 JSON 数组，每个元素是 Tiptap ProseMirror 的 JSONContent 节点。示例：
+
+<ai_blocks>
+[
+  {"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"要点"}]},
+  {"type":"paragraph","content":[{"type":"text","text":"一句介绍。"}]},
+  {"type":"bulletList","content":[
+    {"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"第一点"}]}]},
+    {"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"第二点"}]}]}
+  ]},
+  {"type":"codeBlock","attrs":{"language":"ts"},"content":[{"type":"text","text":"const x = 1;"}]}
+]
+</ai_blocks>
+
+规则：
+- JSON 必须是有效可解析的数组，直接放在 \`<ai_blocks>\` 和 \`</ai_blocks>\` 之间，不要加 markdown 代码围栏。
+- 支持的节点类型：paragraph, heading (attrs.level 1-6), bulletList, orderedList, listItem, codeBlock (attrs.language optional), blockquote。
+- 如果回答只是一段简单的纯文本或一两个段落，不必包，用普通文本即可，调用方会自动回退到 markdown 解析。
+- 如果你已经按知识库规则在末尾输出了 \`<!-- sources:... -->\` 隐藏标记，它应该**在** \`</ai_blocks>\` **之后**。`;
+}
+
 function finalizePrompt(base: string, options?: BuildSystemPromptOptions) {
-  return withPinnedSources(withNoteContext(base, options), options);
+  return withStructuredBlocksInstructions(
+    withPinnedSources(withNoteContext(base, options), options),
+    options
+  );
 }
 
 export function buildSystemPrompt(
