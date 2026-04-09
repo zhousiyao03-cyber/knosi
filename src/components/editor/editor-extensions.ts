@@ -70,7 +70,7 @@ export function createEditorExtensions({
     }),
     CodeBlockWithLang,
     Typography,
-    Table.configure({ resizable: true }),
+    Table.configure({ resizable: true, renderWrapper: true }),
     TableRow,
     TableCell,
     TableHeader,
