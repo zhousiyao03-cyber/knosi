@@ -91,18 +91,49 @@ export function getUserMessageText(message: ModelMessage | undefined) {
     .join("");
 }
 
+export interface BuildSystemPromptOptions {
+  /**
+   * Full plain text of the note the user is currently editing. When present,
+   * it is appended to the system prompt as "current note context" so the
+   * assistant can resolve references like "this note" / "the text above".
+   * Truncated to 8000 chars to keep token usage bounded.
+   */
+  contextNoteText?: string;
+}
+
+function withNoteContext(base: string, options?: BuildSystemPromptOptions) {
+  const noteCtx = options?.contextNoteText?.trim();
+  if (!noteCtx) return base;
+  return `${base}
+
+---
+
+用户当前正在编辑一个笔记。以下是笔记的当前内容，供你理解上下文（当用户说 “这篇笔记”、“上面这段”、“本页” 时，指的就是这段内容；除非用户要求，否则不要原样复述这段内容）：
+
+<current_note>
+${noteCtx.slice(0, 8000)}
+</current_note>`;
+}
+
 export function buildSystemPrompt(
   context: RetrievedKnowledgeItem[],
-  sourceScope: AskAiSourceScope
+  sourceScope: AskAiSourceScope,
+  options?: BuildSystemPromptOptions
 ): string {
   const identityLine = getChatAssistantIdentity();
 
   if (context.length === 0) {
     if (sourceScope === "direct") {
-      return `${identityLine} 当前请求选择了直接回答模式，不要引用知识库，直接用中文回答用户的问题，简洁准确。`;
+      return withNoteContext(
+        `${identityLine} 当前请求选择了直接回答模式，不要引用知识库，直接用中文回答用户的问题，简洁准确。`,
+        options
+      );
     }
 
-    return `${identityLine} 用户的知识库中没有找到相关内容，请直接用中文回答用户的问题，简洁准确。`;
+    return withNoteContext(
+      `${identityLine} 用户的知识库中没有找到相关内容，请直接用中文回答用户的问题，简洁准确。`,
+      options
+    );
   }
 
   const scopeHint =
@@ -132,7 +163,8 @@ export function buildSystemPrompt(
     })
     .join("\n\n");
 
-  return `${identityLine} 你帮助用户管理和理解他们的知识库。用中文回答问题，简洁准确。
+  return withNoteContext(
+    `${identityLine} 你帮助用户管理和理解他们的知识库。用中文回答问题，简洁准确。
 
 ${scopeHint}
 
@@ -147,5 +179,7 @@ ${knowledgeBlock}
 2. 如果你使用了知识库中的内容，必须在回复的最末尾追加一个隐藏标记，格式为：
 <!-- sources:[{"id":"来源ID","type":"note或bookmark","title":"来源标题"}] -->
 只包含你实际引用的来源，不要包含未使用的来源。
-3. 隐藏标记必须是回复的最后一行，前面有一个空行。`;
+3. 隐藏标记必须是回复的最后一行，前面有一个空行。`,
+    options
+  );
 }

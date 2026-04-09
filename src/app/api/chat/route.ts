@@ -24,6 +24,7 @@ const chatInputSchema = z.object({
   id: z.string().optional(),
   messages: z.array(z.unknown()),
   sourceScope: z.enum(ASK_AI_SOURCE_SCOPES).optional(),
+  contextNoteText: z.string().max(32_000).optional(),
 });
 
 const SKIP_RAG_KEYWORDS = ["不用搜索", "直接回答", "不需要搜索", "不要搜索"];
@@ -69,6 +70,10 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      // TODO(ask-ai M1 follow-up): daemon mode currently ignores
+      // contextNoteText. Inline editor Ask AI uses stream mode (sourceScope
+      // "direct"), so this is acceptable until the inline feature also needs
+      // to run against daemon mode.
       const { taskId } = await enqueueChatTask({
         userId,
         messages,
@@ -121,7 +126,9 @@ export async function POST(req: Request) {
       messages,
       sessionId: parsed.data.id,
       signal: req.signal,
-      system: buildSystemPrompt(context, sourceScope),
+      system: buildSystemPrompt(context, sourceScope, {
+        contextNoteText: parsed.data.contextNoteText,
+      }),
     });
 
     // Record usage (fire-and-forget, don't block the response)
