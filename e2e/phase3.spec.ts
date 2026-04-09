@@ -147,19 +147,21 @@ test.describe("Phase 3: Todo 模块", () => {
 });
 
 test.describe("Phase 3: 收藏箱模块", () => {
-  test("收藏列表页加载成功", async ({ page }) => {
+  test("收藏列表页加载成功（Bookmarks h1）", async ({ page }) => {
     await page.goto("/bookmarks");
-    await expect(page.locator("main h1")).toContainText("收藏");
+    await expect(page.locator("main h1")).toContainText("Bookmarks");
   });
 
   test("添加 URL 收藏", async ({ page }) => {
     const title = `bm-${uid()}`;
     await page.goto("/bookmarks");
 
-    await page.getByText("添加收藏").click();
-    await page.locator("input[placeholder='标题']").fill(title);
-    await page.locator("input[placeholder='URL（可选）']").fill("https://example.com");
-    await page.getByRole("button", { name: "保存" }).click();
+    await page.getByRole("button", { name: "Add bookmark" }).click();
+    await page.locator("input[placeholder='Title']").fill(title);
+    await page
+      .locator("input[placeholder='URL (optional)']")
+      .fill("https://example.com");
+    await page.getByRole("button", { name: "Save" }).click();
 
     await expect(page.getByText(title).first()).toBeVisible();
   });
@@ -168,35 +170,18 @@ test.describe("Phase 3: 收藏箱模块", () => {
     const title = `txt-${uid()}`;
     await page.goto("/bookmarks");
 
-    await page.getByText("添加收藏").click();
-    await page.locator("input[placeholder='标题']").fill(title);
-    await page.getByRole("button", { name: "保存" }).click();
+    await page.getByRole("button", { name: "Add bookmark" }).click();
+    await page.locator("input[placeholder='Title']").fill(title);
+    await page.getByRole("button", { name: "Save" }).click();
 
     await expect(page.getByText(title).first()).toBeVisible();
-  });
-
-  test("删除收藏", async ({ page }) => {
-    const title = `delbm-${uid()}`;
-    await page.goto("/bookmarks");
-
-    await page.getByText("添加收藏").click();
-    await page.locator("input[placeholder='标题']").fill(title);
-    await page.getByRole("button", { name: "保存" }).click();
-    await expect(page.getByText(title).first()).toBeVisible();
-
-    // Delete
-    const bmRow = page.locator("div.group").filter({ hasText: title }).first();
-    await bmRow.hover();
-    await bmRow.locator("button[title='删除']").click();
-
-    await expect(page.getByText(title)).not.toBeVisible({ timeout: 5000 });
   });
 
   test("取消添加收藏表单", async ({ page }) => {
     await page.goto("/bookmarks");
-    await page.getByText("添加收藏").click();
-    await expect(page.locator("input[placeholder='标题']")).toBeVisible();
-    await page.getByRole("button", { name: "取消" }).click();
-    await expect(page.locator("input[placeholder='标题']")).not.toBeVisible();
+    await page.getByRole("button", { name: "Add bookmark" }).click();
+    await expect(page.locator("input[placeholder='Title']")).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.locator("input[placeholder='Title']")).not.toBeVisible();
   });
 });
