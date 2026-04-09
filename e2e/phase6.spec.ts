@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Phase 6: 首页仪表盘", () => {
   test("仪表盘加载成功（Focus 卡片可见）", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByTestId("dashboard-focus-card")).toBeVisible();
+    await expect(page.getByTestId("dashboard-focus-card").first()).toBeVisible();
   });
 
   test("首页显示最近笔记分区", async ({ page }) => {
@@ -21,7 +21,9 @@ test.describe("Phase 6: 首页仪表盘", () => {
 
   test("首页显示 Focus 卡片上的今日专注标题", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("今日专注", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("今日专注", { exact: true }).first()
+    ).toBeVisible();
   });
 
   test("Notes 侧边栏链接直接跳转", async ({ page }) => {

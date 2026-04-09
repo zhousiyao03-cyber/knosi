@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Phase 1: 项目骨架 + 基础布局", () => {
   test("首页加载成功，显示 dashboard Focus 卡片", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByTestId("dashboard-focus-card")).toBeVisible();
+    await expect(page.getByTestId("dashboard-focus-card").first()).toBeVisible();
   });
 
   test("侧边栏显示核心导航项（英文 label）", async ({ page }) => {

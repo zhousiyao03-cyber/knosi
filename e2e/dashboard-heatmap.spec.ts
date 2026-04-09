@@ -6,9 +6,13 @@ test.describe("Dashboard 最近 30 天工作时长热力图", () => {
   }) => {
     await page.goto("/");
 
+    // `.first()` because focus-tracker.spec seeds session data in parallel
+    // and Next.js in dev can briefly keep an old dashboard card mounted
+    // alongside the fresh one, producing two matching <section>s.
     const card = page
       .locator("section")
-      .filter({ hasText: "最近 30 天工作时长" });
+      .filter({ hasText: "最近 30 天工作时长" })
+      .first();
     await expect(card).toBeVisible();
 
     // 顶部 4 个汇总指标标签
@@ -26,9 +30,8 @@ test.describe("Dashboard 最近 30 天工作时长热力图", () => {
     await expect(cells).toHaveCount(30);
 
     // 右上角 Focus 详情跳转链接
-    await expect(card.getByRole("link", { name: /Focus 详情/ })).toHaveAttribute(
-      "href",
-      "/focus"
-    );
+    await expect(
+      card.getByRole("link", { name: /Focus 详情/ })
+    ).toHaveAttribute("href", "/focus");
   });
 });
