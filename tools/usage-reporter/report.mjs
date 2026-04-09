@@ -838,6 +838,90 @@ async function pollChatTasks() {
 }
 
 // ---------------------------------------------------------------------------
+// Daily Claude ping — keeps local Claude CLI warm / sanity-check at 05:59 local
+// ---------------------------------------------------------------------------
+
+const DAILY_PING_HOUR = 5;
+const DAILY_PING_MINUTE = 59;
+let lastDailyPingDate = ""; // "YYYY-MM-DD" of last successful run; empty = never
+
+function todayDateKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+async function maybeRunDailyPing() {
+  const now = new Date();
+  const today = todayDateKey();
+
+  // Already ran today
+  if (lastDailyPingDate === today) return;
+
+  // Only fire after the scheduled minute has passed (prevents firing at midnight
+  // just because the daemon started; waits until the actual 05:59 slot today).
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  if (hour < DAILY_PING_HOUR || (hour === DAILY_PING_HOUR && minute < DAILY_PING_MINUTE)) {
+    return;
+  }
+
+  // Mark as run BEFORE spawning so a failure doesn't retry every hour
+  lastDailyPingDate = today;
+
+  console.log(`[${timestamp()}] 🌅 daily claude ping firing`);
+
+  try {
+    const claudeBin = process.env.CLAUDE_BIN || "claude";
+    const child = cpSpawn(
+      claudeBin,
+      ["-p", "hello", "--output-format", "stream-json", "--verbose"],
+      { stdio: ["ignore", "pipe", "pipe"] }
+    );
+
+    let outputText = "";
+    child.stdout.on("data", (chunk) => {
+      outputText += chunk.toString("utf8");
+    });
+
+    await new Promise((resolve, reject) => {
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code !== 0) {
+          reject(new Error(`claude exited with code ${code}`));
+        } else {
+          resolve(undefined);
+        }
+      });
+    });
+
+    // Extract the assistant text for a friendly log line
+    let firstText = "";
+    for (const line of outputText.split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line);
+        if (event.type === "assistant" && event.message?.content) {
+          for (const block of event.message.content) {
+            if (block.type === "text" && typeof block.text === "string") {
+              firstText = block.text;
+              break;
+            }
+          }
+        }
+        if (firstText) break;
+      } catch {}
+    }
+
+    console.log(
+      `[${timestamp()}] ✅ daily claude ping ok: ${firstText.slice(0, 80) || "(no text)"}`
+    );
+  } catch (err) {
+    console.error(`[${timestamp()}] ❌ daily claude ping failed:`, err.message);
+    // Intentionally do NOT reset lastDailyPingDate — we accept one miss per day.
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Heartbeat
 // ---------------------------------------------------------------------------
 
@@ -898,6 +982,11 @@ if (IS_ONCE) {
   setInterval(() => {
     heartbeat("chat").catch(() => {});
   }, HEARTBEAT_INTERVAL_MS);
+
+  // Daily claude ping — fires once/day at 05:59 local, checked hourly
+  setInterval(() => {
+    maybeRunDailyPing().catch(() => {});
+  }, 60 * 60 * 1000);
 
   // Graceful shutdown
   for (const sig of ["SIGINT", "SIGTERM"]) {
