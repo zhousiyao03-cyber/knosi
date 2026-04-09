@@ -39,9 +39,10 @@ Live demo:
   - Mermaid diagram full-screen view + inline editing (live preview)
   - Mixed Markdown paste (auto-detects Mermaid code blocks and Markdown tables, converts to rich text)
   - Auto-save + content loss prevention
+  - Public read-only link sharing, so shared notes open without login
   - One-click daily journal from home page and notes page; journal title shows "date + day of week", comes with three default template blocks, and can inherit incomplete plans from the most recent journal
 - **Learning Notebook** — Organize learning content by topic, with topic cards (editable/deletable), per-topic note lists, tag filtering, AI draft generation, knowledge outline / blind spot analysis / review question generation, and Ask AI based on topic note context
-- **Open Source Projects** — Accumulate code reading notes organized by project, with repo metadata, in-project note editing, tag filtering, and long-term analysis archiving
+- **Open Source Projects** — Accumulate code reading notes organized by project, with repo metadata, in-project note editing, tag filtering, per-note read-only link sharing, and long-term analysis archiving
 - **Portfolio** — Investment portfolio tracking with position management (stocks/crypto), Yahoo Finance + CoinGecko real-time prices, AI position analysis, GPT news aggregation (Marketaux / Google News RSS) with Vercel Cron auto-refresh
 - **Search** — Cmd+K global note search with keyword highlighting
 - **Ask AI** — Chunk-level hybrid RAG Q&A based on your knowledge base, supporting semantic retrieval, keyword recall, adjacent paragraph expansion, and clickable source citations
@@ -55,9 +56,9 @@ Frozen modules (code retained but entry points hidden by default): Bookmarks, To
 ## Product Preview
 
 - **Home**: Aggregates recent notes and token usage — see global status at a glance
-- **Notes**: Centered on editing experience, supports quick capture and structured organization (Mermaid, Excalidraw, tables, side-by-side images, TOC, etc.)
+- **Notes**: Centered on editing experience, supports quick capture, structured organization, and public read-only sharing
 - **Learning Notebook**: Continuously write, ask, and review around a learning topic
-- **Open Source Projects**: Save code reading conclusions and architecture excerpts per project
+- **Open Source Projects**: Save code reading conclusions and architecture excerpts per project, and share individual project notes as read-only pages
 - **Portfolio**: Track positions, real-time prices, and related news
 - **Ask AI**: Query your knowledge base, get answers with source citations
 - **Search**: Use `Cmd+K` to quickly find notes

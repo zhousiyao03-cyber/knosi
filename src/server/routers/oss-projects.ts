@@ -205,6 +205,42 @@ export const ossProjectsRouter = router({
       return { success: true };
     }),
 
+  enableNoteShare: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const [note] = await db
+        .select({ shareToken: osProjectNotes.shareToken })
+        .from(osProjectNotes)
+        .where(and(eq(osProjectNotes.id, input.id), eq(osProjectNotes.userId, ctx.userId)));
+
+      if (!note) {
+        throw new Error("Project note not found");
+      }
+
+      if (note.shareToken) {
+        return { shareToken: note.shareToken };
+      }
+
+      const shareToken = crypto.randomUUID();
+      await db
+        .update(osProjectNotes)
+        .set({ shareToken, sharedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(osProjectNotes.id, input.id), eq(osProjectNotes.userId, ctx.userId)));
+
+      return { shareToken };
+    }),
+
+  disableNoteShare: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      await db
+        .update(osProjectNotes)
+        .set({ shareToken: null, sharedAt: null, updatedAt: new Date() })
+        .where(and(eq(osProjectNotes.id, input.id), eq(osProjectNotes.userId, ctx.userId)));
+
+      return { success: true };
+    }),
+
   listNotes: protectedProcedure
     .input(z.object({ projectId: z.string(), tag: z.string().trim().optional() }))
     .query(async ({ input, ctx }) => {

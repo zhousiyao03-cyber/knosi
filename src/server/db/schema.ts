@@ -514,6 +514,8 @@ export const osProjectNotes = sqliteTable("os_project_notes", {
   content: text("content"),
   plainText: text("plain_text"),
   tags: text("tags"),
+  shareToken: text("share_token").unique(),
+  sharedAt: integer("shared_at", { mode: "timestamp" }),
   noteType: text("note_type").default("manual"), // manual | analysis | followup
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),

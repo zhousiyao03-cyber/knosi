@@ -3,7 +3,15 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, GitCommit, Loader2, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  GitCommit,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Send,
+  Trash2,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatDate } from "@/lib/utils";
 
@@ -102,14 +110,6 @@ export default function ProjectDetailPage({
     timelineEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Reset messages when analysis completes
-  useEffect(() => {
-    if (analysisStatus === "completed" || analysisStatus === "failed") {
-      setMessages([]);
-      lastSeqRef.current = 0;
-    }
-  }, [analysisStatus]);
-
   // When analysis transitions to completed, refresh notes and project data
   useEffect(() => {
     if (analysisStatus === "completed") {
@@ -129,6 +129,8 @@ export default function ProjectDetailPage({
 
   const startAnalysis = trpc.ossProjects.startAnalysis.useMutation({
     onSuccess: () => {
+      setMessages([]);
+      lastSeqRef.current = 0;
       void utils.ossProjects.analysisStatus.invalidate({ projectId: id });
       void utils.ossProjects.getProject.invalidate({ id });
     },
@@ -137,6 +139,8 @@ export default function ProjectDetailPage({
   const askFollowup = trpc.ossProjects.askFollowup.useMutation({
     onSuccess: async () => {
       setFollowupQuestion("");
+      setMessages([]);
+      lastSeqRef.current = 0;
       await utils.ossProjects.listNotes.invalidate({ projectId: id });
     },
   });
@@ -524,13 +528,19 @@ export default function ProjectDetailPage({
 
                 {/* Notes in this group */}
                 {group.map((note) => (
-                  <button
+                  <div
                     key={note.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() =>
                       router.push(`/projects/${id}/notes/${note.id}`)
                     }
-                    className="group w-full rounded-[20px] border border-stone-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:hover:bg-stone-900"
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      router.push(`/projects/${id}/notes/${note.id}`);
+                    }}
+                    className="group w-full rounded-[20px] border border-stone-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-stone-800 dark:bg-stone-950 dark:hover:bg-stone-900 dark:focus:ring-blue-900"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div>
@@ -559,7 +569,7 @@ export default function ProjectDetailPage({
                         </button>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             );
@@ -583,13 +593,19 @@ export default function ProjectDetailPage({
                     </span>
                   </div>
                   {group.map((note) => (
-                    <button
+                    <div
                       key={note.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() =>
                         router.push(`/projects/${id}/notes/${note.id}`)
                       }
-                      className="group w-full rounded-[20px] border border-stone-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:hover:bg-stone-900"
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        router.push(`/projects/${id}/notes/${note.id}`);
+                      }}
+                      className="group w-full rounded-[20px] border border-stone-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-stone-800 dark:bg-stone-950 dark:hover:bg-stone-900 dark:focus:ring-blue-900"
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div>
@@ -604,7 +620,7 @@ export default function ProjectDetailPage({
                           {formatDate(note.updatedAt)}
                         </span>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               );

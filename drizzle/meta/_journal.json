@@ -148,6 +148,13 @@
       "when": 1775652320472,
       "tag": "0020_white_kronos",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1775745380565,
+      "tag": "0021_curly_orphan",
+      "breakpoints": true
     }
   ]
 }
