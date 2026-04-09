@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth, signIn } from "@/lib/auth";
+import { signIn } from "@/lib/auth";
 import { AppBrand } from "@/components/layout/app-brand";
+import { getRequestSession } from "@/server/auth/request-session";
 import { registerWithCredentials } from "./actions";
 
 const errorMessages: Record<string, string> = {
@@ -15,7 +16,7 @@ export default async function RegisterPage({
 }: {
   searchParams: Promise<{ error?: string | string[] }>;
 }) {
-  const session = await auth();
+  const session = await getRequestSession();
   if (session) {
     redirect("/");
   }

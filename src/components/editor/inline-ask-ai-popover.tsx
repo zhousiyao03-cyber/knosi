@@ -63,14 +63,11 @@ export function InlineAskAiPopover({
       )
     : "";
 
-  // Reset state whenever a new anchor opens the popover.
   useEffect(() => {
     if (anchor) {
-      setInput("");
-      setMessages([]);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
-  }, [anchor, setMessages]);
+  }, [anchor]);
 
   // Close on Escape / click outside.
   useEffect(() => {

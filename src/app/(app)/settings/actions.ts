@@ -3,8 +3,8 @@
 import { and, eq, ne } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { auth } from "@/lib/auth";
 import { hashPassword, normalizeEmail, verifyPassword } from "@/server/auth/password";
+import { getRequestSession } from "@/server/auth/request-session";
 import { db } from "@/server/db";
 import { hasTable } from "@/server/db/metadata";
 import { userCredentials, users } from "@/server/db/schema";
@@ -21,7 +21,7 @@ const passwordSchema = z.object({
 });
 
 async function requireSessionUser() {
-  const session = await auth();
+  const session = await getRequestSession();
 
   if (!session?.user?.id) {
     redirect("/login");

@@ -29,15 +29,18 @@ function scanHeadings(editor: Editor): TocEntry[] {
 }
 
 interface TocSidebarProps {
-  editor: Editor | null;
+  editor: Editor;
 }
 
 export function TocSidebar({ editor }: TocSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [headings, setHeadings] = useState<TocEntry[]>([]);
+  const [headings, setHeadings] = useState<TocEntry[]>(() => scanHeadings(editor));
   const [activePos, setActivePos] = useState<number | null>(null);
   const headingsRef = useRef(headings);
-  headingsRef.current = headings;
+
+  useEffect(() => {
+    headingsRef.current = headings;
+  }, [headings]);
 
   const updateHeadings = useCallback(() => {
     if (!editor) return;
@@ -61,9 +64,6 @@ export function TocSidebar({ editor }: TocSidebarProps) {
   }, [editor]);
 
   useEffect(() => {
-    if (!editor) return;
-
-    updateHeadings();
     editor.on("update", updateHeadings);
     editor.on("selectionUpdate", updateActiveHeading);
 
@@ -80,8 +80,6 @@ export function TocSidebar({ editor }: TocSidebarProps) {
     },
     [editor]
   );
-
-  if (!editor) return null;
 
   // Collapsed state: show a small expand button
   if (collapsed) {

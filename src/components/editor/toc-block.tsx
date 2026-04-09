@@ -44,16 +44,13 @@ function indentClass(level: number): string {
 }
 
 function TocNodeView({ editor }: NodeViewProps) {
-  const [entries, setEntries] = useState<TocEntry[]>([]);
+  const [entries, setEntries] = useState<TocEntry[]>(() => scanHeadings(editor));
 
   const refresh = useCallback(() => {
     setEntries(scanHeadings(editor));
   }, [editor]);
 
   useEffect(() => {
-    // Initial scan
-    refresh();
-
     // Re-scan whenever the document changes
     editor.on("update", refresh);
     return () => {

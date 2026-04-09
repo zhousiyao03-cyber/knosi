@@ -754,16 +754,24 @@ export function TiptapEditor({
   return (
     <div className="relative">
       {editable && (
-        <SearchBar
-          editor={editor}
-          isOpen={searchOpen}
-          onClose={() => setSearchOpen(false)}
-        />
+        searchOpen ? (
+          <SearchBar
+            key="search-open"
+            editor={editor}
+            isOpen={searchOpen}
+            onClose={() => setSearchOpen(false)}
+          />
+        ) : null
       )}
       {editable && <BubbleToolbar editor={editor} />}
       {editable && <TableToolbar editor={editor} />}
       {editable && editor && (
         <InlineAskAiPopover
+          key={
+            inlineAskAnchor
+              ? `${inlineAskAnchor.pos}:${inlineAskAnchor.selectionFrom ?? ""}:${inlineAskAnchor.selectionTo ?? ""}`
+              : "inline-ask-closed"
+          }
           editor={editor}
           anchor={inlineAskAnchor}
           noteText={editor.getText()}

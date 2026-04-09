@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getRequestSession } from "@/server/auth/request-session";
 import { db } from "@/server/db";
 import { hasTable } from "@/server/db/metadata";
 import { userCredentials, users } from "@/server/db/schema";
@@ -33,7 +33,7 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const session = await auth();
+  const session = await getRequestSession();
 
   if (!session?.user?.id) {
     redirect("/login");

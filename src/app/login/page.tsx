@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { auth, signIn } from "@/lib/auth";
+import { signIn } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { AppBrand } from "@/components/layout/app-brand";
 import {
   DEV_TEST_ACCOUNT,
   ensureDevTestAccount,
 } from "@/server/auth/dev-test-account";
+import { getRequestSession } from "@/server/auth/request-session";
 import { loginWithCredentials } from "./actions";
 
 const errorMessages: Record<string, string> = {
@@ -18,7 +19,7 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string | string[] }>;
 }) {
-  const session = await auth();
+  const session = await getRequestSession();
   if (session) {
     redirect("/");
   }

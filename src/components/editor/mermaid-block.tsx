@@ -39,8 +39,6 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
 
   useEffect(() => {
     if (!code.trim()) {
-      setSvgHtml(null);
-      setError(null);
       return;
     }
 
@@ -69,12 +67,6 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
     };
   }, [code, editing]);
 
-  const handleStartEditing = useCallback(() => {
-    if (!isEditable) return;
-    setEditing(true);
-    setFullscreen(false);
-  }, [isEditable]);
-
   const handleStopEditing = useCallback(() => {
     setEditing(false);
   }, []);
@@ -95,17 +87,33 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
   // Fullscreen zoom & pan state
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanningState, setIsPanningState] = useState(false);
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0 });
   const panOffset = useRef({ x: 0, y: 0 });
 
-  // Reset zoom/pan when entering fullscreen
-  useEffect(() => {
-    if (fullscreen) {
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-    }
-  }, [fullscreen]);
+  const handleStartEditing = useCallback(() => {
+    if (!isEditable) return;
+    setEditing(true);
+    setFullscreen(false);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setIsPanningState(false);
+  }, [isEditable]);
+
+  const openFullscreen = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setIsPanningState(false);
+    isPanning.current = false;
+    setFullscreen(true);
+  }, []);
+
+  const closeFullscreen = useCallback(() => {
+    setFullscreen(false);
+    setIsPanningState(false);
+    isPanning.current = false;
+  }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -118,6 +126,7 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
   const handlePanStart = useCallback((e: React.MouseEvent) => {
     // Only pan on middle-click or when holding space, or just drag
     isPanning.current = true;
+    setIsPanningState(true);
     panStart.current = { x: e.clientX, y: e.clientY };
     panOffset.current = { ...pan };
   }, [pan]);
@@ -132,17 +141,18 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
 
   const handlePanEnd = useCallback(() => {
     isPanning.current = false;
+    setIsPanningState(false);
   }, []);
 
   // Close fullscreen on Escape
   useEffect(() => {
     if (!fullscreen) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFullscreen(false);
+      if (e.key === "Escape") closeFullscreen();
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [fullscreen]);
+  }, [closeFullscreen, fullscreen]);
 
   return (
     <NodeViewWrapper
@@ -188,20 +198,33 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
       ) : (
         /* ── View Mode ── */
         <div contentEditable={false} className="mermaid-block-view">
-          {error ? (
+          {!code.trim() ? (
+            <div
+              className="mermaid-block-empty"
+              onClick={handleStartEditing}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") handleStartEditing();
+              }}
+            >
+              <GitBranch size={20} />
+              <span>点击编辑 Mermaid 图表</span>
+            </div>
+          ) : error ? (
             <div className="mermaid-block-error">{error}</div>
           ) : svgHtml ? (
             <>
               <div
                 className="mermaid-block-rendered"
-                onClick={() => setFullscreen(true)}
+                onClick={openFullscreen}
                 dangerouslySetInnerHTML={{ __html: svgHtml }}
               />
               {/* Toolbar: top-right corner on hover */}
               <div className="mermaid-block-toolbar">
                 <button
                   type="button"
-                  onClick={() => setFullscreen(true)}
+                  onClick={openFullscreen}
                   title="放大查看"
                 >
                   <Maximize2 size={14} />
@@ -217,20 +240,7 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
                 )}
               </div>
             </>
-          ) : (
-            <div
-              className="mermaid-block-empty"
-              onClick={handleStartEditing}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") handleStartEditing();
-              }}
-            >
-              <GitBranch size={20} />
-              <span>点击编辑 Mermaid 图表</span>
-            </div>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -238,7 +248,7 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
       {fullscreen && svgHtml && (
         <div
           className="mermaid-fullscreen-overlay"
-          onClick={() => setFullscreen(false)}
+          onClick={closeFullscreen}
         >
           <div
             className="mermaid-fullscreen-content"
@@ -248,12 +258,12 @@ function MermaidNodeView({ node, updateAttributes, editor }: NodeViewProps) {
             onMouseMove={handlePanMove}
             onMouseUp={handlePanEnd}
             onMouseLeave={handlePanEnd}
-            style={{ cursor: isPanning.current ? "grabbing" : "grab" }}
+            style={{ cursor: isPanningState ? "grabbing" : "grab" }}
           >
             <button
               type="button"
               className="mermaid-fullscreen-close"
-              onClick={() => setFullscreen(false)}
+              onClick={closeFullscreen}
             >
               <X size={20} />
             </button>

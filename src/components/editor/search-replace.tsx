@@ -286,16 +286,11 @@ export function SearchBar({ editor, isOpen, onClose }: SearchBarProps) {
     };
   }, [editor, isOpen]);
 
-  // Clear search when closing
   useEffect(() => {
-    if (!isOpen) {
+    return () => {
       dispatchSearchMeta(editor, { type: "clear" });
-      setQuery("");
-      setReplaceText("");
-      setShowReplace(false);
-      setMatchInfo({ total: 0, current: 0 });
-    }
-  }, [isOpen, editor]);
+    };
+  }, [editor]);
 
   const handleQueryChange = useCallback(
     (value: string) => {
