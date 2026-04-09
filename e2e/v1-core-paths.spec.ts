@@ -112,7 +112,9 @@ test.describe("V1 核心路径：Ask AI", () => {
 test.describe("V1 核心路径：Bookmark 搜索/筛选", () => {
   test("收藏列表可以按来源筛选", async ({ page }) => {
     await page.goto("/bookmarks");
-    const filter = page.locator("select[aria-label='Filter by source']");
+    const filter = page
+      .locator("select[aria-label='Filter by source']")
+      .first();
     await expect(filter).toBeVisible();
     await filter.selectOption("url");
     await filter.selectOption("text");
@@ -122,7 +124,7 @@ test.describe("V1 核心路径：Bookmark 搜索/筛选", () => {
   test("收藏列表有搜索框", async ({ page }) => {
     await page.goto("/bookmarks");
     await expect(
-      page.locator("input[placeholder='Search bookmarks...']")
+      page.locator("input[placeholder='Search bookmarks...']").first()
     ).toBeVisible();
   });
 });

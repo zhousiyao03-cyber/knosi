@@ -5,10 +5,14 @@ const uid = () => Math.random().toString(36).slice(2, 8);
 test.describe("Phase 3: Todo 模块", () => {
   test("Todo 列表页加载成功", async ({ page }) => {
     await page.goto("/todos");
-    await expect(page.locator("main h1")).toContainText("Todo");
-    await expect(page.getByText("先把任务录进来")).toBeVisible();
-    await expect(page.getByRole("button", { name: "表格" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Dashboard" })).toBeVisible();
+    await expect(page.locator("main h1").first()).toContainText("Todo");
+    await expect(page.getByText("先把任务录进来").first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "表格" }).first()
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Dashboard" }).first()
+    ).toBeVisible();
   });
 
   test("创建带时间和分类的 Todo", async ({ page }) => {

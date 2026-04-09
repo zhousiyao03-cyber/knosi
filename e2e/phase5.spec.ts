@@ -58,8 +58,8 @@ test.describe("Phase 5: AI 探索", () => {
 
   test("显示空状态和探索按钮", async ({ page }) => {
     await page.goto("/explore");
-    await expect(page.getByText("开始探索")).toBeVisible();
-    await expect(page.getByText("AI 会分析你的笔记")).toBeVisible();
+    await expect(page.getByText("开始探索").first()).toBeVisible();
+    await expect(page.getByText("AI 会分析你的笔记").first()).toBeVisible();
   });
 
   test("explore API endpoint 存在", async ({ request }) => {
