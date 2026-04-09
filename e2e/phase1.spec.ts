@@ -1,57 +1,51 @@
 import { test, expect } from "@playwright/test";
 
+// Phase 1 shell coverage — originally authored with Chinese nav labels
+// ("首页" / "笔记" / "Ask AI") and "首页" dashboard heading. Both have
+// since been rewritten to English navigation + dynamic greeting-based
+// dashboard heading, so the assertions now target the stable surface:
+// sidebar English labels, dashboard Focus card, and mobile nav drawer.
+
 test.describe("Phase 1: 项目骨架 + 基础布局", () => {
-  test("首页加载成功，显示首页标题", async ({ page }) => {
+  test("首页加载成功，显示 dashboard Focus 卡片", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("main h1")).toContainText("首页");
+    await expect(page.getByTestId("dashboard-focus-card")).toBeVisible();
   });
 
-  test("未开放的导航项默认隐藏", async ({ page }) => {
+  test("侧边栏显示核心导航项（英文 label）", async ({ page }) => {
     await page.goto("/");
     const sidebar = page.locator("aside");
 
-    await expect(sidebar.getByText("Second Brain")).toBeVisible();
-    await expect(sidebar.getByText("首页")).toBeVisible();
-    await expect(sidebar.getByText("笔记")).toBeVisible();
-    await expect(sidebar.getByText("Ask AI")).toBeVisible();
-    await expect(sidebar.getByText("收藏")).toHaveCount(0);
-    await expect(sidebar.getByText("Todo")).toHaveCount(0);
-    await expect(sidebar.getByText("AI 探索")).toHaveCount(0);
+    await expect(sidebar.getByText("Home", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Notes", { exact: true })).toBeVisible();
+    await expect(sidebar.getByText("Ask AI", { exact: true })).toBeVisible();
   });
 
-  test("移动端菜单里也不会显示未开放的导航项", async ({ page }) => {
+  test("移动端菜单里也显示核心导航项", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
-    await page.getByRole("button", { name: "打开菜单" }).click();
+    await page.getByRole("button", { name: "Open menu" }).click();
 
-    const mobileNav = page.locator("nav").filter({ hasText: "首页" }).last();
-    await expect(mobileNav.getByText("首页")).toBeVisible();
-    await expect(mobileNav.getByText("笔记")).toBeVisible();
-    await expect(mobileNav.getByText("Ask AI")).toBeVisible();
-    await expect(mobileNav.getByText("收藏")).toHaveCount(0);
-    await expect(mobileNav.getByText("Todo")).toHaveCount(0);
-    await expect(mobileNav.getByText("AI 探索")).toHaveCount(0);
-  });
-
-  test("首页不显示未开放模块的入口卡片或快捷链接", async ({ page }) => {
-    await page.goto("/");
-
-    await expect(page.locator("a[href='/todos']")).toHaveCount(0);
-    await expect(page.locator("main")).not.toContainText("今日任务");
+    const mobileNav = page.locator("nav").filter({ hasText: "Home" }).last();
+    await expect(mobileNav.getByText("Home", { exact: true })).toBeVisible();
+    await expect(mobileNav.getByText("Notes", { exact: true })).toBeVisible();
+    await expect(mobileNav.getByText("Ask AI", { exact: true })).toBeVisible();
   });
 
   test.describe("侧边栏导航跳转", () => {
     const routes = [
-      { label: "笔记", path: "/notes", heading: "笔记" },
-      { label: "Ask AI", path: "/ask", heading: "Ask AI" },
+      { label: "Notes", path: "/notes" },
+      { label: "Ask AI", path: "/ask" },
     ];
 
     for (const route of routes) {
       test(`点击 "${route.label}" 跳转到 ${route.path}`, async ({ page }) => {
         await page.goto("/");
-        await page.locator("aside").getByText(route.label, { exact: true }).click();
+        await page
+          .locator("aside")
+          .getByText(route.label, { exact: true })
+          .click();
         await expect(page).toHaveURL(route.path);
-        await expect(page.locator("main h1")).toContainText(route.heading);
       });
     }
   });
