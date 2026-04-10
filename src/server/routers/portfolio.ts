@@ -308,13 +308,13 @@ export const portfolioRouter = router({
       const stockSymbols = symbols.filter((_, i) => assetTypes[i] === "stock");
       const cryptoSymbols = symbols.filter((_, i) => assetTypes[i] === "crypto");
 
-      // 美股：Yahoo Finance（并行请求）
+      // 美股：Yahoo Finance（并行请求，60s 缓存）
       await Promise.all(
         stockSymbols.map(async (sym) => {
           try {
             const res = await fetch(
               `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`,
-              { next: { revalidate: 0 } }
+              { next: { revalidate: 60 } }
             );
             if (!res.ok) throw new Error(`Yahoo Finance error: ${res.status}`);
             const json = await res.json() as {
@@ -376,7 +376,7 @@ export const portfolioRouter = router({
           try {
             const res = await fetch(
               `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`,
-              { next: { revalidate: 0 } }
+              { next: { revalidate: 60 } }
             );
             if (!res.ok) throw new Error(`CoinGecko error: ${res.status}`);
             const json = await res.json() as Record<string, { usd?: number; usd_24h_change?: number }>;

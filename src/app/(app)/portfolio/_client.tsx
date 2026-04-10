@@ -691,8 +691,7 @@ export function PortfolioClient() {
     { symbols, assetTypes },
     {
       enabled: symbols.length > 0,
-      staleTime: 0,
-      refetchOnMount: "always",
+      staleTime: 60_000,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
     }
@@ -844,8 +843,7 @@ export function PortfolioClient() {
   );
   const analysisQuery = trpc.portfolio.analyze.useQuery(analysisInput, {
     enabled: holdingSnapshots.length > 0,
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 5 * 60_000,
   });
   const portfolioAnalysis = analysisQuery.data?.portfolio ?? fallbackAnalysis.portfolio;
   const selectedHoldingAnalysis = analysisQuery.data?.holding ?? fallbackAnalysis.holding;
