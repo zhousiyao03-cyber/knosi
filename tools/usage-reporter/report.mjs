@@ -15,6 +15,10 @@ import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, unlinkS
 import { execSync, spawn as cpSpawn } from "child_process";
 import { homedir, tmpdir } from "os";
 import { join } from "path";
+import {
+  getDelayUntilNextDailyPing,
+  getNextDailyPingAt,
+} from "./daily-ping-scheduler.mjs";
 
 const SERVER_URL = process.env.SECOND_BRAIN_URL || "https://second-brain-self-alpha.vercel.app";
 const SCAN_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -841,33 +845,7 @@ async function pollChatTasks() {
 // Daily Claude ping — keeps local Claude CLI warm / sanity-check at 05:59 local
 // ---------------------------------------------------------------------------
 
-const DAILY_PING_HOUR = 5;
-const DAILY_PING_MINUTE = 59;
-let lastDailyPingDate = ""; // "YYYY-MM-DD" of last successful run; empty = never
-
-function todayDateKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-async function maybeRunDailyPing() {
-  const now = new Date();
-  const today = todayDateKey();
-
-  // Already ran today
-  if (lastDailyPingDate === today) return;
-
-  // Only fire after the scheduled minute has passed (prevents firing at midnight
-  // just because the daemon started; waits until the actual 05:59 slot today).
-  const hour = now.getHours();
-  const minute = now.getMinutes();
-  if (hour < DAILY_PING_HOUR || (hour === DAILY_PING_HOUR && minute < DAILY_PING_MINUTE)) {
-    return;
-  }
-
-  // Mark as run BEFORE spawning so a failure doesn't retry every hour
-  lastDailyPingDate = today;
-
+async function runDailyPing() {
   console.log(`[${timestamp()}] 🌅 daily claude ping firing`);
 
   try {
@@ -917,8 +895,28 @@ async function maybeRunDailyPing() {
     );
   } catch (err) {
     console.error(`[${timestamp()}] ❌ daily claude ping failed:`, err.message);
-    // Intentionally do NOT reset lastDailyPingDate — we accept one miss per day.
+    // Intentionally accept one miss for this day's scheduled slot.
   }
+}
+
+function scheduleDailyPing() {
+  const now = new Date();
+  const nextAt = getNextDailyPingAt(now);
+  const delayMs = getDelayUntilNextDailyPing(now);
+
+  console.log(
+    `[${timestamp()}] 🌅 next daily claude ping scheduled for ${nextAt.toLocaleString("en-GB", {
+      hour12: false,
+    })} (local)`
+  );
+
+  setTimeout(() => {
+    runDailyPing()
+      .catch(() => {})
+      .finally(() => {
+        scheduleDailyPing();
+      });
+  }, delayMs);
 }
 
 // ---------------------------------------------------------------------------
@@ -983,10 +981,8 @@ if (IS_ONCE) {
     heartbeat("chat").catch(() => {});
   }, HEARTBEAT_INTERVAL_MS);
 
-  // Daily claude ping — fires once/day at 05:59 local, checked hourly
-  setInterval(() => {
-    maybeRunDailyPing().catch(() => {});
-  }, 60 * 60 * 1000);
+  // Daily claude ping — fires at the next 05:59 local slot, then reschedules itself
+  scheduleDailyPing();
 
   // Graceful shutdown
   for (const sig of ["SIGINT", "SIGTERM"]) {

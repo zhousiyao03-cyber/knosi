@@ -151,3 +151,4 @@ docs/changelog/       # Phase 完成留档
 - `.claude/rules/api-pitfalls.md` — API 踩坑记录（Vercel AI SDK v6、React 19、Tiptap、E2E）
 - `.claude/rules/compact-recovery.md` — Compact 后的恢复步骤与核心规则
 - `.claude/rules/handoff-protocol.md` — 跨会话交接协议（HANDOFF.md 规范）
+- `.claude/rules/production-turso.md` — 生产 Turso 凭证位置与访问规范（**AI 不要再问 URL/Token**，已在 `.env.turso-prod.local`）
