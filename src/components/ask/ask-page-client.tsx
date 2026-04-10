@@ -448,7 +448,7 @@ function AskPageStream() {
               </h1>
             </section>
           ) : (
-            <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-2 pb-10 pt-6 sm:px-4">
+            <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-2 pb-10 pt-6 sm:px-4">
               {messages.map((message) => {
                 const rawText = getMessageText(message.parts);
                 const isAssistant = message.role === "assistant";
@@ -751,7 +751,7 @@ function AskPageDaemon() {
               </h2>
             </section>
           ) : (
-            <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-2 pb-10 pt-6 sm:px-4">
+            <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-2 pb-10 pt-6 sm:px-4">
               <DaemonBanner />
 
               {messages.map((message) => {
