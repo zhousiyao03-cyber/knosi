@@ -112,6 +112,7 @@ export function FocusPageClient() {
 
   // ── Derived ──
   const [selectedAppName, setSelectedAppName] = useState<string | null>(null);
+  const [showAppSessions, setShowAppSessions] = useState(false);
 
   const appGroups = useMemo(
     () => buildAppGroups(dailySessions ?? [], dailyStats?.totalSecs ?? 0),
@@ -249,7 +250,7 @@ export function FocusPageClient() {
                     <button
                       key={app.appName}
                       type="button"
-                      onClick={() => setSelectedAppName(app.appName)}
+                      onClick={() => { setSelectedAppName(app.appName); setShowAppSessions(false); }}
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
                         active
                           ? "bg-sky-50 dark:bg-sky-950/30"
@@ -290,40 +291,54 @@ export function FocusPageClient() {
           {selectedApp && (
             <section
               data-testid="focus-selected-app"
-              className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950"
+              className="rounded-2xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-950"
             >
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-                  {selectedApp.appName}
-                </h2>
-                <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500">
-                  <span>{formatFocusDuration(selectedApp.durationSecs)}</span>
-                  <span>{selectedApp.sessionCount} sessions</span>
-                  <span>longest {formatFocusDuration(selectedApp.longestSessionSecs)}</span>
+              <div className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                    {selectedApp.appName}
+                  </h2>
+                  <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500">
+                    <span>{formatFocusDuration(selectedApp.durationSecs)}</span>
+                    <span>{selectedApp.sessionCount} sessions</span>
+                    <span>longest {formatFocusDuration(selectedApp.longestSessionSecs)}</span>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <FocusTimeline sessions={selectedApp.sessions} compact />
                 </div>
               </div>
 
-              <div className="mt-3">
-                <FocusTimeline sessions={selectedApp.sessions} compact />
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowAppSessions((v) => !v)}
+                className="flex w-full items-center justify-center gap-1.5 border-t border-stone-100 px-4 py-2.5 text-xs font-medium text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-600 dark:border-stone-800 dark:hover:bg-stone-900/60 dark:hover:text-stone-300"
+              >
+                {showAppSessions ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {showAppSessions ? "Hide sessions" : `Show ${selectedApp.sessionCount} sessions`}
+              </button>
 
-              <div data-testid="focus-selected-app-sessions" className="mt-3 divide-y divide-stone-100 dark:divide-stone-800">
-                {selectedApp.sessions.map((session) => (
-                  <div key={session.id} className="flex items-center justify-between gap-3 py-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm text-stone-700 dark:text-stone-300">
-                        {session.windowTitle ?? session.browserHost ?? getFocusSessionLabel(session)}
+              {showAppSessions && (
+                <div data-testid="focus-selected-app-sessions" className="border-t border-stone-100 px-4 pb-3 dark:border-stone-800">
+                  <div className="divide-y divide-stone-100 dark:divide-stone-800">
+                    {selectedApp.sessions.map((session) => (
+                      <div key={session.id} className="flex items-center justify-between gap-3 py-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm text-stone-700 dark:text-stone-300">
+                            {session.windowTitle ?? session.browserHost ?? getFocusSessionLabel(session)}
+                          </div>
+                          <div className="text-xs text-stone-400 dark:text-stone-500">
+                            {formatClockLabel(session.startedAt)} - {formatClockLabel(session.endedAt)}
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-xs tabular-nums text-stone-500 dark:text-stone-400">
+                          {formatFocusDuration(session.durationSecs)}
+                        </span>
                       </div>
-                      <div className="text-xs text-stone-400 dark:text-stone-500">
-                        {formatClockLabel(session.startedAt)} - {formatClockLabel(session.endedAt)}
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-xs tabular-nums text-stone-500 dark:text-stone-400">
-                      {formatFocusDuration(session.durationSecs)}
-                    </span>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </section>
           )}
         </div>
