@@ -1,7 +1,8 @@
 import { router, protectedProcedure, publicProcedure } from "../trpc";
 import { db } from "../db";
-import { notes } from "../db/schema";
+import { notes, noteLinks } from "../db/schema";
 import { and, desc, eq, isNull, isNotNull, ne, or, sql } from "drizzle-orm";
+import { extractWikiLinks } from "../notes/link-extractor";
 import { z } from "zod/v4";
 import crypto from "crypto";
 import {
@@ -51,6 +52,25 @@ function tiptapDocToPlainText(doc: TiptapNode | null | undefined): string {
   return blocks.join("\n");
 }
 
+/** Sync wiki-links from note content to noteLinks table. Fire-and-forget. */
+async function syncNoteLinks(noteId: string, content: string | null) {
+  const links = extractWikiLinks(content);
+
+  // Delete all existing links from this source
+  await db.delete(noteLinks).where(eq(noteLinks.sourceNoteId, noteId));
+
+  // Insert new links
+  if (links.length > 0) {
+    await db.insert(noteLinks).values(
+      links.map((link) => ({
+        sourceNoteId: noteId,
+        targetNoteId: link.noteId,
+        targetTitle: link.noteTitle,
+      }))
+    ).onConflictDoNothing();
+  }
+}
+
 export const notesRouter = router({
   listFolders: protectedProcedure.query(async ({ ctx }) => {
     const rows = await db
@@ -74,6 +94,7 @@ export const notesRouter = router({
           offset: z.number().int().min(0).default(0),
           type: z.enum(["note", "journal", "summary"]).optional(),
           folder: z.string().optional(),
+          folderId: z.string().optional(),
           noFolder: z.boolean().optional(),
         })
         .optional()
@@ -87,11 +108,13 @@ export const notesRouter = router({
       if (input?.type) {
         clauses.push(eq(notes.type, input.type));
       }
-      if (input?.folder) {
+      if (input?.folderId) {
+        clauses.push(eq(notes.folderId, input.folderId));
+      } else if (input?.folder) {
         clauses.push(eq(notes.folder, input.folder));
       }
       if (input?.noFolder) {
-        clauses.push(isNull(notes.folder));
+        clauses.push(isNull(notes.folderId));
       }
 
       const items = await db
@@ -179,6 +202,7 @@ export const notesRouter = router({
         cover: noteCoverSchema,
         tags: z.string().optional(),
         folder: z.string().trim().nullable().optional(),
+        folderId: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -186,9 +210,8 @@ export const notesRouter = router({
       await db.insert(notes).values({ id, userId: ctx.userId, ...input });
       const [createdNote] = await db.select().from(notes).where(eq(notes.id, id));
       if (createdNote) {
-        void syncNoteKnowledgeIndex(createdNote, "note-create").catch(
-          () => undefined
-        );
+        void syncNoteKnowledgeIndex(createdNote, "note-create").catch(() => undefined);
+        void syncNoteLinks(id, input.content ?? null).catch(() => undefined);
       }
       return { id };
     }),
@@ -205,6 +228,7 @@ export const notesRouter = router({
         cover: noteCoverSchema,
         tags: z.string().optional(),
         folder: z.string().trim().nullable().optional(),
+        folderId: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -216,9 +240,10 @@ export const notesRouter = router({
 
       const [updatedNote] = await db.select().from(notes).where(and(eq(notes.id, id), eq(notes.userId, ctx.userId)));
       if (updatedNote) {
-        void syncNoteKnowledgeIndex(updatedNote, "note-update").catch(
-          () => undefined
-        );
+        void syncNoteKnowledgeIndex(updatedNote, "note-update").catch(() => undefined);
+        if (input.content !== undefined) {
+          void syncNoteLinks(id, updatedNote.content).catch(() => undefined);
+        }
       }
 
       return { id };
@@ -231,6 +256,74 @@ export const notesRouter = router({
       void removeKnowledgeSourceIndex("note", input.id).catch(() => undefined);
       return { success: true };
     }),
+
+  backlinks: protectedProcedure
+    .input(z.object({ noteId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const links = await db
+        .select({
+          sourceNoteId: noteLinks.sourceNoteId,
+          sourceTitle: notes.title,
+          sourceIcon: notes.icon,
+          updatedAt: notes.updatedAt,
+        })
+        .from(noteLinks)
+        .innerJoin(notes, eq(noteLinks.sourceNoteId, notes.id))
+        .where(
+          and(
+            eq(noteLinks.targetNoteId, input.noteId),
+            eq(notes.userId, ctx.userId)
+          )
+        )
+        .orderBy(desc(notes.updatedAt));
+      return links;
+    }),
+
+  /** Search notes by title (lightweight, for wiki-link autocomplete) */
+  searchByTitle: protectedProcedure
+    .input(z.object({ query: z.string().min(1).max(100) }))
+    .query(async ({ input, ctx }) => {
+      const q = `%${input.query}%`;
+      const results = await db
+        .select({
+          id: notes.id,
+          title: notes.title,
+          icon: notes.icon,
+        })
+        .from(notes)
+        .where(
+          and(
+            eq(notes.userId, ctx.userId),
+            sql`lower(${notes.title}) like lower(${q})`
+          )
+        )
+        .orderBy(desc(notes.updatedAt))
+        .limit(10);
+      return results;
+    }),
+
+  graphData: protectedProcedure.query(async ({ ctx }) => {
+    const allNotes = await db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        icon: notes.icon,
+        folderId: notes.folderId,
+      })
+      .from(notes)
+      .where(eq(notes.userId, ctx.userId));
+
+    const allLinks = await db
+      .select({
+        source: noteLinks.sourceNoteId,
+        target: noteLinks.targetNoteId,
+      })
+      .from(noteLinks)
+      .innerJoin(notes, eq(noteLinks.sourceNoteId, notes.id))
+      .where(eq(notes.userId, ctx.userId));
+
+    return { nodes: allNotes, edges: allLinks };
+  }),
 
   enableShare: protectedProcedure
     .input(z.object({ id: z.string() }))

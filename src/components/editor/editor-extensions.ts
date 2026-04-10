@@ -21,6 +21,7 @@ import { MermaidBlock } from "./mermaid-block";
 import { TocBlock } from "./toc-block";
 import { MarkdownTablePaste } from "./markdown-table-paste";
 import { SearchReplace } from "./search-replace";
+import { WikiLink } from "./wiki-link";
 
 interface CreateExtensionsOptions {
   placeholder: string;
@@ -86,6 +87,7 @@ export function createEditorExtensions({
     SearchReplace.configure({
       onOpen: onSearchOpen,
     }),
+    WikiLink,
     slashCommandExtension,
   ] as Extension[];
 }

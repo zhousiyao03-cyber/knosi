@@ -169,6 +169,20 @@
       "when": 1775826890083,
       "tag": "0023_fixed_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1775830847264,
+      "tag": "0024_strange_red_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1775833904784,
+      "tag": "0025_workable_champions",
+      "breakpoints": true
     }
   ]
 }

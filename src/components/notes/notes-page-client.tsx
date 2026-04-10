@@ -1,6 +1,14 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { trpc } from "@/lib/trpc";
 import { useRouter } from "next/navigation";
 import {
@@ -11,12 +19,19 @@ import {
   CalendarDays,
   Loader2,
   Folder,
-  FolderOpen,
   ChevronRight,
+  Menu,
+  X,
+  GripVertical,
+  Network,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { NOTE_TYPE_LABELS } from "@/lib/note-appearance";
+import { FolderTree } from "./folder-tree";
+import { NotesSidebar } from "./notes-sidebar";
+import { DndTreeOverlay } from "./dnd-tree-overlay";
+import { ResizableSidebar } from "./resizable-sidebar";
 
 function parseTags(tags: string | null | undefined) {
   if (!tags) return [] as string[];
@@ -43,22 +58,116 @@ type NoteItem = {
   cover: string | null;
   tags: string | null;
   folder: string | null;
+  folderId: string | null;
   shareToken: string | null;
   sharedAt: Date | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 };
 
+/** Wrapper to make a note card draggable */
+function DraggableNoteCard({
+  noteId,
+  children,
+}: {
+  noteId: string;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `note-drag-${noteId}`,
+    data: { type: "note", noteId },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      className={cn(isDragging && "opacity-40")}
+    >
+      <div className="relative">
+        {/* Drag handle */}
+        <div
+          {...listeners}
+          className="absolute -left-1 top-1/2 -translate-y-1/2 cursor-grab rounded p-1 text-stone-300 opacity-0 transition-opacity hover:text-stone-500 group-hover:opacity-100 active:cursor-grabbing dark:text-stone-600 dark:hover:text-stone-400"
+        >
+          <GripVertical size={14} />
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function NotesPageClient() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [activeFolder, setActiveFolder] = useState<string | null>(null); // null = all, "" = no folder
+  // null = all, "" = unfiled, string = folderId
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const { toast } = useToast();
   const utils = trpc.useUtils();
 
-  // Folder list
-  const { data: folders = [] } = trpc.notes.listFolders.useQuery();
+  // DnD state
+  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+  const [dragActiveType, setDragActiveType] = useState<"note" | "folder" | null>(null);
+  const [dragActiveLabel, setDragActiveLabel] = useState("");
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  );
+
+  const moveNoteToFolder = trpc.notes.update.useMutation({
+    onSuccess: () => {
+      utils.notes.list.invalidate();
+      utils.folders.list.invalidate();
+      toast("Note moved", "success");
+    },
+  });
+
+  const handleDragStart = (event: { active: { id: string | number; data: { current?: Record<string, unknown> } } }) => {
+    const data = event.active.data.current;
+    if (data?.type === "note") {
+      setDragActiveId(String(event.active.id));
+      setDragActiveType("note");
+      const note = allItems.find(
+        (n) => n.id === (data.noteId as string)
+      );
+      setDragActiveLabel(note?.title ?? "");
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setDragActiveId(null);
+    setDragActiveType(null);
+    setDragActiveLabel("");
+
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeData = active.data.current;
+    const overData = over.data.current;
+
+    if (!activeData || !overData) return;
+
+    // Note dropped on folder
+    if (activeData.type === "note" && overData.type === "folder") {
+      const noteId = activeData.noteId as string;
+      const targetFolderId = overData.folderId as string;
+      moveNoteToFolder.mutate({ id: noteId, folderId: targetFolderId });
+    }
+  };
+
+  // Get folder name for display
+  const { data: folderData = [] } = trpc.folders.list.useQuery();
+  const activeFolderName =
+    activeFolderId === null
+      ? null
+      : activeFolderId === ""
+        ? "Unfiled notes"
+        : folderData.find((f) => f.id === activeFolderId)?.name ?? null;
 
   // Paginated notes
   const [offset, setOffset] = useState(0);
@@ -75,7 +184,7 @@ export function NotesPageClient() {
     limit: number;
     offset: number;
     type?: "note" | "journal" | "summary";
-    folder?: string;
+    folderId?: string;
     noFolder?: boolean;
   } = {
     limit: PAGE_SIZE,
@@ -83,15 +192,15 @@ export function NotesPageClient() {
     type: typeParam,
   };
 
-  if (activeFolder !== null) {
-    if (activeFolder === "") {
+  if (activeFolderId !== null) {
+    if (activeFolderId === "") {
       queryInput.noFolder = true;
     } else {
-      queryInput.folder = activeFolder;
+      queryInput.folderId = activeFolderId;
     }
   }
 
-  const queryKey = `${typeFilter}|${activeFolder}`;
+  const queryKey = `${typeFilter}|${activeFolderId}`;
 
   const { data, isLoading, isFetching } = trpc.notes.list.useQuery(queryInput);
 
@@ -125,8 +234,9 @@ export function NotesPageClient() {
   );
 
   const handleFolderChange = useCallback(
-    (folder: string | null) => {
-      setActiveFolder(folder);
+    (folderId: string | null) => {
+      setActiveFolderId(folderId);
+      setMobileTreeOpen(false);
       resetAndRefresh();
     },
     [resetAndRefresh]
@@ -141,7 +251,7 @@ export function NotesPageClient() {
   const createNote = trpc.notes.create.useMutation({
     onSuccess: (data) => {
       utils.notes.list.invalidate();
-      utils.notes.listFolders.invalidate();
+      utils.folders.list.invalidate();
       router.push(`/notes/${data.id}`);
     },
   });
@@ -155,10 +265,20 @@ export function NotesPageClient() {
     onSuccess: () => {
       resetAndRefresh();
       utils.notes.list.invalidate();
-      utils.notes.listFolders.invalidate();
+      utils.folders.list.invalidate();
       toast("Note deleted", "success");
     },
   });
+
+  const handleCreateNote = useCallback(
+    (folderId: string | null) => {
+      createNote.mutate({
+        title: "",
+        folderId: folderId || undefined,
+      });
+    },
+    [createNote]
+  );
 
   // Client-side search filter on loaded items
   const filtered = allItems.filter((note) => {
@@ -170,94 +290,91 @@ export function NotesPageClient() {
     );
   });
 
-  const totalFolderNotes = folders.reduce((sum, f) => sum + f.count, 0);
-
   return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
     <div className="flex gap-6">
-      {/* Folder sidebar */}
-      <div className="hidden w-52 shrink-0 md:block">
-        <div className="sticky top-6 space-y-1">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-400">
-            Folders
-          </h2>
-          <button
-            onClick={() => handleFolderChange(null)}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-              activeFolder === null
-                ? "bg-stone-100 font-medium text-stone-900 dark:bg-stone-800 dark:text-stone-100"
-                : "text-stone-600 hover:bg-stone-50 dark:text-stone-400 dark:hover:bg-stone-900"
-            )}
-          >
-            <FileText size={14} />
-            <span className="flex-1">All notes</span>
-          </button>
-          <button
-            onClick={() => handleFolderChange("")}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-              activeFolder === ""
-                ? "bg-stone-100 font-medium text-stone-900 dark:bg-stone-800 dark:text-stone-100"
-                : "text-stone-600 hover:bg-stone-50 dark:text-stone-400 dark:hover:bg-stone-900"
-            )}
-          >
-            <FileText size={14} />
-            <span className="flex-1">Unfiled</span>
-          </button>
-
-          {folders.length > 0 && (
-            <div className="my-2 border-t border-stone-200 dark:border-stone-700" />
-          )}
-
-          {folders.map((f) => (
-            <button
-              key={f.name}
-              onClick={() => handleFolderChange(f.name)}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                activeFolder === f.name
-                  ? "bg-stone-100 font-medium text-stone-900 dark:bg-stone-800 dark:text-stone-100"
-                  : "text-stone-600 hover:bg-stone-50 dark:text-stone-400 dark:hover:bg-stone-900"
-              )}
-            >
-              {activeFolder === f.name ? (
-                <FolderOpen size={14} />
-              ) : (
-                <Folder size={14} />
-              )}
-              <span className="flex-1 truncate">{f.name}</span>
-              <span className="text-xs text-stone-400">{f.count}</span>
-            </button>
-          ))}
+      {/* Desktop multi-panel sidebar */}
+      <ResizableSidebar className="hidden md:block">
+        <div className="sticky top-6 h-[calc(100vh-120px)]">
+          <NotesSidebar
+            activeFolderId={activeFolderId}
+            onSelectFolder={handleFolderChange}
+            onCreateNote={handleCreateNote}
+          />
         </div>
-      </div>
+      </ResizableSidebar>
+
+      {/* Mobile tree drawer */}
+      {mobileTreeOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileTreeOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full w-72 overflow-y-auto bg-white p-4 shadow-xl dark:bg-stone-950">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                Folders
+              </h2>
+              <button
+                onClick={() => setMobileTreeOpen(false)}
+                className="rounded p-1 text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <FolderTree
+              activeFolderId={activeFolderId}
+              onSelectFolder={handleFolderChange}
+              onCreateNote={handleCreateNote}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {activeFolder
-                ? activeFolder
-                : activeFolder === ""
-                  ? "Unfiled notes"
-                  : "Notes"}
-            </h1>
-            {activeFolder && (
-              <button
-                onClick={() => handleFolderChange(null)}
-                className="mt-1 flex items-center gap-1 text-xs text-stone-400 hover:text-stone-600"
-              >
-                <ChevronRight size={12} className="rotate-180" />
-                All notes
-              </button>
-            )}
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileTreeOpen(true)}
+              className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 md:hidden dark:hover:bg-stone-800"
+            >
+              <Menu size={20} />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {activeFolderName ?? "Notes"}
+              </h1>
+              {activeFolderId && (
+                <button
+                  onClick={() => handleFolderChange(null)}
+                  className="mt-1 flex items-center gap-1 text-xs text-stone-400 hover:text-stone-600"
+                >
+                  <ChevronRight size={12} className="rotate-180" />
+                  All notes
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => router.push("/notes/graph")}
+              className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-stone-600 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400 dark:hover:bg-stone-800"
+              title="Graph View"
+            >
+              <Network size={16} />
+              <span className="hidden lg:inline">Graph</span>
+            </button>
+            <button
               onClick={() => openTodayJournal.mutate()}
               disabled={openTodayJournal.isPending}
-              className="flex items-center gap-2 px-4 py-2 border border-amber-200 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
             >
               <CalendarDays size={16} />
               <span className="hidden sm:inline">
@@ -267,14 +384,9 @@ export function NotesPageClient() {
               </span>
             </button>
             <button
-              onClick={() =>
-                createNote.mutate({
-                  title: "",
-                  folder: activeFolder || undefined,
-                })
-              }
+              onClick={() => handleCreateNote(activeFolderId === "" ? null : activeFolderId)}
               disabled={createNote.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
             >
               <Plus size={16} />
               New note
@@ -282,29 +394,7 @@ export function NotesPageClient() {
           </div>
         </div>
 
-        {/* Mobile folder selector */}
-        <div className="mb-4 md:hidden">
-          <select
-            value={activeFolder ?? "__all__"}
-            onChange={(e) => {
-              const v = e.target.value;
-              handleFolderChange(
-                v === "__all__" ? null : v === "__unfiled__" ? "" : v
-              );
-            }}
-            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm"
-          >
-            <option value="__all__">All notes</option>
-            <option value="__unfiled__">Unfiled</option>
-            {folders.map((f) => (
-              <option key={f.name} value={f.name}>
-                {f.name} ({f.count})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-3 mb-4">
+        <div className="mb-4 flex items-center gap-3">
           <div className="relative flex-1">
             <Search
               size={16}
@@ -315,13 +405,13 @@ export function NotesPageClient() {
               placeholder="Search notes..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             />
           </div>
           <select
             value={typeFilter}
             onChange={(e) => handleFilterChange(e.target.value)}
-            className="px-3 py-2 border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           >
             <option value="all">All types</option>
             <option value="note">Note</option>
@@ -331,9 +421,9 @@ export function NotesPageClient() {
         </div>
 
         {isLoading && allItems.length === 0 ? (
-          <p className="text-gray-500 text-sm">Loading...</p>
+          <p className="text-sm text-gray-500">Loading...</p>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
+          <div className="py-12 text-center text-gray-400">
             <FileText size={48} className="mx-auto mb-3 opacity-50" />
             <p>
               {allItems.length === 0
@@ -346,8 +436,8 @@ export function NotesPageClient() {
             {filtered.map((note) => {
               const tags = parseTags(note.tags);
               return (
+                <DraggableNoteCard key={note.id} noteId={note.id}>
                 <div
-                  key={note.id}
                   onClick={() => router.push(`/notes/${note.id}`)}
                   data-testid="note-card"
                   className="group flex items-center justify-between rounded-2xl border border-stone-200 bg-white/80 p-4 shadow-sm transition-colors hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950/70 dark:hover:bg-stone-900/80"
@@ -388,7 +478,7 @@ export function NotesPageClient() {
                         <span className="text-xs text-stone-400">
                           {formatDate(note.updatedAt)}
                         </span>
-                        {activeFolder === null && note.folder && (
+                        {activeFolderId === null && note.folder && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500 dark:bg-stone-800 dark:text-stone-400">
                             <Folder size={10} />
                             {note.folder}
@@ -421,6 +511,7 @@ export function NotesPageClient() {
                     <Trash2 size={16} />
                   </button>
                 </div>
+                </DraggableNoteCard>
               );
             })}
 
@@ -444,5 +535,11 @@ export function NotesPageClient() {
         )}
       </div>
     </div>
+    <DndTreeOverlay
+      activeId={dragActiveId}
+      activeType={dragActiveType}
+      activeLabel={dragActiveLabel}
+    />
+    </DndContext>
   );
 }

@@ -1,5 +1,6 @@
 import { router } from "../trpc";
 import { notesRouter } from "./notes";
+import { foldersRouter } from "./folders";
 import { bookmarksRouter } from "./bookmarks";
 import { todosRouter } from "./todos";
 import { workflowsRouter } from "./workflows";
@@ -11,6 +12,7 @@ import { ossProjectsRouter } from "./oss-projects";
 
 export const appRouter = router({
   notes: notesRouter,
+  folders: foldersRouter,
   bookmarks: bookmarksRouter,
   todos: todosRouter,
   ossProjects: ossProjectsRouter,

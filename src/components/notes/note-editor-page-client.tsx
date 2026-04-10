@@ -4,8 +4,9 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { inferRouterOutputs } from "@trpc/server";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Copy, ImagePlus, Link, Share2, Tag, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, FolderOpen, ImagePlus, Link, Share2, Tag, X } from "lucide-react";
 import dynamic from "next/dynamic";
+import { BacklinksPanel } from "./backlinks-panel";
 
 const TiptapEditor = dynamic(
   () =>
@@ -42,6 +43,7 @@ interface NoteData extends NonNullable<NoteOutput> {
   icon: string | null;
   cover: string | null;
   tags: string | null;
+  folderId: string | null;
   shareToken: string | null;
   updatedAt: Date | null;
 }
@@ -51,6 +53,7 @@ interface SaveOverrides {
   type?: "note" | "journal" | "summary";
   tags?: string[];
   cover?: string | null;
+  folderId?: string | null;
 }
 
 function parseTags(tags: string | null | undefined) {
@@ -263,6 +266,9 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
   const [cover, setCover] = useState<string | null>(note.cover);
   const [tags, setTags] = useState<string[]>(parseTags(note.tags));
   const [tagInput, setTagInput] = useState("");
+  const [folderId, setFolderId] = useState<string | null>(note.folderId ?? null);
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false);
+  const { data: allFolders = [] } = trpc.folders.list.useQuery();
   const [isCoverPickerOpen, setIsCoverPickerOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">(
     "saved"
@@ -294,6 +300,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
           icon: note.icon,
           cover: overrides?.cover ?? cover,
           tags: JSON.stringify(overrides?.tags ?? tags),
+          folderId: overrides?.folderId !== undefined ? overrides.folderId : folderId,
         },
         {
           onSuccess: () => {
@@ -304,7 +311,7 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
         }
       );
     },
-    [cover, id, note.icon, tags, title, type, updateNote]
+    [cover, folderId, id, note.icon, tags, title, type, updateNote]
   );
 
   const scheduleAutoSave = useCallback(() => {
@@ -394,6 +401,12 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
     const newTags = tags.filter((tag) => tag !== tagToRemove);
     setTags(newTags);
     doSave({ tags: newTags });
+  };
+
+  const handleFolderChange = (newFolderId: string | null) => {
+    setFolderId(newFolderId);
+    setFolderPickerOpen(false);
+    doSave({ folderId: newFolderId });
   };
 
   const handleCoverChange = (nextCover: string | null) => {
@@ -579,6 +592,61 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
 
           <span className="hidden h-4 w-px bg-stone-200 dark:bg-stone-800 md:block" />
 
+          {/* Folder picker */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setFolderPickerOpen((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
+                folderId
+                  ? "border-stone-300 bg-stone-50 text-stone-700 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
+                  : "border-dashed border-stone-300 text-stone-400 hover:border-stone-400 hover:text-stone-600 dark:border-stone-700 dark:text-stone-500 dark:hover:border-stone-600 dark:hover:text-stone-400"
+              )}
+            >
+              <FolderOpen size={13} />
+              {folderId
+                ? allFolders.find((f) => f.id === folderId)?.name ?? "Folder"
+                : "Add to folder"}
+            </button>
+
+            {folderPickerOpen && (
+              <div className="absolute left-0 top-full z-40 mt-2 w-52 rounded-xl border border-stone-200 bg-white py-1 shadow-lg dark:border-stone-700 dark:bg-stone-900">
+                <button
+                  type="button"
+                  onClick={() => handleFolderChange(null)}
+                  className={cn(
+                    "flex w-full items-center gap-2 px-3 py-1.5 text-sm transition-colors",
+                    folderId === null
+                      ? "bg-stone-100 font-medium text-stone-900 dark:bg-stone-800 dark:text-stone-100"
+                      : "text-stone-600 hover:bg-stone-50 dark:text-stone-400 dark:hover:bg-stone-800"
+                  )}
+                >
+                  No folder
+                </button>
+                {allFolders.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => handleFolderChange(f.id)}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-1.5 text-sm transition-colors",
+                      folderId === f.id
+                        ? "bg-stone-100 font-medium text-stone-900 dark:bg-stone-800 dark:text-stone-100"
+                        : "text-stone-600 hover:bg-stone-50 dark:text-stone-400 dark:hover:bg-stone-800"
+                    )}
+                    style={{ paddingLeft: 12 }}
+                  >
+                    <FolderOpen size={13} />
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <span className="hidden h-4 w-px bg-stone-200 dark:bg-stone-800 md:block" />
+
           <div className="flex flex-wrap items-center gap-2">
             {tags.map((tag) => (
               <span
@@ -657,6 +725,10 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
               }
             }}
           />
+        </div>
+
+        <div className="sm:px-1">
+          <BacklinksPanel noteId={id} />
         </div>
       </div>
     </div>

@@ -42,6 +42,30 @@ export const userCredentials = sqliteTable("user_credentials", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
+// ── Folders (hierarchical) ─────────────────────────
+export const folders = sqliteTable(
+  "folders",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    parentId: text("parent_id"), // self-reference for nesting
+    icon: text("icon"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    collapsed: integer("collapsed", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index("folders_user_idx").on(table.userId),
+    index("folders_parent_idx").on(table.parentId),
+  ]
+);
+
 export const notes = sqliteTable(
   "notes",
   {
@@ -56,7 +80,8 @@ export const notes = sqliteTable(
     icon: text("icon"),
     cover: text("cover"),
     tags: text("tags"), // JSON array
-    folder: text("folder"), // optional grouping (replaces learningTopics)
+    folder: text("folder"), // legacy flat grouping (kept for compat)
+    folderId: text("folder_id").references(() => folders.id, { onDelete: "set null" }),
     shareToken: text("share_token").unique(),
     sharedAt: integer("shared_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
@@ -65,6 +90,30 @@ export const notes = sqliteTable(
   (table) => [
     index("notes_user_idx").on(table.userId),
     index("notes_user_folder_idx").on(table.userId, table.folder),
+    index("notes_folder_id_idx").on(table.folderId),
+  ]
+);
+
+// ── Note Links (bidirectional wiki-links) ──────────
+export const noteLinks = sqliteTable(
+  "note_links",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    sourceNoteId: text("source_note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
+    targetNoteId: text("target_note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
+    targetTitle: text("target_title").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  },
+  (table) => [
+    index("note_links_source_idx").on(table.sourceNoteId),
+    index("note_links_target_idx").on(table.targetNoteId),
+    uniqueIndex("note_links_pair_idx").on(table.sourceNoteId, table.targetNoteId),
   ]
 );
 
@@ -104,7 +153,10 @@ export const todos = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
     updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   },
-  (table) => [index("todos_user_idx").on(table.userId)]
+  (table) => [
+    index("todos_user_idx").on(table.userId),
+    index("todos_user_duedate_status_idx").on(table.userId, table.dueDate, table.status),
+  ]
 );
 
 export const chatMessages = sqliteTable(
@@ -466,7 +518,10 @@ export const portfolioHoldings = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
     updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   },
-  (table) => [index("portfolio_holdings_user_idx").on(table.userId)]
+  (table) => [
+    index("portfolio_holdings_user_idx").on(table.userId),
+    index("portfolio_holdings_user_symbol_idx").on(table.userId, table.symbol),
+  ]
 );
 
 export const portfolioNews = sqliteTable(
@@ -483,7 +538,10 @@ export const portfolioNews = sqliteTable(
     sentiment: text("sentiment", { enum: ["bullish", "bearish", "neutral"] }).notNull(),
     generatedAt: integer("generated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   },
-  (table) => [index("portfolio_news_user_idx").on(table.userId)]
+  (table) => [
+    index("portfolio_news_user_idx").on(table.userId),
+    index("portfolio_news_user_symbol_idx").on(table.userId, table.symbol),
+  ]
 );
 
 // ── Learning Notebook ──────────────────────────────
