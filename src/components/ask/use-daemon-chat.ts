@@ -150,9 +150,6 @@ export function useDaemonChat({ api, sourceScope }: UseDaemonChatOptions) {
                 if (data.type === "text_delta" && data.delta != null) {
                   currentText += data.delta;
                   updateAssistant(currentText);
-                } else if (data.type === "text_final" && data.delta != null) {
-                  currentText = data.delta;
-                  updateAssistant(currentText);
                 }
               } else if (eventType === "done") {
                 if (data.totalText && data.totalText !== currentText) {

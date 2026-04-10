@@ -801,9 +801,7 @@ async function handleChatTask(task) {
       clearTimeout(flushTimer);
       flushTimer = null;
     }
-    // Emit final-text marker so the frontend has a clean stop signal
-    seq++;
-    pending.push({ seq, type: "text_final", delta: totalText });
+    // Flush any remaining deltas before marking complete
     await flushMessages();
 
     const res = await fetch(`${SERVER_URL}/api/chat/complete`, {
