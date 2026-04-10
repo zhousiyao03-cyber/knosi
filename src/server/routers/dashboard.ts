@@ -1,8 +1,8 @@
 import { z } from "zod/v4";
 import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
-import { notes, bookmarks, todos, learningNotes, learningTopics, osProjectNotes, osProjects } from "../db/schema";
-import { and, asc, count, desc, eq, gte, like, lt, or } from "drizzle-orm";
+import { notes, bookmarks, todos, osProjectNotes, osProjects } from "../db/schema";
+import { and, asc, count, desc, eq, gte, isNotNull, like, lt, or } from "drizzle-orm";
 import { normalizeJournalTitlesForUser } from "../notes/journal-titles";
 
 export const dashboardRouter = router({
@@ -55,20 +55,17 @@ export const dashboardRouter = router({
       .orderBy(asc(todos.dueDate), desc(todos.updatedAt))
       .limit(5);
 
-    // Recent learning notes (across all topics)
+    // Recent folder notes (learning notes now live in notes table with folder set)
     const recentLearnNotes = await db
       .select({
-        id: learningNotes.id,
-        title: learningNotes.title,
-        topicId: learningNotes.topicId,
-        topicTitle: learningTopics.title,
-        topicIcon: learningTopics.icon,
-        updatedAt: learningNotes.updatedAt,
+        id: notes.id,
+        title: notes.title,
+        folder: notes.folder,
+        updatedAt: notes.updatedAt,
       })
-      .from(learningNotes)
-      .innerJoin(learningTopics, eq(learningNotes.topicId, learningTopics.id))
-      .where(eq(learningTopics.userId, ctx.userId))
-      .orderBy(desc(learningNotes.updatedAt))
+      .from(notes)
+      .where(and(eq(notes.userId, ctx.userId), isNotNull(notes.folder)))
+      .orderBy(desc(notes.updatedAt))
       .limit(5);
 
     // Recent project notes (across all projects)

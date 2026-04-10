@@ -214,15 +214,15 @@ export function DashboardPageClient({
             ) : !data?.recentLearnNotes?.length ? (
               <div className="py-8 text-center">
                 <p className="text-sm text-stone-400">暂无学习笔记</p>
-                <Link href="/learn" className="mt-2 inline-block text-xs text-blue-600 hover:text-blue-700">
-                  去创建一个学习主题 →
+                <Link href="/notes" className="mt-2 inline-block text-xs text-blue-600 hover:text-blue-700">
+                  去 Notes 里创建一个文件夹 →
                 </Link>
               </div>
             ) : (
               data.recentLearnNotes.map((note) => (
                 <Link
                   key={note.id}
-                  href={`/learn/${note.topicId}/notes/${note.id}`}
+                  href={`/notes/${note.id}`}
                   className="block rounded-xl border border-stone-100 px-4 py-3 transition-colors hover:border-stone-200 hover:bg-stone-50 dark:border-stone-800 dark:hover:border-stone-700 dark:hover:bg-stone-900"
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -230,9 +230,11 @@ export function DashboardPageClient({
                       <span className="truncate text-sm font-medium text-stone-800 dark:text-stone-200">
                         {note.title || "未命名"}
                       </span>
-                      <span className="ml-2 text-xs text-stone-400">
-                        {note.topicIcon} {note.topicTitle}
-                      </span>
+                      {note.folder && (
+                        <span className="ml-2 text-xs text-stone-400">
+                          📁 {note.folder}
+                        </span>
+                      )}
                     </div>
                     <span className="shrink-0 text-xs text-stone-400">{formatDate(note.updatedAt)}</span>
                   </div>

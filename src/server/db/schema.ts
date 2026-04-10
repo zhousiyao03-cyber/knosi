@@ -56,12 +56,16 @@ export const notes = sqliteTable(
     icon: text("icon"),
     cover: text("cover"),
     tags: text("tags"), // JSON array
+    folder: text("folder"), // optional grouping (replaces learningTopics)
     shareToken: text("share_token").unique(),
     sharedAt: integer("shared_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
     updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   },
-  (table) => [index("notes_user_idx").on(table.userId)]
+  (table) => [
+    index("notes_user_idx").on(table.userId),
+    index("notes_user_folder_idx").on(table.userId, table.folder),
+  ]
 );
 
 export const bookmarks = sqliteTable(

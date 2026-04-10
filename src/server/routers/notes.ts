@@ -1,7 +1,7 @@
 import { router, protectedProcedure, publicProcedure } from "../trpc";
 import { db } from "../db";
 import { notes } from "../db/schema";
-import { and, desc, eq, ne, or } from "drizzle-orm";
+import { and, desc, eq, isNull, isNotNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import crypto from "crypto";
 import {
@@ -52,6 +52,20 @@ function tiptapDocToPlainText(doc: TiptapNode | null | undefined): string {
 }
 
 export const notesRouter = router({
+  listFolders: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await db
+      .select({
+        folder: notes.folder,
+        count: sql<number>`count(*)`.as("count"),
+      })
+      .from(notes)
+      .where(and(eq(notes.userId, ctx.userId), isNotNull(notes.folder)))
+      .groupBy(notes.folder)
+      .orderBy(notes.folder);
+
+    return rows.map((r) => ({ name: r.folder!, count: r.count }));
+  }),
+
   list: protectedProcedure
     .input(
       z
@@ -59,6 +73,8 @@ export const notesRouter = router({
           limit: z.number().int().min(1).max(100).default(30),
           offset: z.number().int().min(0).default(0),
           type: z.enum(["note", "journal", "summary"]).optional(),
+          folder: z.string().optional(),
+          noFolder: z.boolean().optional(),
         })
         .optional()
     )
@@ -70,6 +86,12 @@ export const notesRouter = router({
       const clauses = [eq(notes.userId, ctx.userId)];
       if (input?.type) {
         clauses.push(eq(notes.type, input.type));
+      }
+      if (input?.folder) {
+        clauses.push(eq(notes.folder, input.folder));
+      }
+      if (input?.noFolder) {
+        clauses.push(isNull(notes.folder));
       }
 
       const items = await db
@@ -156,6 +178,7 @@ export const notesRouter = router({
         icon: noteIconSchema,
         cover: noteCoverSchema,
         tags: z.string().optional(),
+        folder: z.string().trim().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -181,6 +204,7 @@ export const notesRouter = router({
         icon: noteIconSchema,
         cover: noteCoverSchema,
         tags: z.string().optional(),
+        folder: z.string().trim().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {

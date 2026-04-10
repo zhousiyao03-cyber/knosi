@@ -1,11 +1,9 @@
-import { and, asc, count, desc, eq, gte, lt, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNotNull, lt, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { DashboardPageClient } from "@/components/dashboard/dashboard-page-client";
 import { getRequestSession } from "@/server/auth/request-session";
 import { db } from "@/server/db";
 import {
-  learningNotes,
-  learningTopics,
   notes,
   osProjectNotes,
   osProjects,
@@ -77,17 +75,14 @@ export default async function DashboardPage() {
 
   const recentLearnNotes = await db
     .select({
-      id: learningNotes.id,
-      title: learningNotes.title,
-      topicId: learningNotes.topicId,
-      topicTitle: learningTopics.title,
-      topicIcon: learningTopics.icon,
-      updatedAt: learningNotes.updatedAt,
+      id: notes.id,
+      title: notes.title,
+      folder: notes.folder,
+      updatedAt: notes.updatedAt,
     })
-    .from(learningNotes)
-    .innerJoin(learningTopics, eq(learningNotes.topicId, learningTopics.id))
-    .where(eq(learningTopics.userId, userId))
-    .orderBy(desc(learningNotes.updatedAt))
+    .from(notes)
+    .where(and(eq(notes.userId, userId), isNotNull(notes.folder)))
+    .orderBy(desc(notes.updatedAt))
     .limit(5);
 
   const recentProjectNotes = await db
