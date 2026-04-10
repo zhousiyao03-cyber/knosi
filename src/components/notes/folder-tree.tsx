@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useDroppable } from "@dnd-kit/core";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { trpc } from "@/lib/trpc";
 import {
   ChevronRight,
@@ -70,26 +70,42 @@ function DroppableFolderRow({
   onToggleCollapse: () => void;
   children: React.ReactNode;
 }) {
-  const { isOver, setNodeRef } = useDroppable({
+  const { isOver, setNodeRef: setDropRef } = useDroppable({
     id: `folder-drop-${node.id}`,
     data: { type: "folder", folderId: node.id },
   });
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({
+    id: `folder-drag-${node.id}`,
+    data: { type: "folder", folderId: node.id, folderName: node.name },
+  });
+
   return (
     <div
-      ref={setNodeRef}
+      ref={(el) => {
+        setDropRef(el);
+        setDragRef(el);
+      }}
+      {...attributes}
       className={cn(
         "group relative flex w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors",
         isActive
           ? "bg-stone-100 font-medium text-stone-900 dark:bg-stone-800 dark:text-stone-100"
           : "text-stone-600 hover:bg-stone-50 dark:text-stone-400 dark:hover:bg-stone-900",
         isOver &&
-          "ring-2 ring-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:ring-blue-500"
+          "ring-2 ring-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:ring-blue-500",
+        isDragging && "opacity-40"
       )}
       style={{ paddingLeft: 8 + node.depth * 20 }}
       onClick={onSelect}
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
+      {...listeners}
     >
       {/* Expand/collapse chevron */}
       <button

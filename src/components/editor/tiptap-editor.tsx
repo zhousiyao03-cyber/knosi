@@ -43,6 +43,8 @@ import { createToggleBlockNode } from "./toggle-block";
 import { SearchBar } from "./search-replace";
 import { createEditorExtensions } from "./editor-extensions";
 import { buildBlockActionItems } from "./editor-block-actions";
+import { createWikiLinkTriggerExtension } from "./wiki-link-trigger";
+import { WikiLinkSuggest } from "./wiki-link-suggest";
 import {
   parseEditorContent,
   extractPlainTextFromContent,
@@ -115,6 +117,8 @@ export function TiptapEditor({
   const [, setIsDragging] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [linkTooltip, setLinkTooltip] = useState<{ href: string; top: number; left: number } | null>(null);
+  const [wikiLinkCoords, setWikiLinkCoords] = useState<{ top: number; left: number } | null>(null);
+  const [wikiLinkQuery, setWikiLinkQuery] = useState("");
   const [inlineAskAnchor, setInlineAskAnchor] =
     useState<InlineAskAiAnchor | null>(null);
   // Bump every time a new anchor is set, so the popover remounts and
@@ -157,6 +161,99 @@ export function TiptapEditor({
         handleSlashQueryChange
       ),
     [handleSlashActivate, handleSlashDeactivate, handleSlashQueryChange]
+  );
+
+  // Wiki-link [[ trigger
+  const handleWikiLinkActivate = useCallback(
+    (query: string, coords: { top: number; left: number }) => {
+      setWikiLinkQuery(query);
+      setWikiLinkCoords(coords);
+    },
+    []
+  );
+  const handleWikiLinkDeactivate = useCallback(() => {
+    setWikiLinkCoords(null);
+    setWikiLinkQuery("");
+  }, []);
+  const handleWikiLinkQueryChange = useCallback((query: string) => {
+    setWikiLinkQuery(query);
+  }, []);
+
+  const wikiLinkTriggerExtension = useMemo(
+    () =>
+      createWikiLinkTriggerExtension(
+        handleWikiLinkActivate,
+        handleWikiLinkDeactivate,
+        handleWikiLinkQueryChange
+      ),
+    [handleWikiLinkActivate, handleWikiLinkDeactivate, handleWikiLinkQueryChange]
+  );
+
+  const handleWikiLinkSelect = useCallback(
+    (noteId: string, noteTitle: string) => {
+      const currentEditor = editorRef.current;
+      if (!currentEditor) return;
+
+      const { state } = currentEditor;
+      const { from } = state.selection;
+      // Delete the `[[query` text that was typed (go back to find `[[`)
+      const docText = state.doc.textBetween(Math.max(0, from - 100), from);
+      const bracketPos = docText.lastIndexOf("[[");
+      if (bracketPos >= 0) {
+        const deleteFrom = from - (docText.length - bracketPos);
+        currentEditor
+          .chain()
+          .focus()
+          .deleteRange({ from: deleteFrom, to: from })
+          .insertContent({
+            type: "text",
+            text: noteTitle,
+            marks: [
+              {
+                type: "wikiLink",
+                attrs: { noteId, noteTitle },
+              },
+            ],
+          })
+          .run();
+      }
+      handleWikiLinkDeactivate();
+    },
+    [handleWikiLinkDeactivate]
+  );
+
+  const handleWikiLinkCreateNew = useCallback(
+    (title: string) => {
+      // For now, just insert the text as a wiki-link mark with empty noteId
+      // The link will show as "unresolved" and can be created later
+      const currentEditor = editorRef.current;
+      if (!currentEditor) return;
+
+      const { state } = currentEditor;
+      const { from } = state.selection;
+      const docText = state.doc.textBetween(Math.max(0, from - 100), from);
+      const bracketPos = docText.lastIndexOf("[[");
+      if (bracketPos >= 0) {
+        const deleteFrom = from - (docText.length - bracketPos);
+        currentEditor
+          .chain()
+          .focus()
+          .deleteRange({ from: deleteFrom, to: from })
+          .insertContent({
+            type: "text",
+            text: title,
+            marks: [
+              {
+                type: "wikiLink",
+                attrs: { noteId: "", noteTitle: title },
+              },
+            ],
+          })
+          .run();
+      }
+      handleWikiLinkDeactivate();
+    },
+    [handleWikiLinkDeactivate]
   );
 
   const reportError = useCallback(
@@ -398,13 +495,15 @@ export function TiptapEditor({
   }, []);
 
   const extensions = useMemo(
-    () =>
-      createEditorExtensions({
+    () => [
+      ...createEditorExtensions({
         placeholder,
         slashCommandExtension,
         onSearchOpen: () => setSearchOpen(true),
       }),
-    [placeholder, slashCommandExtension]
+      wikiLinkTriggerExtension,
+    ],
+    [placeholder, slashCommandExtension, wikiLinkTriggerExtension]
   );
 
   const editor = useEditor({
@@ -911,6 +1010,16 @@ export function TiptapEditor({
           groups={commandGroups}
           testId="editor-slash-menu"
           onClose={handleSlashDeactivate}
+        />
+      )}
+
+      {wikiLinkCoords && (
+        <WikiLinkSuggest
+          query={wikiLinkQuery}
+          position={wikiLinkCoords}
+          onSelect={handleWikiLinkSelect}
+          onCreateNew={handleWikiLinkCreateNew}
+          onClose={handleWikiLinkDeactivate}
         />
       )}
 

@@ -127,6 +127,13 @@ export function NotesPageClient() {
     },
   });
 
+  const moveFolderToFolder = trpc.folders.move.useMutation({
+    onSuccess: () => {
+      utils.folders.list.invalidate();
+      toast("Folder moved", "success");
+    },
+  });
+
   const handleDragStart = (event: { active: { id: string | number; data: { current?: Record<string, unknown> } } }) => {
     const data = event.active.data.current;
     if (data?.type === "note") {
@@ -136,6 +143,10 @@ export function NotesPageClient() {
         (n) => n.id === (data.noteId as string)
       );
       setDragActiveLabel(note?.title ?? "");
+    } else if (data?.type === "folder") {
+      setDragActiveId(String(event.active.id));
+      setDragActiveType("folder");
+      setDragActiveLabel((data.folderName as string) ?? "");
     }
   };
 
@@ -157,6 +168,20 @@ export function NotesPageClient() {
       const noteId = activeData.noteId as string;
       const targetFolderId = overData.folderId as string;
       moveNoteToFolder.mutate({ id: noteId, folderId: targetFolderId });
+    }
+
+    // Folder dropped on folder (reparent)
+    if (activeData.type === "folder" && overData.type === "folder") {
+      const draggedFolderId = activeData.folderId as string;
+      const targetFolderId = overData.folderId as string;
+
+      // Don't drop on self
+      if (draggedFolderId === targetFolderId) return;
+
+      moveFolderToFolder.mutate({
+        id: draggedFolderId,
+        targetParentId: targetFolderId,
+      });
     }
   };
 
