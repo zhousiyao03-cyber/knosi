@@ -336,8 +336,20 @@ function spawnClaudeForChat({ prompt, systemPrompt, model, onText }) {
     const args = [
       "-p",
       prompt,
-      "--append-system-prompt",
+      // Replace the default Claude Code system prompt entirely. Using
+      // --append-system-prompt leaves the coding-agent persona in place,
+      // which makes the model reach for Read/Bash/Glob to explore the local
+      // filesystem instead of answering from the knowledge base we injected.
+      "--system-prompt",
       systemPrompt,
+      // Disable every built-in tool. Empty string == no tools. Without this,
+      // Claude Code headless mode keeps its default tool set enabled and will
+      // happily read files on the host machine.
+      "--tools",
+      "",
+      // Skip CLAUDE.md auto-discovery, hooks, plugins, skills — all of which
+      // can inject coding-agent instructions that fight our system prompt.
+      "--bare",
       "--output-format",
       "stream-json",
       "--verbose",
@@ -345,7 +357,6 @@ function spawnClaudeForChat({ prompt, systemPrompt, model, onText }) {
     if (model) {
       args.push("--model", model);
     }
-    // Intentionally no --allowedTools → Claude gets no tools, pure chat.
 
     const child = cpSpawn(claudeBin, args, {
       detached: true,
