@@ -198,69 +198,82 @@ function topLabelsFromSessions(sessions: SessionForSummary[]) {
   ].slice(0, 3);
 }
 
-type RangeInsightInput = {
-  days: { date: string; totalSecs: number; workHoursSecs: number }[];
+type DailyInsightInput = {
+  date: string;
+  totalSecs: number;
+  sessions: {
+    appName: string;
+    windowTitle: string | null;
+    browserPageTitle: string | null;
+    browserSurfaceType: string | null;
+    startedAt: Date;
+    endedAt: Date;
+    durationSecs: number;
+    tags: string | null;
+  }[];
   topApps: [string, number][];
-  totalDays: number;
-  endDate: string;
+  firstSessionAt: Date;
+  lastSessionAt: Date;
 };
 
-const rangeInsightSchema = z.object({
-  insights: z.array(z.string()).min(1).max(5),
+const dailyInsightSchema = z.object({
+  insights: z.array(z.string()).min(1).max(4),
 });
 
-export async function generateRangeInsight(input: RangeInsightInput) {
-  const activeDays = input.days.filter((d) => d.totalSecs > 0);
-  const totalSecs = input.days.reduce((s, d) => s + d.totalSecs, 0);
-  const workSecs = input.days.reduce((s, d) => s + d.workHoursSecs, 0);
-
-  if (activeDays.length === 0) {
-    return { insights: ["No focus data recorded in this period."], aiGenerated: false };
+export async function generateDailyInsight(input: DailyInsightInput) {
+  if (input.sessions.length === 0) {
+    return { insights: [], aiGenerated: false };
   }
 
-  const avgSecs = Math.floor(totalSecs / activeDays.length);
-  const dailyBreakdown = input.days
-    .filter((d) => d.totalSecs > 0)
-    .map((d) => `${d.date}: ${formatDurationShort(d.totalSecs)} (work: ${formatDurationShort(d.workHoursSecs)})`)
-    .join("\n");
   const appBreakdown = input.topApps
     .map(([app, secs]) => `${app}: ${formatDurationShort(secs)}`)
     .join(", ");
 
+  // Build a condensed timeline (group consecutive same-app sessions)
+  const timeline: string[] = [];
+  for (const s of input.sessions) {
+    const start = s.startedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: false });
+    const end = s.endedAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: false });
+    const label = s.browserPageTitle ?? s.windowTitle ?? s.appName;
+    const surface = s.browserSurfaceType ? ` [${s.browserSurfaceType}]` : "";
+    if (s.durationSecs >= 60) {
+      timeline.push(`${start}-${end} ${s.appName}: ${label}${surface} (${formatDurationShort(s.durationSecs)})`);
+    }
+  }
+
+  const firstTime = input.firstSessionAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const lastTime = input.lastSessionAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
   try {
     const result = await generateStructuredData({
-      name: "focus_range_insight",
-      description: "Analyze focus tracking data over a period and generate actionable insights in Chinese.",
-      prompt: `Analyze the following ${input.totalDays}-day focus data ending ${input.endDate}.
+      name: "focus_daily_insight",
+      description: "Analyze a single day's focus data and generate specific insights in Chinese.",
+      prompt: `Analyze today's (${input.date}) focus data.
 
-Summary:
-- Active days: ${activeDays.length}/${input.totalDays}
-- Total tracked: ${formatDurationShort(totalSecs)}
-- Total work hours: ${formatDurationShort(workSecs)}
-- Daily average: ${formatDurationShort(avgSecs)}
+Total tracked: ${formatDurationShort(input.totalSecs)}
+Active window: ${firstTime} — ${lastTime}
+Sessions: ${input.sessions.length}
+Apps: ${appBreakdown}
 
-Top apps: ${appBreakdown}
+Timeline (sessions ≥1min):
+${timeline.slice(0, 40).join("\n")}
 
-Daily breakdown:
-${dailyBreakdown}
+Generate 2-3 concise, specific insights in Chinese. Focus on:
+- What the user actually worked on today (be specific about apps/tasks)
+- Time distribution patterns (concentrated vs scattered, morning vs afternoon)
+- Any notable observations (long stretches, frequent switching, etc.)
 
-Generate 2-4 concise, specific, actionable insights in Chinese. Focus on:
-- Trends (increasing/decreasing work hours, weekend patterns)
-- App usage patterns (which apps dominate, any concerning patterns)
-- Work/non-work ratio
-- Consistency (streaks, gaps)
-
-Be specific with numbers. Don't be generic. Each insight should be 1-2 sentences.`,
-      schema: rangeInsightSchema,
+Be specific with app names and times. Each insight should be 1-2 sentences. Don't repeat what the stats already show.`,
+      schema: dailyInsightSchema,
       signal: createFocusAiTimeoutSignal(),
     });
     return { insights: result.insights, aiGenerated: true };
   } catch {
-    const fallback = [
-      `过去 ${input.totalDays} 天中有 ${activeDays.length} 天有记录，日均 ${formatDurationShort(avgSecs)}。`,
-      `Top 应用：${input.topApps.slice(0, 3).map(([app]) => app).join("、")}。`,
-    ];
-    return { insights: fallback, aiGenerated: false };
+    const topAppNames = input.topApps.slice(0, 3).map(([app]) => app).join("、");
+    return {
+      insights: [`今天主要使用了 ${topAppNames}，从 ${firstTime} 到 ${lastTime} 共 ${formatDurationShort(input.totalSecs)}。`],
+      aiGenerated: false,
+    };
   }
 }
 

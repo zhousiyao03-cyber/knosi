@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, isNull, lt, max, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
-import { generateDailySummary, classifyActivitySessions, generateRangeInsight } from "../ai/focus";
+import { generateDailySummary, classifyActivitySessions, generateDailyInsight } from "../ai/focus";
 import { db } from "../db";
 import {
   activitySessions,
@@ -580,22 +580,16 @@ export const focusRouter = router({
       };
     }),
 
-  rangeInsight: protectedProcedure
-    .input(
-      z.object({
-        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-        days: z.number().int().min(7).max(120).default(30),
-        timeZone: z.string().min(1).default("UTC"),
-      })
-    )
+  dailyInsight: protectedProcedure
+    .input(focusDateInput)
     .query(async ({ ctx, input }) => {
-      const startDate = addDaysToDateString(input.endDate, -(input.days - 1));
-      const startRange = getLocalDayRange({ date: startDate, timeZone: input.timeZone }).start;
-      const endRange = getLocalDayRange({ date: addDaysToDateString(input.endDate, 1), timeZone: input.timeZone }).start;
-
+      const { start, end } = getLocalDayRange(input);
       const sessions = await db
         .select({
           appName: activitySessions.appName,
+          windowTitle: activitySessions.windowTitle,
+          browserPageTitle: activitySessions.browserPageTitle,
+          browserSurfaceType: activitySessions.browserSurfaceType,
           startedAt: activitySessions.startedAt,
           endedAt: activitySessions.endedAt,
           durationSecs: activitySessions.durationSecs,
@@ -605,33 +599,36 @@ export const focusRouter = router({
         .where(
           and(
             eq(activitySessions.userId, ctx.userId),
-            lt(activitySessions.startedAt, endRange),
-            gt(activitySessions.endedAt, startRange)
+            lt(activitySessions.startedAt, end),
+            gt(activitySessions.endedAt, start)
           )
         )
         .orderBy(activitySessions.startedAt);
 
-      const rangeData = buildRangeStats({
-        sessions,
-        startDate,
-        days: input.days,
-        timeZone: input.timeZone,
-      });
+      if (sessions.length === 0) {
+        return { insights: [], aiGenerated: false };
+      }
 
-      // Build app breakdown for AI context
+      // Build app breakdown
       const appTotals: Record<string, number> = {};
       for (const s of sessions) {
         appTotals[s.appName] = (appTotals[s.appName] ?? 0) + s.durationSecs;
       }
       const topApps = Object.entries(appTotals)
         .sort(([, a], [, b]) => b - a)
-        .slice(0, 10);
+        .slice(0, 8);
 
-      return generateRangeInsight({
-        days: rangeData,
+      const totalSecs = sessions.reduce((s, x) => s + x.durationSecs, 0);
+      const firstSession = sessions[0];
+      const lastSession = sessions[sessions.length - 1];
+
+      return generateDailyInsight({
+        date: input.date,
+        totalSecs,
+        sessions,
         topApps,
-        totalDays: input.days,
-        endDate: input.endDate,
+        firstSessionAt: firstSession.startedAt,
+        lastSessionAt: lastSession.endedAt,
       });
     }),
 });

@@ -21,9 +21,6 @@ import {
   getLocalDateString,
 } from "./focus-shared";
 import {
-  splitSessionsByDisplayThreshold,
-} from "./focus-display";
-import {
   buildAppGroups,
   getDefaultSelectedApp,
   getSelectedAppDetails,
@@ -95,10 +92,6 @@ export function FocusPageClient() {
   const [drillDate, setDrillDate] = useState<string | null>(null);
 
   const rangeStats = trpc.focus.rangeStats.useQuery({ endDate: today, days: RANGE_DAYS, timeZone });
-  const rangeInsight = trpc.focus.rangeInsight.useQuery(
-    { endDate: today, days: RANGE_DAYS, timeZone },
-    { staleTime: 10 * 60_000 }
-  );
   const days = useMemo<DayStat[]>(() => rangeStats.data ?? [], [rangeStats.data]);
   const columns = useMemo(() => buildHeatmapColumns(days, today), [days, today]);
 
@@ -184,27 +177,6 @@ export function FocusPageClient() {
             </div>
           </section>
 
-          {/* ━━━ AI Insights ━━━ */}
-          {rangeInsight.data && rangeInsight.data.insights.length > 0 && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-950">
-              <div className="mb-3 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-amber-500" />
-                <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">AI Insights</h2>
-                {!rangeInsight.data.aiGenerated && (
-                  <span className="text-[10px] text-stone-400">(fallback)</span>
-                )}
-              </div>
-              <ul className="space-y-2">
-                {rangeInsight.data.insights.map((insight, i) => (
-                  <li key={i} className="flex gap-2 text-sm leading-6 text-stone-600 dark:text-stone-300">
-                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                    {insight}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
           {/* ━━━ Today card — dashboard style ━━━ */}
           <button type="button" onClick={() => setDrillDate(today)}
             className="w-full rounded-2xl border border-sky-200 bg-sky-50/80 p-5 text-left transition-colors hover:border-sky-300 hover:bg-sky-50 dark:border-sky-900/50 dark:bg-sky-950/20 dark:hover:border-sky-800 dark:hover:bg-sky-950/30">
@@ -253,13 +225,16 @@ export function FocusPageClient() {
 
 function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
   const dailyFull = trpc.focus.dailyFull.useQuery({ date, timeZone });
+  const dailyInsight = trpc.focus.dailyInsight.useQuery(
+    { date, timeZone },
+    { staleTime: 5 * 60_000 }
+  );
   const dailyStats = dailyFull.data?.stats;
   const dailySessions = dailyFull.data?.sessions;
   const [selectedAppName, setSelectedAppName] = useState<string | null>(null);
   const [showAppSessions, setShowAppSessions] = useState(false);
 
   const appGroups = useMemo(() => buildAppGroups(dailySessions ?? [], dailyStats?.totalSecs ?? 0), [dailySessions, dailyStats?.totalSecs]);
-  const displaySessionGroups = useMemo(() => splitSessionsByDisplayThreshold(dailySessions ?? []), [dailySessions]);
   const selectedApp = useMemo(() => getSelectedAppDetails(selectedAppName, dailySessions ?? []), [selectedAppName, dailySessions]);
 
   useEffect(() => {
@@ -323,6 +298,24 @@ function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
           <span data-testid="focus-session-count">{dailyStats?.sessionCount ?? 0} sessions · {dailyStats?.appSwitches ?? 0} switches · streak {dailyStats ? formatFocusDuration(dailyStats.longestStreakSecs) : "--"}</span>
         </div>
       </section>
+
+      {/* AI Insight */}
+      {dailyInsight.data && dailyInsight.data.insights.length > 0 && (
+        <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
+          <div className="mb-2 flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+            <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">AI Insight</h2>
+          </div>
+          <ul className="space-y-1.5">
+            {dailyInsight.data.insights.map((insight, i) => (
+              <li key={i} className="flex gap-2 text-sm leading-6 text-stone-600 dark:text-stone-300">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
+                {insight}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Apps list */}
       <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
