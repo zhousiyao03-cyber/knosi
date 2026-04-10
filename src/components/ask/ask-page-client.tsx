@@ -547,7 +547,7 @@ function AskPageStream() {
               className={cn(
                 "rounded-2xl border bg-white transition-all dark:bg-stone-950",
                 isComposerFocused
-                  ? "border-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.12)] dark:border-blue-500"
+                  ? "border-stone-300 shadow-sm dark:border-stone-700"
                   : "border-stone-200 shadow-sm hover:border-stone-300 dark:border-stone-800 dark:hover:border-stone-700"
               )}
             >
@@ -848,7 +848,7 @@ function AskPageDaemon() {
               className={cn(
                 "rounded-2xl border bg-white transition-all dark:bg-stone-950",
                 isComposerFocused
-                  ? "border-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.12)] dark:border-blue-500"
+                  ? "border-stone-300 shadow-sm dark:border-stone-700"
                   : "border-stone-200 shadow-sm hover:border-stone-300 dark:border-stone-800 dark:hover:border-stone-700"
               )}
             >
