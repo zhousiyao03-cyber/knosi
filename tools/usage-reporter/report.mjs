@@ -345,11 +345,13 @@ function spawnClaudeForChat({ prompt, systemPrompt, model, onText }) {
       // Disable every built-in tool. Empty string == no tools. Without this,
       // Claude Code headless mode keeps its default tool set enabled and will
       // happily read files on the host machine.
+      // NOTE: intentionally NOT using --bare here. --bare refuses to read the
+      // Claude Max OAuth token from the keychain and demands an explicit API
+      // key, which breaks logged-in users. --system-prompt already replaces
+      // the coding-agent persona and --tools "" already kills all tools, so
+      // --bare is unnecessary for our isolation goal.
       "--tools",
       "",
-      // Skip CLAUDE.md auto-discovery, hooks, plugins, skills — all of which
-      // can inject coding-agent instructions that fight our system prompt.
-      "--bare",
       "--output-format",
       "stream-json",
       "--verbose",
