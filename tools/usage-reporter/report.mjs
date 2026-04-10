@@ -354,6 +354,10 @@ function spawnClaudeForChat({ prompt, systemPrompt, model, onText }) {
       "",
       "--output-format",
       "stream-json",
+      // Emit partial message chunks (content_block_delta events) as they
+      // arrive, so the worker can forward tokens to the frontend in real
+      // time instead of waiting for the full assistant message.
+      "--include-partial-messages",
       "--verbose",
     ];
     if (model) {
@@ -368,6 +372,11 @@ function spawnClaudeForChat({ prompt, systemPrompt, model, onText }) {
     const stderrChunks = [];
     let finalResult = "";
     let lineBuf = "";
+    // Running accumulator for partial token deltas. With
+    // --include-partial-messages, the CLI emits stream_event lines carrying
+    // Anthropic content_block_delta events; we concatenate their .text and
+    // push the cumulative snapshot to the frontend on every delta.
+    let partialText = "";
 
     child.stdout.on("data", (chunk) => {
       lineBuf += chunk.toString("utf8");
@@ -379,12 +388,28 @@ function spawnClaudeForChat({ prompt, systemPrompt, model, onText }) {
         try {
           const event = JSON.parse(line);
 
+          // Real-time partial deltas (only with --include-partial-messages).
+          if (event.type === "stream_event" && event.event) {
+            const se = event.event;
+            if (se.type === "message_start") {
+              partialText = "";
+            } else if (
+              se.type === "content_block_delta" &&
+              se.delta?.type === "text_delta" &&
+              typeof se.delta.text === "string"
+            ) {
+              partialText += se.delta.text;
+              onText(partialText);
+            }
+            continue;
+          }
+
           if (event.type === "assistant" && event.message?.content) {
             for (const block of event.message.content) {
               if (block.type === "text" && typeof block.text === "string") {
-                // CLI emits each assistant text block as a full string.
-                // Treat it as the current cumulative text — the frontend
-                // will overwrite rather than concatenate.
+                // Final full assistant message. Overwrite with the canonical
+                // text so any tiny drift from streamed deltas gets corrected.
+                partialText = block.text;
                 onText(block.text);
               }
             }
