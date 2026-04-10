@@ -13,6 +13,7 @@ import { protectedProcedure, router } from "../trpc";
 import {
   addDaysToDateString,
   buildDailyStats,
+  buildRangeStats,
   buildWeeklyStats,
   getLocalDayRange,
 } from "../focus/aggregates";
@@ -224,6 +225,47 @@ export const focusRouter = router({
       }).displaySessions;
     }),
 
+  /** Combined endpoint: returns both stats and sessions in one DB query */
+  dailyFull: protectedProcedure
+    .input(focusDateInput)
+    .query(async ({ ctx, input }) => {
+      const { start, end } = getLocalDayRange(input);
+      const sessions = await db
+        .select()
+        .from(activitySessions)
+        .where(
+          and(
+            eq(activitySessions.userId, ctx.userId),
+            lt(activitySessions.startedAt, end),
+            gt(activitySessions.endedAt, start)
+          )
+        )
+        .orderBy(activitySessions.startedAt);
+
+      const daily = buildDailyStats({
+        sessions,
+        date: input.date,
+        timeZone: input.timeZone,
+      });
+
+      return {
+        stats: {
+          totalSecs: daily.totalSecs,
+          focusedSecs: daily.focusedSecs,
+          spanSecs: daily.spanSecs,
+          workHoursSecs: daily.workHoursSecs,
+          filteredOutSecs: daily.filteredOutSecs,
+          nonWorkBreakdown: daily.nonWorkBreakdown,
+          tagBreakdown: daily.tagBreakdown,
+          longestStreakSecs: daily.longestStreakSecs,
+          appSwitches: daily.appSwitches,
+          sessionCount: daily.sessionCount,
+          displaySessionCount: daily.displaySessions.length,
+        },
+        sessions: daily.sessions,
+      };
+    }),
+
   dailyStats: protectedProcedure
     .input(focusDateInput)
     .query(async ({ ctx, input }) => {
@@ -316,8 +358,14 @@ export const focusRouter = router({
         timeZone: input.timeZone,
       }).start;
 
+      // Only fetch the columns needed for range aggregation
       const sessions = await db
-        .select()
+        .select({
+          startedAt: activitySessions.startedAt,
+          endedAt: activitySessions.endedAt,
+          durationSecs: activitySessions.durationSecs,
+          tags: activitySessions.tags,
+        })
         .from(activitySessions)
         .where(
           and(
@@ -328,18 +376,11 @@ export const focusRouter = router({
         )
         .orderBy(activitySessions.startedAt);
 
-      return Array.from({ length: input.days }, (_, index) => {
-        const date = addDaysToDateString(startDate, index);
-        const daily = buildDailyStats({
-          sessions,
-          date,
-          timeZone: input.timeZone,
-        });
-        return {
-          date,
-          totalSecs: daily.totalSecs,
-          workHoursSecs: daily.workHoursSecs,
-        };
+      return buildRangeStats({
+        sessions,
+        startDate,
+        days: input.days,
+        timeZone: input.timeZone,
       });
     }),
 

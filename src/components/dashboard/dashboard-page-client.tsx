@@ -51,14 +51,15 @@ export function DashboardPageClient({
   });
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", []);
   const today = useMemo(() => getLocalDateString(), []);
-  const focusStats = trpc.focus.dailyStats.useQuery({ date: today, timeZone });
-  const focusSessions = trpc.focus.dailySessions.useQuery({ date: today, timeZone });
-  const topApps = useMemo(() => buildTopApps(focusSessions.data ?? []), [focusSessions.data]);
+  const focusFull = trpc.focus.dailyFull.useQuery({ date: today, timeZone });
+  const focusStats = focusFull.data?.stats;
+  const focusSessions = focusFull.data?.sessions;
+  const topApps = useMemo(() => buildTopApps(focusSessions ?? []), [focusSessions]);
   const utils = trpc.useUtils();
   const greetingLabel = getGreetingLabel(new Date().getHours());
   const displayName = getUserDisplayName(identity.name, identity.email);
-  const focusGoalPct = focusStats.data
-    ? Math.min(100, Math.round((focusStats.data.totalSecs / (8 * 3600)) * 100))
+  const focusGoalPct = focusStats
+    ? Math.min(100, Math.round((focusStats.totalSecs / (8 * 3600)) * 100))
     : 0;
   const openTodayJournal = trpc.notes.openTodayJournal.useMutation({
     onSuccess: (result) => {
@@ -113,7 +114,7 @@ export function DashboardPageClient({
               今日专注
             </div>
             <div className="mt-2 text-2xl font-semibold text-stone-900 dark:text-stone-50">
-              {focusStats.data ? formatFocusDuration(focusStats.data.totalSecs) : "--"}
+              {focusStats ? formatFocusDuration(focusStats.totalSecs) : "--"}
             </div>
           </div>
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/80 text-sky-600 shadow-sm dark:bg-stone-900 dark:text-sky-300">
@@ -132,7 +133,7 @@ export function DashboardPageClient({
         </div>
 
         <div className="mt-4">
-          <FocusTimeline sessions={focusSessions.data ?? []} compact />
+          <FocusTimeline sessions={focusSessions ?? []} compact />
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 text-xs text-stone-600 dark:text-stone-300">

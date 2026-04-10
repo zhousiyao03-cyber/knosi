@@ -522,6 +522,64 @@ export function buildDisplaySessionsFromSlices(
   return merged;
 }
 
+/**
+ * Lightweight range aggregation — single-pass bucketing by day.
+ * Only needs startedAt/endedAt/durationSecs/tags per session (no full record).
+ */
+export function buildRangeStats({
+  sessions,
+  startDate,
+  days,
+  timeZone,
+}: {
+  sessions: {
+    startedAt: Date;
+    endedAt: Date;
+    durationSecs: number;
+    tags: string | null;
+  }[];
+  startDate: string;
+  days: number;
+  timeZone: string;
+}) {
+  // Pre-compute day boundaries
+  const dayBoundaries = Array.from({ length: days }, (_, i) => {
+    const date = addDaysToDateString(startDate, i);
+    const { start, end } = getLocalDayRange({ date, timeZone });
+    return { date, startMs: start.getTime(), endMs: end.getTime(), totalSecs: 0, workHoursSecs: 0 };
+  });
+
+  // Single pass: assign each session to overlapping days
+  for (const session of sessions) {
+    const sessionStartMs = session.startedAt.getTime();
+    const sessionEndMs = session.endedAt.getTime();
+    const tags = parseJsonStringArray(session.tags);
+    const isWork = countsTowardWorkHours(tags) && !getNonWorkReason(tags);
+
+    for (const day of dayBoundaries) {
+      // Skip days completely before/after this session
+      if (sessionStartMs >= day.endMs || sessionEndMs <= day.startMs) continue;
+
+      const overlapStart = Math.max(sessionStartMs, day.startMs);
+      const overlapEnd = Math.min(sessionEndMs, day.endMs);
+      const overlapSecs = Math.floor((overlapEnd - overlapStart) / 1000);
+
+      if (overlapSecs > 0) {
+        day.totalSecs += overlapSecs;
+        if (isWork) {
+          day.workHoursSecs += overlapSecs;
+        }
+      }
+    }
+  }
+
+  return dayBoundaries.map(({ date, totalSecs, workHoursSecs }) => ({
+    date,
+    totalSecs,
+    workHoursSecs,
+  }));
+}
+
 export function buildWeeklyStats({
   sessions,
   weekStart,

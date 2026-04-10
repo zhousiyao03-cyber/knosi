@@ -1,0 +1,1 @@
+CREATE INDEX `activity_sessions_user_started_idx` ON `activity_sessions` (`user_id`,`started_at`);

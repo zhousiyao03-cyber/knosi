@@ -292,6 +292,10 @@ export const activitySessions = sqliteTable(
       table.sourceDeviceId,
       table.sourceSessionId
     ),
+    index("activity_sessions_user_started_idx").on(
+      table.userId,
+      table.startedAt
+    ),
   ]
 );
 

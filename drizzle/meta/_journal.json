@@ -162,6 +162,13 @@
       "when": 1775749086679,
       "tag": "0022_high_jasper_sitwell",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1775826890083,
+      "tag": "0023_fixed_cobalt_man",
+      "breakpoints": true
     }
   ]
 }

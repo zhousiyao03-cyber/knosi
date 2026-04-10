@@ -45,14 +45,12 @@ export function FocusPageClient() {
   );
   const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
 
-  const dailyStats = trpc.focus.dailyStats.useQuery({
+  const dailyFull = trpc.focus.dailyFull.useQuery({
     date: selectedDate,
     timeZone,
   });
-  const dailySessions = trpc.focus.dailySessions.useQuery({
-    date: selectedDate,
-    timeZone,
-  });
+  const dailyStats = dailyFull.data?.stats;
+  const dailySessions = dailyFull.data?.sessions;
   const weeklyStats = trpc.focus.weeklyStats.useQuery({
     weekStart: getWeekStart(selectedDate),
     timeZone,
@@ -88,8 +86,7 @@ export function FocusPageClient() {
   const classifySessions = trpc.focus.classifySessions.useMutation({
     onSuccess: async () => {
       await Promise.all([
-        dailySessions.refetch(),
-        dailyStats.refetch(),
+        dailyFull.refetch(),
         summaryStatus.refetch(),
       ]);
     },
@@ -102,16 +99,16 @@ export function FocusPageClient() {
 
   const appGroups = useMemo(
     () =>
-      buildAppGroups(dailySessions.data ?? [], dailyStats.data?.totalSecs ?? 0),
-    [dailySessions.data, dailyStats.data?.totalSecs]
+      buildAppGroups(dailySessions ?? [], dailyStats?.totalSecs ?? 0),
+    [dailySessions, dailyStats?.totalSecs]
   );
   const displaySessionGroups = useMemo(
-    () => splitSessionsByDisplayThreshold(dailySessions.data ?? []),
-    [dailySessions.data]
+    () => splitSessionsByDisplayThreshold(dailySessions ?? []),
+    [dailySessions]
   );
   const selectedApp = useMemo(
-    () => getSelectedAppDetails(selectedAppName, dailySessions.data ?? []),
-    [selectedAppName, dailySessions.data]
+    () => getSelectedAppDetails(selectedAppName, dailySessions ?? []),
+    [selectedAppName, dailySessions]
   );
   const selectedAppDisplayName = selectedApp?.appName ?? null;
   const visibleAppGroups = useMemo(
@@ -133,11 +130,11 @@ export function FocusPageClient() {
     }
   }, [appGroups, selectedAppName]);
   const filteredRows = useMemo(() => {
-    if (!dailyStats.data?.nonWorkBreakdown) {
+    if (!dailyStats?.nonWorkBreakdown) {
       return [];
     }
 
-    return Object.entries(dailyStats.data.nonWorkBreakdown)
+    return Object.entries(dailyStats.nonWorkBreakdown)
       .filter(([, secs]) => secs > 0)
       .sort((left, right) => right[1] - left[1])
       .map(([reason, secs]) => ({
@@ -145,7 +142,7 @@ export function FocusPageClient() {
         secs,
         label: nonWorkLabels[reason as keyof typeof nonWorkLabels] ?? reason,
       }));
-  }, [dailyStats.data]);
+  }, [dailyStats]);
   const summaryText = summary.data?.aiAnalysis?.trim();
 
   return (
@@ -190,8 +187,7 @@ export function FocusPageClient() {
               type="button"
               onClick={() =>
                 Promise.all([
-                  dailyStats.refetch(),
-                  dailySessions.refetch(),
+                  dailyFull.refetch(),
                   weeklyStats.refetch(),
                   summary.refetch(),
                   summaryStatus.refetch(),
@@ -214,7 +210,7 @@ export function FocusPageClient() {
               data-testid="focus-total-secs"
               className="mt-2 text-3xl font-semibold text-stone-950 dark:text-stone-50"
             >
-              {dailyStats.data ? formatFocusDuration(dailyStats.data.totalSecs) : "--"}
+              {dailyStats ? formatFocusDuration(dailyStats.totalSecs) : "--"}
             </div>
             <div className="mt-2 text-sm font-medium text-stone-700 dark:text-stone-300">
               {appGroups.length
@@ -228,10 +224,10 @@ export function FocusPageClient() {
               Working hours
             </div>
             <div className="mt-2 text-3xl font-semibold text-stone-950 dark:text-stone-50">
-              {dailyStats.data ? formatFocusDuration(dailyStats.data.workHoursSecs) : "--"}
+              {dailyStats ? formatFocusDuration(dailyStats.workHoursSecs) : "--"}
             </div>
             <div className="mt-2 text-sm font-medium text-stone-700 dark:text-stone-300">
-              {getWorkingHoursBaselineCopy(dailyStats.data?.workHoursSecs)}
+              {getWorkingHoursBaselineCopy(dailyStats?.workHoursSecs)}
             </div>
           </div>
 
@@ -240,7 +236,7 @@ export function FocusPageClient() {
               Filtered out
             </div>
             <div className="mt-2 text-3xl font-semibold text-stone-950 dark:text-stone-50">
-              {dailyStats.data ? formatFocusDuration(dailyStats.data.filteredOutSecs) : "--"}
+              {dailyStats ? formatFocusDuration(dailyStats.filteredOutSecs) : "--"}
             </div>
             <div className="mt-2 text-sm font-medium text-stone-700 dark:text-stone-300">
               Non-work time excluded from working hours.
@@ -253,13 +249,13 @@ export function FocusPageClient() {
             data-testid="focus-session-count"
             className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 dark:border-stone-800 dark:bg-stone-900/60"
           >
-            Sessions: {dailyStats.data?.sessionCount ?? 0}
+            Sessions: {dailyStats?.sessionCount ?? 0}
           </span>
           <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 dark:border-stone-800 dark:bg-stone-900/60">
-            Longest streak: {dailyStats.data ? formatFocusDuration(dailyStats.data.longestStreakSecs) : "--"}
+            Longest streak: {dailyStats ? formatFocusDuration(dailyStats.longestStreakSecs) : "--"}
           </span>
           <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 dark:border-stone-800 dark:bg-stone-900/60">
-            App switches: {dailyStats.data?.appSwitches ?? 0}
+            App switches: {dailyStats?.appSwitches ?? 0}
           </span>
         </div>
       </section>
@@ -552,7 +548,7 @@ export function FocusPageClient() {
             </p>
             <div className="mt-4 rounded-[20px] border border-stone-200 bg-stone-50/80 p-4 dark:border-stone-800 dark:bg-stone-900/50">
               <div className="text-2xl font-semibold text-stone-950 dark:text-stone-50">
-                {dailyStats.data ? formatFocusDuration(dailyStats.data.filteredOutSecs) : "--"}
+                {dailyStats ? formatFocusDuration(dailyStats.filteredOutSecs) : "--"}
               </div>
               <div className="mt-1 text-sm text-stone-500 dark:text-stone-400">
                 Excluded from today&apos;s Working Hours total.
@@ -574,7 +570,7 @@ export function FocusPageClient() {
                         style={{
                           width: `${Math.max(
                             8,
-                            Math.round((row.secs / Math.max(dailyStats.data?.filteredOutSecs ?? 1, 1)) * 100)
+                            Math.round((row.secs / Math.max(dailyStats?.filteredOutSecs ?? 1, 1)) * 100)
                           )}%`,
                         }}
                       />
