@@ -299,110 +299,116 @@ function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
         </div>
       </section>
 
-      {/* AI Insight */}
-      {dailyInsight.data && dailyInsight.data.insights.length > 0 && (
+      {/* Two-column: Left = Apps, Right = AI + Filtered + Selected app */}
+      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+        {/* Left: Apps list */}
         <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
-          <div className="mb-2 flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-            <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">AI Insight</h2>
-          </div>
-          <ul className="space-y-1.5">
-            {dailyInsight.data.insights.map((insight, i) => (
-              <li key={i} className="flex gap-2 text-sm leading-6 text-stone-600 dark:text-stone-300">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-                {insight}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* Apps list */}
-      <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
-        <h2 className="mb-3 text-sm font-semibold text-stone-900 dark:text-stone-100">Apps</h2>
-        <div className="space-y-1">
-          {appGroups.length > 0 ? appGroups.map((app) => {
-            const active = app.appName === selectedApp?.appName;
-            return (
-              <button key={app.appName} type="button"
-                onClick={() => { setSelectedAppName(app.appName); setShowAppSessions(false); }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${active ? "bg-sky-50 dark:bg-sky-950/30" : "hover:bg-stone-50 dark:hover:bg-stone-900/60"}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className={`truncate text-sm font-medium ${active ? "text-sky-700 dark:text-sky-300" : "text-stone-800 dark:text-stone-200"}`}>{app.appName}</span>
-                    <span className="shrink-0 text-xs text-stone-400 dark:text-stone-500">{app.sessionCount}x</span>
-                  </div>
-                  <div className="mt-1 h-1 rounded-full bg-stone-100 dark:bg-stone-800">
-                    <div className={`h-full rounded-full ${active ? "bg-sky-400" : "bg-stone-300 dark:bg-stone-600"}`} style={{ width: `${Math.max(4, app.percentage)}%` }} />
-                  </div>
-                </div>
-                <span className="shrink-0 text-sm tabular-nums text-stone-600 dark:text-stone-300">{formatFocusDuration(app.durationSecs)}</span>
-              </button>
-            );
-          }) : <p className="py-8 text-center text-sm text-stone-400">No activity for this day.</p>}
-        </div>
-      </section>
-
-      {/* Filtered out (below apps, only if data) */}
-      {filteredRows.length > 0 && (
-        <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
-          <h2 className="mb-3 text-sm font-semibold text-stone-900 dark:text-stone-100">
-            Filtered out <span className="ml-2 text-xs font-normal text-stone-400">{formatFocusDuration(dailyStats?.filteredOutSecs ?? 0)}</span>
-          </h2>
-          <div className="space-y-2">
-            {filteredRows.map((row) => (
-              <div key={row.reason} className="flex items-center gap-3">
-                <span className="w-20 shrink-0 text-xs text-stone-600 dark:text-stone-300">{row.label}</span>
-                <div className="h-1.5 flex-1 rounded-full bg-stone-100 dark:bg-stone-800">
-                  <div className="h-full rounded-full bg-amber-400 dark:bg-amber-500"
-                    style={{ width: `${Math.max(8, Math.round((row.secs / Math.max(dailyStats?.filteredOutSecs ?? 1, 1)) * 100))}%` }} />
-                </div>
-                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-stone-400">{formatFocusDuration(row.secs)}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Selected app detail (below filtered out) */}
-      {selectedApp && (
-        <section data-testid="focus-selected-app" className="rounded-2xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-950">
-          <div className="p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">{selectedApp.appName}</h2>
-              <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500">
-                <span>{formatFocusDuration(selectedApp.durationSecs)}</span>
-                <span>{selectedApp.sessionCount} sessions</span>
-              </div>
-            </div>
-            <div className="mt-3"><FocusTimeline sessions={selectedApp.sessions} compact /></div>
-          </div>
-          <button type="button" onClick={() => setShowAppSessions((v) => !v)}
-            className="flex w-full items-center justify-center gap-1.5 border-t border-stone-100 px-4 py-2.5 text-xs font-medium text-stone-400 hover:bg-stone-50 hover:text-stone-600 dark:border-stone-800 dark:hover:bg-stone-900/60 dark:hover:text-stone-300">
-            {showAppSessions ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-            {showAppSessions ? "Hide sessions" : `Show ${selectedApp.sessionCount} sessions`}
-          </button>
-          {showAppSessions && (
-            <div data-testid="focus-selected-app-sessions" className="border-t border-stone-100 px-4 pb-3 dark:border-stone-800">
-              <div className="divide-y divide-stone-100 dark:divide-stone-800">
-                {selectedApp.sessions.map((session) => (
-                  <div key={session.id} className="flex items-center justify-between gap-3 py-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm text-stone-700 dark:text-stone-300">
-                        {session.windowTitle ?? session.browserHost ?? getFocusSessionLabel(session)}
-                      </div>
-                      <div className="text-xs text-stone-400 dark:text-stone-500">
-                        {formatClockLabel(session.startedAt)} - {formatClockLabel(session.endedAt)}
-                      </div>
+          <h2 className="mb-3 text-sm font-semibold text-stone-900 dark:text-stone-100">Apps</h2>
+          <div className="space-y-1">
+            {appGroups.length > 0 ? appGroups.map((app) => {
+              const active = app.appName === selectedApp?.appName;
+              return (
+                <button key={app.appName} type="button"
+                  onClick={() => { setSelectedAppName(app.appName); setShowAppSessions(false); }}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${active ? "bg-sky-50 dark:bg-sky-950/30" : "hover:bg-stone-50 dark:hover:bg-stone-900/60"}`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className={`truncate text-sm font-medium ${active ? "text-sky-700 dark:text-sky-300" : "text-stone-800 dark:text-stone-200"}`}>{app.appName}</span>
+                      <span className="shrink-0 text-xs text-stone-400 dark:text-stone-500">{app.sessionCount}x</span>
                     </div>
-                    <span className="shrink-0 text-xs tabular-nums text-stone-500 dark:text-stone-400">{formatFocusDuration(session.durationSecs)}</span>
+                    <div className="mt-1 h-1 rounded-full bg-stone-100 dark:bg-stone-800">
+                      <div className={`h-full rounded-full ${active ? "bg-sky-400" : "bg-stone-300 dark:bg-stone-600"}`} style={{ width: `${Math.max(4, app.percentage)}%` }} />
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-sm tabular-nums text-stone-600 dark:text-stone-300">{formatFocusDuration(app.durationSecs)}</span>
+                </button>
+              );
+            }) : <p className="py-8 text-center text-sm text-stone-400">No activity for this day.</p>}
+          </div>
+        </section>
+
+        {/* Right: AI Insight + Filtered out + Selected app */}
+        <div className="space-y-5">
+          {/* AI Insight */}
+          {dailyInsight.data && dailyInsight.data.insights.length > 0 && (
+            <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
+              <div className="mb-2 flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">AI Insight</h2>
+              </div>
+              <ul className="space-y-1.5">
+                {dailyInsight.data.insights.map((insight, i) => (
+                  <li key={i} className="flex gap-2 text-sm leading-6 text-stone-600 dark:text-stone-300">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
+                    {insight}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* Filtered out */}
+          {filteredRows.length > 0 && (
+            <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
+              <h2 className="mb-3 text-sm font-semibold text-stone-900 dark:text-stone-100">
+                Filtered out <span className="ml-2 text-xs font-normal text-stone-400">{formatFocusDuration(dailyStats?.filteredOutSecs ?? 0)}</span>
+              </h2>
+              <div className="space-y-2">
+                {filteredRows.map((row) => (
+                  <div key={row.reason} className="flex items-center gap-3">
+                    <span className="w-20 shrink-0 text-xs text-stone-600 dark:text-stone-300">{row.label}</span>
+                    <div className="h-1.5 flex-1 rounded-full bg-stone-100 dark:bg-stone-800">
+                      <div className="h-full rounded-full bg-amber-400 dark:bg-amber-500"
+                        style={{ width: `${Math.max(8, Math.round((row.secs / Math.max(dailyStats?.filteredOutSecs ?? 1, 1)) * 100))}%` }} />
+                    </div>
+                    <span className="w-10 shrink-0 text-right text-xs tabular-nums text-stone-400">{formatFocusDuration(row.secs)}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
-        </section>
-      )}
+
+          {/* Selected app detail */}
+          {selectedApp && (
+            <section data-testid="focus-selected-app" className="rounded-2xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-950">
+              <div className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">{selectedApp.appName}</h2>
+                  <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500">
+                    <span>{formatFocusDuration(selectedApp.durationSecs)}</span>
+                    <span>{selectedApp.sessionCount} sessions</span>
+                  </div>
+                </div>
+                <div className="mt-3"><FocusTimeline sessions={selectedApp.sessions} compact /></div>
+              </div>
+              <button type="button" onClick={() => setShowAppSessions((v) => !v)}
+                className="flex w-full items-center justify-center gap-1.5 border-t border-stone-100 px-4 py-2.5 text-xs font-medium text-stone-400 hover:bg-stone-50 hover:text-stone-600 dark:border-stone-800 dark:hover:bg-stone-900/60 dark:hover:text-stone-300">
+                {showAppSessions ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {showAppSessions ? "Hide sessions" : `Show ${selectedApp.sessionCount} sessions`}
+              </button>
+              {showAppSessions && (
+                <div data-testid="focus-selected-app-sessions" className="border-t border-stone-100 px-4 pb-3 dark:border-stone-800">
+                  <div className="divide-y divide-stone-100 dark:divide-stone-800">
+                    {selectedApp.sessions.map((session) => (
+                      <div key={session.id} className="flex items-center justify-between gap-3 py-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm text-stone-700 dark:text-stone-300">
+                            {session.windowTitle ?? session.browserHost ?? getFocusSessionLabel(session)}
+                          </div>
+                          <div className="text-xs text-stone-400 dark:text-stone-500">
+                            {formatClockLabel(session.startedAt)} - {formatClockLabel(session.endedAt)}
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-xs tabular-nums text-stone-500 dark:text-stone-400">{formatFocusDuration(session.durationSecs)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
