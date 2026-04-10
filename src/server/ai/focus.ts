@@ -198,6 +198,72 @@ function topLabelsFromSessions(sessions: SessionForSummary[]) {
   ].slice(0, 3);
 }
 
+type RangeInsightInput = {
+  days: { date: string; totalSecs: number; workHoursSecs: number }[];
+  topApps: [string, number][];
+  totalDays: number;
+  endDate: string;
+};
+
+const rangeInsightSchema = z.object({
+  insights: z.array(z.string()).min(1).max(5),
+});
+
+export async function generateRangeInsight(input: RangeInsightInput) {
+  const activeDays = input.days.filter((d) => d.totalSecs > 0);
+  const totalSecs = input.days.reduce((s, d) => s + d.totalSecs, 0);
+  const workSecs = input.days.reduce((s, d) => s + d.workHoursSecs, 0);
+
+  if (activeDays.length === 0) {
+    return { insights: ["No focus data recorded in this period."], aiGenerated: false };
+  }
+
+  const avgSecs = Math.floor(totalSecs / activeDays.length);
+  const dailyBreakdown = input.days
+    .filter((d) => d.totalSecs > 0)
+    .map((d) => `${d.date}: ${formatDurationShort(d.totalSecs)} (work: ${formatDurationShort(d.workHoursSecs)})`)
+    .join("\n");
+  const appBreakdown = input.topApps
+    .map(([app, secs]) => `${app}: ${formatDurationShort(secs)}`)
+    .join(", ");
+
+  try {
+    const result = await generateStructuredData({
+      name: "focus_range_insight",
+      description: "Analyze focus tracking data over a period and generate actionable insights in Chinese.",
+      prompt: `Analyze the following ${input.totalDays}-day focus data ending ${input.endDate}.
+
+Summary:
+- Active days: ${activeDays.length}/${input.totalDays}
+- Total tracked: ${formatDurationShort(totalSecs)}
+- Total work hours: ${formatDurationShort(workSecs)}
+- Daily average: ${formatDurationShort(avgSecs)}
+
+Top apps: ${appBreakdown}
+
+Daily breakdown:
+${dailyBreakdown}
+
+Generate 2-4 concise, specific, actionable insights in Chinese. Focus on:
+- Trends (increasing/decreasing work hours, weekend patterns)
+- App usage patterns (which apps dominate, any concerning patterns)
+- Work/non-work ratio
+- Consistency (streaks, gaps)
+
+Be specific with numbers. Don't be generic. Each insight should be 1-2 sentences.`,
+      schema: rangeInsightSchema,
+      signal: createFocusAiTimeoutSignal(),
+    });
+    return { insights: result.insights, aiGenerated: true };
+  } catch {
+    const fallback = [
+      `过去 ${input.totalDays} 天中有 ${activeDays.length} 天有记录，日均 ${formatDurationShort(avgSecs)}。`,
+      `Top 应用：${input.topApps.slice(0, 3).map(([app]) => app).join("、")}。`,
+    ];
+    return { insights: fallback, aiGenerated: false };
+  }
+}
+
 function parseTags(tags: string | null | undefined) {
   if (!tags) {
     return [] as string[];

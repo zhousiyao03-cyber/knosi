@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, isNull, lt, max, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
-import { generateDailySummary, classifyActivitySessions } from "../ai/focus";
+import { generateDailySummary, classifyActivitySessions, generateRangeInsight } from "../ai/focus";
 import { db } from "../db";
 import {
   activitySessions,
@@ -578,5 +578,60 @@ export const focusRouter = router({
             ? summary.generatedAt < summary.sourceUpdatedAt
             : Boolean(summary?.sourceUpdatedAt && !summary?.generatedAt),
       };
+    }),
+
+  rangeInsight: protectedProcedure
+    .input(
+      z.object({
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        days: z.number().int().min(7).max(120).default(30),
+        timeZone: z.string().min(1).default("UTC"),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const startDate = addDaysToDateString(input.endDate, -(input.days - 1));
+      const startRange = getLocalDayRange({ date: startDate, timeZone: input.timeZone }).start;
+      const endRange = getLocalDayRange({ date: addDaysToDateString(input.endDate, 1), timeZone: input.timeZone }).start;
+
+      const sessions = await db
+        .select({
+          appName: activitySessions.appName,
+          startedAt: activitySessions.startedAt,
+          endedAt: activitySessions.endedAt,
+          durationSecs: activitySessions.durationSecs,
+          tags: activitySessions.tags,
+        })
+        .from(activitySessions)
+        .where(
+          and(
+            eq(activitySessions.userId, ctx.userId),
+            lt(activitySessions.startedAt, endRange),
+            gt(activitySessions.endedAt, startRange)
+          )
+        )
+        .orderBy(activitySessions.startedAt);
+
+      const rangeData = buildRangeStats({
+        sessions,
+        startDate,
+        days: input.days,
+        timeZone: input.timeZone,
+      });
+
+      // Build app breakdown for AI context
+      const appTotals: Record<string, number> = {};
+      for (const s of sessions) {
+        appTotals[s.appName] = (appTotals[s.appName] ?? 0) + s.durationSecs;
+      }
+      const topApps = Object.entries(appTotals)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10);
+
+      return generateRangeInsight({
+        days: rangeData,
+        topApps,
+        totalDays: input.days,
+        endDate: input.endDate,
+      });
     }),
 });
