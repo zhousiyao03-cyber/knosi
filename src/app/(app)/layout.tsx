@@ -27,7 +27,15 @@ export default async function AppLayout({
       <WorkspaceIdentityProvider
         value={{ email: session?.user?.email, name: session?.user?.name }}
       >
-        <div className="flex h-full bg-[var(--background)]">
+        <div
+          data-app-shell
+          className="flex h-full bg-[var(--background)]"
+          style={
+            {
+              "--app-sidebar-w": sidebarCollapsed ? "68px" : "15rem",
+            } as React.CSSProperties
+          }
+        >
           <Sidebar
             workspaceLabel={workspaceLabel}
             initialCollapsed={sidebarCollapsed}

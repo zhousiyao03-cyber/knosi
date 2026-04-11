@@ -40,6 +40,10 @@ export function Sidebar({
     setCollapsed((prev) => {
       const next = !prev;
       document.cookie = `${COLLAPSED_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
+      const shell = document.querySelector<HTMLElement>("[data-app-shell]");
+      if (shell) {
+        shell.style.setProperty("--app-sidebar-w", next ? "68px" : "15rem");
+      }
       return next;
     });
   };
