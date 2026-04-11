@@ -917,3 +917,63 @@ claimNextJob:       SEARCH knowledge_index_jobs USING INDEX
 - `scripts/db/apply-2026-04-11-composite-indexes-rollout.mjs` — 幂等 rollout + EXPLAIN 验证
 - `docs/changelog/2026-04-11-composite-indexes-rollout.md` — rollout 留档
 - `scripts/learn/b1-explain-audit.mjs` — 用来做 before/after 对比的同一个脚本
+
+---
+
+## Phase B1 — 总结（after state）
+
+把 B1 的 5 个子任务连起来看，这个 Phase 本质上是一次"**把课本上的后端知识点压成肌肉记忆**"的训练——每个子任务都针对一个我以前只在文章里见过、没在真实项目里手动走过一遍的概念。
+
+### 子任务产出一览
+
+| 子任务 | 做了什么 | 真正学到的东西 |
+|---|---|---|
+| **B1-2** | 4-variant 并发 benchmark 脚本 + CAS 概念卡 | "**原子性不是 SELECT+UPDATE 两步的结果，是 UPDATE 的 WHERE 守卫的结果**"——CAS 这件事在 SQL 里天然可表达。 |
+| **B1-1** | 把 `notes.update` 包进事务 + 重写 `claimNextJob` 成一条 UPDATE+RETURNING | "**事务越短越好，不是越完整越好**"；"**事务里绝对不做网络 IO**"——Redis/Vercel Cache 必须留在事务外。 |
+| **B1-3** | `notes.version` 单调计数器（刻意不做乐观锁）+ 5 类场景对照表 | "**学过的方案不一定要用**"——乐观锁在 notes content 这种自然语言字段上是错解，但在 jobs status / 工单状态机上是正解。形状决定方案。 |
+| **B1-4** | 18 查询 EXPLAIN QUERY PLAN 体检脚本 + 8/10 warn 分类 | "**index 能帮 WHERE ≠ 能帮 ORDER BY**"——这是我最大的盲区修正。"equality first, range/sort last"黄金规则。 |
+| **B1-5** | 4 条复合索引 + rollout 脚本里带 EXPLAIN 验证 | "**加了 index 不等于 planner 用它**"——rollout 必须跑一次 EXPLAIN 验证选中。"孤儿表"（tokenUsageEntries）反向教育：audit warn ≠ 真问题。 |
+
+### 跨子任务的 3 条主线
+
+把 5 个子任务的"学到了什么"合并起来看，有 3 条贯穿始终的线：
+
+**1. CAS 是后端并发的统一语言。**
+
+B1-2 用 `status='pending'` 守卫发现了它，B1-1 把它写进 `claimNextJob` 的一条 SQL，B1-3 把它挪到 `notes.version` 字段上然后**明确选择不用**——反而让"什么时候该用 CAS"这个判断变清晰了。CAS 不是一个"需要记住的技巧"，是**"读和写之间有时间差就必须解决"的反射**。有了这个反射以后，看到任何"SELECT → 业务逻辑 → UPDATE"的代码都会本能地问"WHERE 里有没有防止别人改过？"。
+
+**2. 事务的边界必须围绕"DB 写一致性"画，不是围绕"所有相关操作"画。**
+
+我以前画事务边界的默认倾向是"反正都相关就一起包进去"。B1-1 被迫拆 `notes.update` 的 6 个步骤，才意识到**把 Redis invalidate 塞进事务会把持锁时间变成"外部系统的 RTT 波动区间"**——这是我最容易犯但最危险的错。新习惯：**事务只包同库写**，其他东西（Redis、消息队列、HTTP 回调、缓存失效）全部留在事务外。需要"DB 写 + 发消息"原子一致时，用 outbox 模式（写 outbox 表和业务写进同事务），不用"把发消息硬塞进事务"。
+
+**3. 工具能给你 warning，不能给你决策。**
+
+B1-4 的 audit 脚本跑出 10 个 warn，B1-5 最终只修 4 条——因为剩下 6 条中有 5 条要么数据量太小、要么在孤儿表上。**静态体检的结果永远需要叠加"这段 SQL 在线上真的高频跑吗？"这个运行时问题才有意义**。以后再做 audit 工具，我会直接在里面加一步 grep——检查这张表 / 这个查询在 router 里有没有引用——把假目标提前过滤掉。
+
+### 3 个我以前没有的习惯（B1 之后的行为改变）
+
+这是 "after state" 最实在的部分——不是概念，是我以后做事的方式会变。
+
+1. **看任何"读一次 → 做决定 → 写回去"的代码，第一反应是"WHERE 里有没有 CAS 守卫？"**。这个反射在 B1-2 之后是自动的。
+2. **画事务边界时先列"这一步是同库写 / 网络 IO / 弱一致业务调用"三类**——只有第一类进事务，后两类必须在外面。这件事在 B1-1 之前我从来没想过。
+3. **加 index 不是"改 schema.ts 就完事"**。流程变成：改 schema → `pnpm db:generate` 留 migration → 写 rollout 脚本 → **脚本里带 EXPLAIN 验证 planner 真选中** → 先生产 rollout → 本地 → commit → push。这整条链条在 B1-3 / B1-5 各跑一次，已经是肌肉记忆。
+
+### 2 个遗留的待办（不在 B1 作用域，但值得留档）
+
+1. **`tokenUsageEntries` 孤儿表**——schema.ts 里有但没人读写。是未上线的功能还是要删的废物，下次做 repo 清理时决策。
+2. **`notes.appendBlocks` 没有缓存失效**——B1-3 读代码时发现 `appendBlocks` 改了 content 但没调 `invalidateNotesListForUser`。没在 B1-3 里顺手修因为要保持"一次 commit 一件事"，flagged 在 B1-3 的 phase-b1.md 段落和 changelog 里。
+
+### 数字总结
+
+- **代码变动**：3 个 routers、1 个 schema、2 个 learn 脚本、2 个 rollout 脚本、2 个 drizzle migration
+- **DB 结构变动**：`notes.version` 列 + 4 条复合索引（全部已上生产 Turso 并 EXPLAIN 验证）
+- **文档**：1 份 `docs/learn-backend/phase-b1.md`（~700 行）+ 2 份 `docs/changelog/2026-04-11-*.md`
+- **EXPLAIN audit**：18 查询，8 绿 10 警 → 14 绿 4 警
+- **并发 benchmark**：32 workers × 50 rounds，A0 truly-naive 32/32 double-claim（证明"没有 CAS 的两步 SELECT+UPDATE 就是不安全"）
+- **生产影响**：0 故障，4 次 rollout 全部幂等成功（B1-3 notes.version × 1，B1-5 indexes × 1，加上 audit/verify 的读操作多次）
+
+### 下一个 Phase：B2 单元测试 + 集成测试
+
+B1 留下的代码变动（`claimNextJob` 改造、事务边界、version 递增、4 条新 index）目前都只有 smoke test 覆盖，没有回归测试网。**B2 会先补 Vitest + 内存 SQLite 的集成测试**，给这些改动建立安全网，然后才能放心做 B3 可观测性、B4 缓存模式这种需要频繁重构的工作。
+
+——完。
