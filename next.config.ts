@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { withBotId } from "botid/next/config";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
@@ -7,4 +6,4 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@excalidraw/excalidraw"],
 };
 
-export default withBotId(nextConfig);
+export default nextConfig;
