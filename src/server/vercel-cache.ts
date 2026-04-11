@@ -56,8 +56,11 @@ export class VercelRuntimeCache<T> {
 
     try {
       const cache = getCache();
-      const cached = (await cache.get(fullKey)) as R | undefined;
-      if (cached !== undefined) {
+      // Vercel RuntimeCache.get 契约: miss 时返回 null(不是 undefined)。
+      // 必须用 != null 同时挡 null 和 undefined,否则 miss 会被当成 hit
+      // 永远返回 null 给调用方,loader 永远不会执行。
+      const cached = (await cache.get(fullKey)) as R | null | undefined;
+      if (cached != null) {
         recordCacheEvent({ name: this.name, event: "hit" });
         logger.debug(
           { event: "cache.hit", cache: this.name, key: rawKey },
