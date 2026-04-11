@@ -50,6 +50,9 @@ next-env.d.ts
 /data/**/*.db-shm
 /data/**/*outbox.json
 /data/focus-collector/
+/.sqlite.db
+/.sqlite.db-wal
+/.sqlite.db-shm
 
 # test results
 /test-results/
