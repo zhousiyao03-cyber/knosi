@@ -24,13 +24,13 @@ const SERVER_URL = process.env.SECOND_BRAIN_URL || "https://second-brain-self-al
 const SCAN_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const IS_ONCE = process.argv.includes("--once");
 
-const ANALYSIS_POLL_INTERVAL_MS = 10 * 1000; // 10 seconds
+const ANALYSIS_POLL_INTERVAL_MS = 60 * 1000; // 60 seconds — Hobby plan invocation budget
 const MAX_CONCURRENT_ANALYSIS = 5;
 let analysisRunning = 0;
 
-const CHAT_POLL_INTERVAL_MS = 3 * 1000; // 3 seconds
+const CHAT_POLL_INTERVAL_MS = 30 * 1000; // 30 seconds — Hobby plan invocation budget
 const MAX_CONCURRENT_CHAT = 3;
-const HEARTBEAT_INTERVAL_MS = 30 * 1000; // 30 seconds
+const HEARTBEAT_INTERVAL_MS = 120 * 1000; // 120 seconds — Hobby plan invocation budget
 let chatRunning = 0;
 const ANALYSIS_BASE_DIR = join(tmpdir(), "source-readings");
 const ANALYSIS_PROVIDER = process.env.ANALYSIS_PROVIDER || "claude"; // "claude" | "codex"
