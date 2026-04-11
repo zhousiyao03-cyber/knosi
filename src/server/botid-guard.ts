@@ -1,39 +1,21 @@
 import { checkBotId } from "botid/server";
 
 /**
- * BotID 基础校验。E2E/AUTH_BYPASS 环境直接放行,避免测试误伤。
- * 返回 null = 通过;返回 Response = 已拦截,调用方直接 return。
+ * BotID 观测器。当前项目没有 Deep Analysis,Basic 模式对 JSON POST 请求
+ * 会偏保守地标为 bot,所以只记录判定结果,不拦截请求。真正的滥用防护依
+ * 赖 checkAiRateLimit。未来升到 Pro 并启用 BotID Deep Analysis 后,可
+ * 把 console.warn 改回 403 拦截。
  */
-export async function guardBot(req?: Request): Promise<Response | null> {
+export async function guardBot(_req?: Request): Promise<Response | null> {
   if (process.env.AUTH_BYPASS === "true") return null;
 
   try {
     const verification = await checkBotId();
     if (verification.isBot) {
-      const headerSnapshot = req
-        ? {
-            "x-is-human-len": req.headers.get("x-is-human")?.length ?? 0,
-            "x-path": req.headers.get("x-path"),
-            "x-method": req.headers.get("x-method"),
-            "x-forwarded-host": req.headers.get("x-forwarded-host"),
-            host: req.headers.get("host"),
-            url: req.url,
-          }
-        : null;
-      console.warn(
-        "[botid] blocked",
-        JSON.stringify(verification),
-        "headers",
-        JSON.stringify(headerSnapshot)
-      );
-      return Response.json(
-        { error: "Request blocked" },
-        { status: 403 }
-      );
+      console.warn("[botid] would-block", JSON.stringify(verification));
     }
   } catch (err) {
     console.warn("[botid] check threw", err);
-    return null;
   }
 
   return null;
