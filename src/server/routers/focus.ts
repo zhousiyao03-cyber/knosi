@@ -422,16 +422,19 @@ export const focusRouter = router({
         }))
       );
 
-      for (const classification of classifications) {
-        await db
-          .update(activitySessions)
-          .set({
-            aiSummary: classification.summary,
-            ingestionStatus: "processed",
-            updatedAt: new Date(),
-          })
-          .where(eq(activitySessions.id, classification.id));
-      }
+      // 批量 UPDATE：用事务包裹，减少单独的写操作开销
+      await db.transaction(async (tx) => {
+        for (const classification of classifications) {
+          await tx
+            .update(activitySessions)
+            .set({
+              aiSummary: classification.summary,
+              ingestionStatus: "processed",
+              updatedAt: new Date(),
+            })
+            .where(eq(activitySessions.id, classification.id));
+        }
+      });
 
       return { classified: classifications.length };
     }),

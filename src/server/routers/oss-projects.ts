@@ -40,6 +40,7 @@ function parseTags(tags: string | null | undefined) {
   }
 }
 
+/** 单个项目的 meta 查询（用于 getProject 等单条场景） */
 async function collectProjectMeta(projectId: string) {
   const notes = await db
     .select({ tags: osProjectNotes.tags })
@@ -58,10 +59,55 @@ async function collectProjectMeta(projectId: string) {
     .slice(0, 5)
     .map(([tag]) => tag);
 
-  return {
-    noteCount: notes.length,
-    topTags,
-  };
+  return { noteCount: notes.length, topTags };
+}
+
+/**
+ * 批量获取多个项目的 meta（解决 N+1 问题）
+ * 用一次 SQL 查询替代 N 次 collectProjectMeta 调用
+ */
+async function collectProjectMetaBatch(projectIds: string[]) {
+  if (projectIds.length === 0) return new Map<string, { noteCount: number; topTags: string[] }>();
+
+  const allNotes = await db
+    .select({
+      projectId: osProjectNotes.projectId,
+      noteCount: sql<number>`count(*)`.as("note_count"),
+      allTags: sql<string>`group_concat(${osProjectNotes.tags})`.as("all_tags"),
+    })
+    .from(osProjectNotes)
+    .where(
+      sql`${osProjectNotes.projectId} IN (${sql.join(projectIds.map((id) => sql`${id}`), sql`, `)})`
+    )
+    .groupBy(osProjectNotes.projectId);
+
+  const metaMap = new Map<string, { noteCount: number; topTags: string[] }>();
+
+  for (const row of allNotes) {
+    const tagCounts = new Map<string, number>();
+    if (row.allTags) {
+      for (const chunk of row.allTags.split(",")) {
+        for (const tag of parseTags(chunk)) {
+          tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+        }
+      }
+    }
+    const topTags = [...tagCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([tag]) => tag);
+
+    metaMap.set(row.projectId, { noteCount: row.noteCount, topTags });
+  }
+
+  // 没有笔记的项目也要有默认值
+  for (const id of projectIds) {
+    if (!metaMap.has(id)) {
+      metaMap.set(id, { noteCount: 0, topTags: [] });
+    }
+  }
+
+  return metaMap;
 }
 
 export const ossProjectsRouter = router({
@@ -72,12 +118,12 @@ export const ossProjectsRouter = router({
       .where(eq(osProjects.userId, ctx.userId))
       .orderBy(desc(osProjects.updatedAt));
 
-    return Promise.all(
-      projects.map(async (project) => ({
-        ...project,
-        ...(await collectProjectMeta(project.id)),
-      }))
-    );
+    const metaMap = await collectProjectMetaBatch(projects.map((p) => p.id));
+
+    return projects.map((project) => ({
+      ...project,
+      ...(metaMap.get(project.id) ?? { noteCount: 0, topTags: [] }),
+    }));
   }),
 
   listProjectsPaged: protectedProcedure
@@ -119,12 +165,11 @@ export const ossProjectsRouter = router({
         .limit(pageSize)
         .offset(offset);
 
-      const items = await Promise.all(
-        rows.map(async (project) => ({
-          ...project,
-          ...(await collectProjectMeta(project.id)),
-        }))
-      );
+      const metaMap = await collectProjectMetaBatch(rows.map((p) => p.id));
+      const items = rows.map((project) => ({
+        ...project,
+        ...(metaMap.get(project.id) ?? { noteCount: 0, topTags: [] }),
+      }));
 
       return {
         items,
@@ -276,25 +321,27 @@ export const ossProjectsRouter = router({
     .input(noteSchema)
     .mutation(async ({ input, ctx }) => {
       const id = crypto.randomUUID();
-      await db.insert(osProjectNotes).values({
-        id,
-        projectId: input.projectId,
-        userId: ctx.userId,
-        title: input.title?.trim() || "",
-        content: input.content,
-        plainText: input.plainText,
-        tags: input.tags,
-      });
+      await db.transaction(async (tx) => {
+        await tx.insert(osProjectNotes).values({
+          id,
+          projectId: input.projectId,
+          userId: ctx.userId,
+          title: input.title?.trim() || "",
+          content: input.content,
+          plainText: input.plainText,
+          tags: input.tags,
+        });
 
-      await db
-        .update(osProjects)
-        .set({ updatedAt: new Date() })
-        .where(
-          and(
-            eq(osProjects.id, input.projectId),
-            eq(osProjects.userId, ctx.userId)
-          )
-        );
+        await tx
+          .update(osProjects)
+          .set({ updatedAt: new Date() })
+          .where(
+            and(
+              eq(osProjects.id, input.projectId),
+              eq(osProjects.userId, ctx.userId)
+            )
+          );
+      });
 
       return { id };
     }),
@@ -303,17 +350,19 @@ export const ossProjectsRouter = router({
     .input(noteSchema.extend({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const { id, projectId, ...data } = input;
-      await db
-        .update(osProjectNotes)
-        .set({ ...data, updatedAt: new Date() })
-        .where(
-          and(eq(osProjectNotes.id, id), eq(osProjectNotes.userId, ctx.userId))
-        );
+      await db.transaction(async (tx) => {
+        await tx
+          .update(osProjectNotes)
+          .set({ ...data, updatedAt: new Date() })
+          .where(
+            and(eq(osProjectNotes.id, id), eq(osProjectNotes.userId, ctx.userId))
+          );
 
-      await db
-        .update(osProjects)
-        .set({ updatedAt: new Date() })
-        .where(and(eq(osProjects.id, projectId), eq(osProjects.userId, ctx.userId)));
+        await tx
+          .update(osProjects)
+          .set({ updatedAt: new Date() })
+          .where(and(eq(osProjects.id, projectId), eq(osProjects.userId, ctx.userId)));
+      });
 
       return { id };
     }),
@@ -321,21 +370,23 @@ export const ossProjectsRouter = router({
   deleteNote: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      await db
-        .delete(osProjectNotes)
-        .where(
-          and(eq(osProjectNotes.id, input.id), eq(osProjectNotes.userId, ctx.userId))
-        );
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(osProjectNotes)
+          .where(
+            and(eq(osProjectNotes.id, input.id), eq(osProjectNotes.userId, ctx.userId))
+          );
 
-      await db
-        .update(osProjects)
-        .set({ updatedAt: new Date() })
-        .where(
-          and(
-            eq(osProjects.id, input.projectId),
-            eq(osProjects.userId, ctx.userId)
-          )
-        );
+        await tx
+          .update(osProjects)
+          .set({ updatedAt: new Date() })
+          .where(
+            and(
+              eq(osProjects.id, input.projectId),
+              eq(osProjects.userId, ctx.userId)
+            )
+          );
+      });
 
       return { success: true };
     }),

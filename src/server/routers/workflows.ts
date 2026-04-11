@@ -58,8 +58,10 @@ export const workflowsRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      await db.delete(workflowRuns).where(eq(workflowRuns.workflowId, input.id));
-      await db.delete(workflows).where(and(eq(workflows.id, input.id), eq(workflows.userId, ctx.userId)));
+      await db.transaction(async (tx) => {
+        await tx.delete(workflowRuns).where(eq(workflowRuns.workflowId, input.id));
+        await tx.delete(workflows).where(and(eq(workflows.id, input.id), eq(workflows.userId, ctx.userId)));
+      });
       return { success: true };
     }),
 

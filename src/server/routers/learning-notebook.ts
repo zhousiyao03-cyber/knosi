@@ -257,26 +257,28 @@ export const learningNotebookRouter = router({
     .input(noteInputSchema)
     .mutation(async ({ input, ctx }) => {
       const id = crypto.randomUUID();
-      await db.insert(learningNotes).values({
-        id,
-        topicId: input.topicId,
-        userId: ctx.userId,
-        title: input.title?.trim() || "",
-        content: input.content,
-        plainText: input.plainText,
-        tags: input.tags,
-        aiSummary: input.aiSummary,
-      });
+      await db.transaction(async (tx) => {
+        await tx.insert(learningNotes).values({
+          id,
+          topicId: input.topicId,
+          userId: ctx.userId,
+          title: input.title?.trim() || "",
+          content: input.content,
+          plainText: input.plainText,
+          tags: input.tags,
+          aiSummary: input.aiSummary,
+        });
 
-      await db
-        .update(learningTopics)
-        .set({ updatedAt: new Date() })
-        .where(
-          and(
-            eq(learningTopics.id, input.topicId),
-            eq(learningTopics.userId, ctx.userId)
-          )
-        );
+        await tx
+          .update(learningTopics)
+          .set({ updatedAt: new Date() })
+          .where(
+            and(
+              eq(learningTopics.id, input.topicId),
+              eq(learningTopics.userId, ctx.userId)
+            )
+          );
+      });
 
       return { id };
     }),
@@ -285,22 +287,24 @@ export const learningNotebookRouter = router({
     .input(updateNoteSchema)
     .mutation(async ({ input, ctx }) => {
       const { id, topicId, ...data } = input;
-      await db
-        .update(learningNotes)
-        .set({ ...data, updatedAt: new Date() })
-        .where(
-          and(eq(learningNotes.id, id), eq(learningNotes.userId, ctx.userId))
-        );
+      await db.transaction(async (tx) => {
+        await tx
+          .update(learningNotes)
+          .set({ ...data, updatedAt: new Date() })
+          .where(
+            and(eq(learningNotes.id, id), eq(learningNotes.userId, ctx.userId))
+          );
 
-      await db
-        .update(learningTopics)
-        .set({ updatedAt: new Date() })
-        .where(
-          and(
-            eq(learningTopics.id, topicId),
-            eq(learningTopics.userId, ctx.userId)
-          )
-        );
+        await tx
+          .update(learningTopics)
+          .set({ updatedAt: new Date() })
+          .where(
+            and(
+              eq(learningTopics.id, topicId),
+              eq(learningTopics.userId, ctx.userId)
+            )
+          );
+      });
 
       return { id };
     }),
@@ -308,21 +312,23 @@ export const learningNotebookRouter = router({
   deleteNote: protectedProcedure
     .input(z.object({ id: z.string(), topicId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      await db
-        .delete(learningNotes)
-        .where(
-          and(eq(learningNotes.id, input.id), eq(learningNotes.userId, ctx.userId))
-        );
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(learningNotes)
+          .where(
+            and(eq(learningNotes.id, input.id), eq(learningNotes.userId, ctx.userId))
+          );
 
-      await db
-        .update(learningTopics)
-        .set({ updatedAt: new Date() })
-        .where(
-          and(
-            eq(learningTopics.id, input.topicId),
-            eq(learningTopics.userId, ctx.userId)
-          )
-        );
+        await tx
+          .update(learningTopics)
+          .set({ updatedAt: new Date() })
+          .where(
+            and(
+              eq(learningTopics.id, input.topicId),
+              eq(learningTopics.userId, ctx.userId)
+            )
+          );
+      });
 
       return { success: true };
     }),

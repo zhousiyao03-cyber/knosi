@@ -131,31 +131,33 @@ export async function generatePortfolioNews(userId: string, symbol: string) {
       sentiment: "neutral" as const,
     }));
 
-  // upsert：有则覆盖，无则插入
-  const existing = await db
-    .select()
-    .from(portfolioNews)
-    .where(and(eq(portfolioNews.userId, userId), eq(portfolioNews.symbol, normalizedSymbol)))
-    .limit(1);
+  // 原子 upsert：用事务保证查+写的一致性，防止并发重复插入
+  await db.transaction(async (tx) => {
+    const existing = await tx
+      .select({ id: portfolioNews.id })
+      .from(portfolioNews)
+      .where(and(eq(portfolioNews.userId, userId), eq(portfolioNews.symbol, normalizedSymbol)))
+      .limit(1);
 
-  if (existing[0]) {
-    await db
-      .update(portfolioNews)
-      .set({
+    if (existing[0]) {
+      await tx
+        .update(portfolioNews)
+        .set({
+          summary: result.summary,
+          sentiment: result.sentiment,
+          generatedAt: new Date(),
+        })
+        .where(eq(portfolioNews.id, existing[0].id));
+    } else {
+      await tx.insert(portfolioNews).values({
+        id: crypto.randomUUID(),
+        userId,
+        symbol: normalizedSymbol,
         summary: result.summary,
         sentiment: result.sentiment,
-        generatedAt: new Date(),
-      })
-      .where(and(eq(portfolioNews.userId, userId), eq(portfolioNews.symbol, normalizedSymbol)));
-  } else {
-    await db.insert(portfolioNews).values({
-      id: crypto.randomUUID(),
-      userId,
-      symbol: normalizedSymbol,
-      summary: result.summary,
-      sentiment: result.sentiment,
-    });
-  }
+      });
+    }
+  });
 
   return result;
 }
