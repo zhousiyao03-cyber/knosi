@@ -17,6 +17,7 @@ export default auth((req) => {
     pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/icon") ||
     pathname.startsWith("/apple-icon") ||
+    pathname.startsWith("/149e9513-01fa-4fb0-aad4-566afd725d1b/") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/focus/ingest") ||
     pathname.startsWith("/api/focus/status") ||
