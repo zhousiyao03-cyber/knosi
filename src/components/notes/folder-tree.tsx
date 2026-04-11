@@ -9,7 +9,6 @@ import {
   FolderOpen,
   FolderPlus,
   GripVertical,
-  MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
@@ -59,7 +58,6 @@ function DroppableFolderRow({
   onContextMenu,
   onDoubleClick,
   onToggleCollapse,
-  children,
 }: {
   node: FlatNode;
   isActive: boolean;
@@ -68,7 +66,6 @@ function DroppableFolderRow({
   onContextMenu: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onToggleCollapse: () => void;
-  children: React.ReactNode;
 }) {
   const { isOver, setNodeRef: setDropRef } = useDroppable({
     id: `folder-drop-${node.id}`,
@@ -152,8 +149,6 @@ function DroppableFolderRow({
           {node.noteCount}
         </span>
       )}
-
-      {children}
     </div>
   );
 }
@@ -237,7 +232,17 @@ export function FolderTree({
 
   const handleContextMenu = (e: React.MouseEvent, folderId: string) => {
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, folderId });
+    e.stopPropagation();
+    // Anchor to the right edge of the clicked row, not the mouse position.
+    // This keeps the menu inside/near the sidebar instead of overlapping
+    // the main content area.
+    const row = e.currentTarget as HTMLElement;
+    const rect = row.getBoundingClientRect();
+    setContextMenu({
+      x: rect.right + 4,
+      y: rect.top,
+      folderId,
+    });
   };
 
   const startRename = (folderId: string) => {
@@ -291,7 +296,7 @@ export function FolderTree({
         }
       }}
     >
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-3 flex h-9 items-center justify-between">
         <button
           onClick={() => onSelectFolder(null)}
           className="text-xs font-semibold uppercase tracking-wider text-stone-400 transition-colors hover:text-stone-600 dark:hover:text-stone-300"
@@ -349,25 +354,7 @@ export function FolderTree({
             onContextMenu={(e) => handleContextMenu(e, node.id)}
             onDoubleClick={() => startRename(node.id)}
             onToggleCollapse={() => toggleCollapse.mutate({ id: node.id })}
-          >
-            {/* More button on hover */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const rect = (
-                  e.currentTarget as HTMLElement
-                ).getBoundingClientRect();
-                setContextMenu({
-                  x: rect.right,
-                  y: rect.bottom,
-                  folderId: node.id,
-                });
-              }}
-              className="shrink-0 rounded p-0.5 text-stone-400 opacity-0 transition-opacity hover:text-stone-600 group-hover:opacity-100 dark:hover:text-stone-300"
-            >
-              <MoreHorizontal size={14} />
-            </button>
-          </DroppableFolderRow>
+          />
         );
       })}
 

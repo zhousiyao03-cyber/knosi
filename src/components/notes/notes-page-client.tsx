@@ -19,7 +19,6 @@ import {
   CalendarDays,
   Loader2,
   Folder,
-  ChevronRight,
   Menu,
   X,
   GripVertical,
@@ -353,20 +352,9 @@ export function NotesPageClient() {
             >
               <Menu size={20} />
             </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {activeFolderName ?? "Notes"}
-              </h1>
-              {activeFolderId && (
-                <button
-                  onClick={() => handleFolderChange(null)}
-                  className="mt-1 flex items-center gap-1 text-xs text-stone-400 hover:text-stone-600"
-                >
-                  <ChevronRight size={12} className="rotate-180" />
-                  All notes
-                </button>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {activeFolderName ?? "Notes"}
+            </h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -382,7 +370,7 @@ export function NotesPageClient() {
               </span>
             </button>
             <button
-              onClick={() => handleCreateNote(activeFolderId === "" ? null : activeFolderId)}
+              onClick={() => handleCreateNote(activeFolderId)}
               disabled={createNote.isPending}
               className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
             >
