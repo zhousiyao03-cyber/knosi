@@ -102,6 +102,10 @@ export const notes = sqliteTable(
     index("notes_user_idx").on(table.userId),
     index("notes_user_folder_idx").on(table.userId, table.folder),
     index("notes_folder_id_idx").on(table.folderId),
+    // B1-5: covers notes.list's default ORDER BY updated_at DESC,
+    // removing the "TEMP B-TREE FOR ORDER BY" file-sort step.
+    // Rule: equality-first (user_id), range/sort-last (updated_at).
+    index("notes_user_updated_idx").on(table.userId, table.updatedAt),
   ]
 );
 
@@ -145,7 +149,11 @@ export const bookmarks = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
     updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   },
-  (table) => [index("bookmarks_user_idx").on(table.userId)]
+  (table) => [
+    index("bookmarks_user_idx").on(table.userId),
+    // B1-5: covers bookmarks.list's default ORDER BY created_at DESC.
+    index("bookmarks_user_created_idx").on(table.userId, table.createdAt),
+  ]
 );
 
 export const todos = sqliteTable(
@@ -167,6 +175,9 @@ export const todos = sqliteTable(
   (table) => [
     index("todos_user_idx").on(table.userId),
     index("todos_user_duedate_status_idx").on(table.userId, table.dueDate, table.status),
+    // B1-5: covers todos.list's default ORDER BY created_at DESC and
+    // dashboard.pendingTodos which sorts on the same column.
+    index("todos_user_created_idx").on(table.userId, table.createdAt),
   ]
 );
 
@@ -246,6 +257,14 @@ export const knowledgeIndexJobs = sqliteTable(
   (table) => [
     index("knowledge_index_jobs_source_idx").on(table.sourceId),
     index("knowledge_index_jobs_status_idx").on(table.status),
+    // B1-5: covers the claimNextJob hot path — WHERE status='pending'
+    // AND queued_at <= ? ORDER BY queued_at ASC. Equality-first
+    // (status), range+sort-last (queued_at). Replaces the TEMP B-TREE
+    // FOR ORDER BY step that showed up in the B1-4 audit.
+    index("knowledge_index_jobs_status_queued_idx").on(
+      table.status,
+      table.queuedAt
+    ),
   ]
 );
 

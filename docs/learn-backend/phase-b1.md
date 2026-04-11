@@ -769,3 +769,151 @@ B1-5 就是基于这 10 个 warn 修 index。**但不是 10 条都修**——有
 
 - `scripts/learn/b1-explain-audit.mjs` — EXPLAIN 审计脚本
 - `src/server/db/schema.ts` — 现有 index 的声明位置（B1-5 要改这里）
+
+---
+
+## B1-5 — 补索引：从 10 warn 修到 4 warn
+
+### 作用域筛选
+
+B1-4 的 audit 列出 10 个 file-sort 警告。我**没有全修**——每条 index 都会让写路径多一点开销，而且 SQLite index 会占 DB 空间。哪些值得修，取决于**数据量 × 访问频率**。
+
+筛选逻辑：
+
+1. **先判断目标查询是不是真实的**——B1-4 的 audit 脚本里有些查询是我猜的，不一定对应真实 router 调用
+2. **再看数据量**——表只有 20 行时 file-sort 的绝对耗时 <1ms，感知不到
+3. **再看频率**——每次打开列表页就跑 vs 一天跑一次，优先修前者
+
+扫完这三层后，**10 个 warn 收敛到 4 个值得修**：
+
+| 优先级 | 索引 | 目标查询 | 访问频率 |
+|---|---|---|---|
+| **高** | `notes_user_updated_idx` on `(user_id, updated_at)` | `notes.list` 默认 + 6 处 dashboard/子查询（grep 到 7 个 `orderBy(desc(notes.updatedAt))`）| 每次打开 notes 页都跑 |
+| **高** | `bookmarks_user_created_idx` on `(user_id, created_at)` | `bookmarks.list` | bookmarks 页主路径 |
+| **高** | `knowledge_index_jobs_status_queued_idx` on `(status, queued_at)` | `claimNextJob` | 每次 job tick 都跑，jobs 表会持续增长 |
+| **中** | `todos_user_created_idx` on `(user_id, created_at)` | `todos.list` + dashboard.pendingTodos | todos 数据量小但访问高频 |
+
+**跳过并且写进文档留档的**：
+
+| 跳过项 | 原因 |
+|---|---|
+| `notes.list + folder filter` | 非主路径，现有 `(folder_id)` index 已够用 |
+| `folders.list ORDER BY sort_order` | 数据量 <20 行，index 成本 > file-sort 成本 |
+| `learning_notes GROUP BY topic_id` | 数据量 <100 行 |
+| `todos due today` 的 partial sort | 现有三列复合 index 已覆盖主 WHERE + 第一层 ORDER BY，第二层 ORDER BY 的 file-sort 绝对耗时微乎其微 |
+| `token_usage_entries` | **audit 里的假目标** — 后面会讲 |
+
+### 意外发现：一张"孤儿表"
+
+跑 audit 时 `token_usage_entries` 被标为 warn，我准备修之前先 grep 看看 router 里怎么调的——**结果仓库里没有任何代码读或写这张表**。
+
+```bash
+rg 'tokenUsageEntries|token_usage_entries' src
+# 只命中 schema.ts 自己
+```
+
+这张表在 `schema.ts` 里声明得很正经（13 列 + 1 索引），但没有任何 router 读它、没有任何 instrumentation 写它。两种可能：
+
+1. 一个**做了一半就被砍掉的功能**——写完 schema 就没继续
+2. 一个**等着某个未来功能的"预留 schema"**——但那个功能没来
+
+不管哪种，**给一个没人读的表加 index 是纯负担**。所以：
+- B1-5 **不修**这张表
+- 在 changelog 里把它作为"清理候选"留档
+- 让未来的某次清理 Phase 去决定"删表还是接上用"
+
+**这件事本身就是 B1-5 最大的一个意外学习点**——**audit 工具跑出来的 warn 不一定等于值得修的真问题**。Classifier 只看 SQL 语法，不看"这段 SQL 是不是真的在线上跑"。真正的决策永远需要把"静态体检结果"和"运行时的真实访问模式"叠在一起看。这是一种自动化工具永远做不到的事。
+
+### 新 index 的字段顺序：equality-first, range/sort-last
+
+4 条新 index 都严格按 B1-4 总结的规则：
+
+```
+notes              (user_id, updated_at)
+bookmarks          (user_id, created_at)
+todos              (user_id, created_at)
+knowledge_index_jobs (status, queued_at)
+```
+
+每条都是"**前面是 `=` 比较的列，后面是 range/ORDER BY 的列**"。
+
+- `notes.list`: WHERE user_id = ? （等值）ORDER BY updated_at DESC（排序）→ 先 user_id 后 updated_at
+- `claimNextJob`: WHERE status = 'pending' （等值）AND queued_at <= ? （range）ORDER BY queued_at ASC（排序）→ 先 status 后 queued_at（range 和 sort 正好同一列，一箭双雕）
+
+如果字段顺序反了会发生什么？比如 `(updated_at, user_id)` 给 notes——SQLite 想定位某个 user 的笔记时，必须把整个按 `updated_at` 排好的 index 都扫一遍（因为 user_id 不是前缀，没法 seek）。index 等于没建。
+
+### Before / After audit 对比
+
+跑 audit 脚本跑 before 和 after：
+
+| | 绿灯 | 警告 | 相对 before 减少 |
+|---|---|---|---|
+| **Before（B1-4 体检）** | 8 | 10 | — |
+| **After（B1-5 加 4 条 index）** | **14** | **4** | **-6** |
+
+- `notes.list`: `SEARCH notes USING INDEX notes_user_idx` + TEMP B-TREE → `SEARCH notes USING INDEX notes_user_updated_idx`，TEMP B-TREE 消失
+- `bookmarks.list`: 同样切到新 index，TEMP B-TREE 消失
+- `todos.list + status`: 切到新 index，TEMP B-TREE 消失
+- `claimNextJob subquery`: 切到新 index，**且 `status=? AND queued_at<?` 两个条件都吃进 index**（之前只吃到 `status=?`），TEMP B-TREE 消失
+- `queue: pending by queued_at`: 同上
+
+**这个对比才是 B1-5 最有说服力的证据**——不是"我加了 index 所以更快"，而是**同一个 audit 脚本跑两次，10 个 warn 消掉 6 个，对应的查询计划从 "TEMP B-TREE FOR ORDER BY" 变成 "SEARCH USING INDEX"**。你能亲手看到 SQLite 的选择变了。
+
+### Production rollout
+
+按 B1-3 的惯例：**先 rollout 生产 → 再本地 → 再 commit → 再 push**。
+
+脚本：`scripts/db/apply-2026-04-11-composite-indexes-rollout.mjs`。它做 4 件事：
+
+1. 检查这 4 条 index 是不是已存在（before state）
+2. 跑 `CREATE INDEX IF NOT EXISTS`（幂等）
+3. 从 `sqlite_master` 读回每条 index 的 CREATE SQL 作为证据
+4. **对生产数据库直接跑 `EXPLAIN QUERY PLAN`，验证 query planner 真的选到了新 index 且 TEMP B-TREE 消失**
+
+第 4 步是关键——我不想只"创建了 index 就完事"，而是要**证明生产的 SQLite 在看到真实查询时会选它**。如果因为统计信息过时或别的原因 planner 拒绝用，脚本会报错退出。
+
+生产实际运行的 `EXPLAIN` 输出：
+
+```
+notes.list:         SEARCH notes USING INDEX notes_user_updated_idx (user_id=?)
+bookmarks.list:     SEARCH bookmarks USING INDEX bookmarks_user_created_idx (user_id=?)
+todos.list:         SEARCH todos USING INDEX todos_user_created_idx (user_id=?)
+claimNextJob:       SEARCH knowledge_index_jobs USING INDEX
+                    knowledge_index_jobs_status_queued_idx (status=? AND queued_at<?)
+```
+
+全部命中，全部没有 TEMP B-TREE。
+
+详细 rollout 输出在 `docs/changelog/2026-04-11-composite-indexes-rollout.md`。
+
+### 踩坑记录
+
+1. **drizzle-kit push 又一次拒绝**，这次它把 "增加新 index" 也认为是需要交互确认的变更。对策和 B1-3 一样——绕开 drizzle-kit，直接用 `@libsql/client` 发 `CREATE INDEX IF NOT EXISTS`。我意识到对这个项目而言，**drizzle-kit 只用于生成 migration 文件（留档）+ 写 schema.ts，真正的 apply 走自己的 .mjs 脚本**。这已经形成了一个稳定的工作流。
+
+2. **`tokenUsageEntries` 是孤儿表**，看上去没发现就会白加一个 index。这让我意识到以后写 audit 工具时应该**自动 grep 每张表的引用**作为"真实性前置检查"——否则 classifier 会认真给你一堆假目标。
+
+3. **verify 阶段不是可选的**，是必须的。我第一版 rollout 脚本只到 "CREATE INDEX + 读 sqlite_master 确认存在" 就停了，想一下发现：**存在 ≠ 被使用**。SQLite 的 query planner 可能因为统计信息不全、index 覆盖不完美等原因拒绝用新 index——这时候表面看 rollout 成功，实际线上还是旧计划。加了 `EXPLAIN QUERY PLAN` 在 rollout 脚本里跑一次对目标查询验证，这个风险才真正被覆盖。
+
+### 验证
+
+- `pnpm build` ✅（通过）
+- `eslint src/server/db/schema.ts` ✅（exit 0）
+- **本地 audit before/after**：8→14 绿，10→4 警，减少 6 个 warn
+- **生产 rollout + 生产 EXPLAIN 验证**：4 条 index 创建、存在、且被 query planner 实际选用（脚本的 step 4 直接跑 EXPLAIN）
+- 无 code path 变化——所有改动只影响 SQLite 存储层的 index，router 代码一行没动
+
+### 学到了什么（after state）
+
+1. **"index 加了就好"是幻觉**。真正的证据链是"schema 加 → sqlite_master 确认存在 → EXPLAIN QUERY PLAN 确认 planner 选中 → TEMP B-TREE 消失"。**这四步少一步都可能出事**。以后写 index 相关 rollout 脚本我都会加一个对目标查询的 EXPLAIN 验证，这是一次性的成本，长期收益巨大。
+2. **"audit 工具暴露的 warn 不等于真问题"**。`tokenUsageEntries` 是反例：静态看 SQL 它是 warn，但结合仓库引用一看它根本没跑。**工具是输入，决策仍然需要人的上下文判断**。自动化能把可能性收窄，不能替你拍板。
+3. **"arbitrage 哪些值得修"本身就是技能**。10 条 warn 我只修 4 条，不是偷懒——是因为"数据量 × 访问频率"这个过滤器能把真正有感知的优化和无感的清洁工作分开。后者留给"未来的 rainy day 再统一处理"比现在一次做完更合理。
+4. **"先 rollout 生产再 commit" 流程越来越顺手了**。B1-3 第一次这么做时还有些紧张——怕脚本出错、怕错过验证。B1-5 做第二次就是肌肉记忆：写幂等脚本、对生产跑、对着输出抄 changelog、commit。这种流程纪律本身也是学习 Phase 的成果之一。
+5. **write 开销不是零**。加 4 条 index 意味着 `notes / bookmarks / todos / jobs` 的每次 INSERT/UPDATE 都要多维护 4 个 B-tree。对 B1 这个作用域来说无感——这些都是读多写少的表。但**下次如果要对一张写热表加 index**（比如 activity_sessions），就得认真权衡了。
+
+### 关键文件
+
+- `src/server/db/schema.ts` — 4 条新 `index()` 声明
+- `drizzle/0027_demonic_leo.sql` — 自动生成的 migration，作为 repo 证据
+- `scripts/db/apply-2026-04-11-composite-indexes-rollout.mjs` — 幂等 rollout + EXPLAIN 验证
+- `docs/changelog/2026-04-11-composite-indexes-rollout.md` — rollout 留档
+- `scripts/learn/b1-explain-audit.mjs` — 用来做 before/after 对比的同一个脚本
