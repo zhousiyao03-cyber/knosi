@@ -16,7 +16,12 @@ import {
   extractTomorrowPlanItems,
 } from "@/lib/note-templates";
 import { normalizeJournalTitlesForUser } from "../notes/journal-titles";
-import { invalidateDashboardForUser } from "../cache/instances";
+import {
+  invalidateDashboardForUser,
+  invalidateNotesListForUser,
+  notesListCache,
+  notesListTagForUser,
+} from "../cache/instances";
 
 const noteCoverSchema = z.string().trim().nullable().optional();
 const noteIconSchema = z.string().trim().max(8).nullable().optional();
@@ -88,23 +93,30 @@ export const notesRouter = router({
       const offset = input?.offset ?? 0;
       await normalizeJournalTitlesForUser(ctx.userId);
 
-      const clauses = [eq(notes.userId, ctx.userId)];
-      if (input?.folderId) {
-        clauses.push(eq(notes.folderId, input.folderId));
-      }
+      const cacheKey = `${ctx.userId}:${input?.folderId ?? "*"}:${limit}:${offset}`;
+      return notesListCache.getOrLoad(
+        cacheKey,
+        async () => {
+          const clauses = [eq(notes.userId, ctx.userId)];
+          if (input?.folderId) {
+            clauses.push(eq(notes.folderId, input.folderId));
+          }
 
-      const items = await db
-        .select()
-        .from(notes)
-        .where(and(...clauses))
-        .orderBy(desc(notes.updatedAt))
-        .limit(limit + 1)
-        .offset(offset);
+          const items = await db
+            .select()
+            .from(notes)
+            .where(and(...clauses))
+            .orderBy(desc(notes.updatedAt))
+            .limit(limit + 1)
+            .offset(offset);
 
-      const hasMore = items.length > limit;
-      if (hasMore) items.pop();
+          const hasMore = items.length > limit;
+          if (hasMore) items.pop();
 
-      return { items, hasMore, offset };
+          return { items, hasMore, offset };
+        },
+        [notesListTagForUser(ctx.userId)]
+      );
     }),
 
   get: protectedProcedure
@@ -161,6 +173,7 @@ export const notesRouter = router({
     void enqueueNoteIndexJob(id, "note-create").catch(() => undefined);
 
     invalidateDashboardForUser(ctx.userId);
+    invalidateNotesListForUser(ctx.userId);
     return { id, created: true };
   }),
 
@@ -182,6 +195,7 @@ export const notesRouter = router({
       void enqueueNoteIndexJob(id, "note-create").catch(() => undefined);
       void syncNoteLinks(id, input.content ?? null).catch(() => undefined);
       invalidateDashboardForUser(ctx.userId);
+      invalidateNotesListForUser(ctx.userId);
       return { id };
     }),
 
@@ -214,6 +228,7 @@ export const notesRouter = router({
       }
 
       invalidateDashboardForUser(ctx.userId);
+      invalidateNotesListForUser(ctx.userId);
       return { id };
     }),
 
@@ -223,6 +238,7 @@ export const notesRouter = router({
       await db.delete(notes).where(and(eq(notes.id, input.id), eq(notes.userId, ctx.userId)));
       void removeKnowledgeSourceIndex("note", input.id).catch(() => undefined);
       invalidateDashboardForUser(ctx.userId);
+      invalidateNotesListForUser(ctx.userId);
       return { success: true };
     }),
 

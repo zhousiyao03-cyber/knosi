@@ -11,6 +11,7 @@
  */
 
 import { RedisCache } from "../redis-cache";
+import { VercelRuntimeCache } from "../vercel-cache";
 
 /**
  * dashboard.stats 的缓存。
@@ -40,4 +41,30 @@ export const dashboardStatsCache = new RedisCache<any>({
  */
 export function invalidateDashboardForUser(userId: string) {
   void dashboardStatsCache.invalidate(userId).catch(() => undefined);
+}
+
+/**
+ * notes.list 缓存 —— 跑在 Vercel Runtime Cache 上。
+ * key = `${userId}:${folderId ?? "*"}:${limit}:${offset}`
+ * tag = `notes:${userId}` — 写操作失效整个用户的 notes 列表
+ * TTL = 60 秒(notes 列表变化频率低于 dashboard,允许更长 TTL)
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const notesListCache = new VercelRuntimeCache<any>({
+  name: "notes.list",
+  ttlSeconds: 60,
+});
+
+export function notesListTagForUser(userId: string) {
+  return `notes:${userId}`;
+}
+
+/**
+ * 当用户的 notes 发生写操作时,失效该用户所有 notes.list 缓存项。
+ * 调用方不需要知道 key 结构,只管"我改了 user X 的 notes"。
+ */
+export function invalidateNotesListForUser(userId: string) {
+  void notesListCache
+    .expireTag(notesListTagForUser(userId))
+    .catch(() => undefined);
 }
