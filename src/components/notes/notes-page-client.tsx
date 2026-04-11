@@ -82,18 +82,17 @@ function DraggableNoteCard({
     <div
       ref={setNodeRef}
       {...attributes}
-      className={cn(isDragging && "opacity-40")}
+      className={cn("group/drag relative", isDragging && "opacity-40")}
     >
-      <div className="relative">
-        {/* Drag handle */}
-        <div
-          {...listeners}
-          className="absolute -left-1 top-1/2 -translate-y-1/2 cursor-grab rounded p-1 text-stone-300 opacity-0 transition-opacity hover:text-stone-500 group-hover:opacity-100 active:cursor-grabbing dark:text-stone-600 dark:hover:text-stone-400"
-        >
-          <GripVertical size={14} />
-        </div>
-        {children}
+      {/* Drag handle — visible on card hover */}
+      <div
+        {...listeners}
+        className="absolute -left-6 top-1/2 z-10 -translate-y-1/2 cursor-grab rounded p-1 text-stone-300 opacity-0 transition-opacity hover:text-stone-500 group-hover/drag:opacity-100 active:cursor-grabbing dark:text-stone-600 dark:hover:text-stone-400"
+        style={{ touchAction: "none" }}
+      >
+        <GripVertical size={14} />
       </div>
+      {children}
     </div>
   );
 }
@@ -115,7 +114,7 @@ export function NotesPageClient() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
+      activationConstraint: { distance: 5 },
     })
   );
 
@@ -457,7 +456,7 @@ export function NotesPageClient() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 pl-7">
             {filtered.map((note) => {
               const tags = parseTags(note.tags);
               return (

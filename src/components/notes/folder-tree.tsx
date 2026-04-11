@@ -9,6 +9,7 @@ import {
   FolderOpen,
   FolderPlus,
   FileText,
+  GripVertical,
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -77,7 +78,7 @@ function DroppableFolderRow({
 
   const {
     attributes,
-    listeners,
+    listeners: dragListeners,
     setNodeRef: setDragRef,
     isDragging,
   } = useDraggable({
@@ -87,11 +88,7 @@ function DroppableFolderRow({
 
   return (
     <div
-      ref={(el) => {
-        setDropRef(el);
-        setDragRef(el);
-      }}
-      {...attributes}
+      ref={setDropRef}
       className={cn(
         "group relative flex w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors",
         isActive
@@ -105,8 +102,19 @@ function DroppableFolderRow({
       onClick={onSelect}
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
-      {...listeners}
     >
+      {/* Drag handle — only this triggers folder drag */}
+      <div
+        ref={setDragRef}
+        {...attributes}
+        {...dragListeners}
+        className="shrink-0 cursor-grab rounded p-0.5 text-stone-300 opacity-0 transition-opacity hover:text-stone-500 group-hover:opacity-100 active:cursor-grabbing dark:text-stone-600 dark:hover:text-stone-400"
+        style={{ touchAction: "none" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical size={12} />
+      </div>
+
       {/* Expand/collapse chevron */}
       <button
         onClick={(e) => {
