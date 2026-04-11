@@ -64,3 +64,6 @@ HANDOFF.md
 # claude code local settings
 .claude/settings.local.json
 .claude/
+
+# git worktrees (isolated workspaces)
+.worktrees/
