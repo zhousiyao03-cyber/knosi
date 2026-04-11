@@ -658,14 +658,14 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
         </div>
       </div>
 
-      {/* TOC sidebar — fixed in the right margin, shown on large screens */}
+      {/* TOC sidebar — fixed in the left margin, right next to the global
+          app sidebar (w-64 = 16rem). Entering a note leaves the Notes folder
+          tree behind, so the left margin is empty and is the natural spot
+          for TOC (matching the previous knowledge-note-editor layout). */}
       {editorInstance && (
         <div
-          className="fixed bottom-4 top-24 hidden xl:flex"
-          style={{
-            right: "max(1.5rem, calc((100vw - 980px) / 2 - 14rem - 1rem))",
-            width: "13rem",
-          }}
+          className="fixed bottom-4 top-24 hidden 2xl:flex"
+          style={{ left: "calc(16rem + 12px)", width: "13rem" }}
         >
           <div className="w-full overflow-y-auto">
             <TocSidebar editor={editorInstance} />
