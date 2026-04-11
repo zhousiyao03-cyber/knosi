@@ -271,29 +271,6 @@ export const notesRouter = router({
       return results;
     }),
 
-  graphData: protectedProcedure.query(async ({ ctx }) => {
-    const allNotes = await db
-      .select({
-        id: notes.id,
-        title: notes.title,
-        icon: notes.icon,
-        folderId: notes.folderId,
-      })
-      .from(notes)
-      .where(eq(notes.userId, ctx.userId));
-
-    const allLinks = await db
-      .select({
-        source: noteLinks.sourceNoteId,
-        target: noteLinks.targetNoteId,
-      })
-      .from(noteLinks)
-      .innerJoin(notes, eq(noteLinks.sourceNoteId, notes.id))
-      .where(eq(notes.userId, ctx.userId));
-
-    return { nodes: allNotes, edges: allLinks };
-  }),
-
   enableShare: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {

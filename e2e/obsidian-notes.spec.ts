@@ -157,33 +157,6 @@ test.describe("Obsidian-Style Notes System", () => {
     });
   });
 
-  test.describe("Graph View", () => {
-    test("graph view page loads with header", async ({ page }) => {
-      await page.goto("/notes/graph");
-      await expect(page.getByText("Graph View")).toBeVisible();
-    });
-
-    test("graph view accessible from notes page via Graph button", async ({
-      page,
-    }) => {
-      await page.goto("/notes");
-      // Click Graph button (has Network icon)
-      const graphButton = page.locator("button").filter({ hasText: /Graph/ });
-      if (await graphButton.isVisible()) {
-        await graphButton.click();
-        await expect(page).toHaveURL("/notes/graph");
-        await expect(page.getByText("Graph View")).toBeVisible();
-      }
-    });
-
-    test("graph view has back button to notes", async ({ page }) => {
-      await page.goto("/notes/graph");
-      await expect(page.getByText("Notes").first()).toBeVisible();
-      await page.getByText("Notes").first().click();
-      await expect(page).toHaveURL("/notes");
-    });
-  });
-
   test.describe("Editor Backlinks", () => {
     test("note editor loads without error", async ({ page }) => {
       await page.goto("/notes");

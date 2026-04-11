@@ -23,7 +23,6 @@ import {
   Menu,
   X,
   GripVertical,
-  Network,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
@@ -370,14 +369,6 @@ export function NotesPageClient() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push("/notes/graph")}
-              className="flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-stone-600 transition-colors hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400 dark:hover:bg-stone-800"
-              title="Graph View"
-            >
-              <Network size={16} />
-              <span className="hidden lg:inline">Graph</span>
-            </button>
             <button
               onClick={() => openTodayJournal.mutate()}
               disabled={openTodayJournal.isPending}
