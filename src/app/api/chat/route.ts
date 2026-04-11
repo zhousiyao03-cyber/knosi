@@ -111,7 +111,7 @@ async function resolvePinnedSources(
 const SKIP_RAG_KEYWORDS = ["不用搜索", "直接回答", "不需要搜索", "不要搜索"];
 
 export async function POST(req: Request) {
-  const botBlock = await guardBot();
+  const botBlock = await guardBot(req);
   if (botBlock) return botBlock;
 
   // Auth bypass for E2E testing
