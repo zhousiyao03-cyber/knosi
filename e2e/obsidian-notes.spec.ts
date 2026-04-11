@@ -6,9 +6,10 @@ test.describe("Obsidian-Style Notes System", () => {
   test.describe("Folder Tree", () => {
     test("notes page shows folder sidebar on desktop", async ({ page }) => {
       await page.goto("/notes");
-      // "All notes" and "Unfiled" should exist in the sidebar
-      await expect(page.getByText("All notes").first()).toBeVisible();
-      await expect(page.getByText("Unfiled").first()).toBeVisible();
+      // Explorer header (clickable, shows root) should exist
+      await expect(page.getByText("Explorer")).toBeVisible();
+      // New folder button should exist
+      await expect(page.locator('button[title="New folder"]')).toBeVisible();
     });
 
     test("can create a folder via the new folder button", async ({ page }) => {
@@ -125,11 +126,22 @@ test.describe("Obsidian-Style Notes System", () => {
       await expect(folderElements).toHaveCount(0, { timeout: 5000 });
     });
 
-    test("clicking a folder filters the note list", async ({ page }) => {
+    test("clicking a created folder filters the note list", async ({ page }) => {
+      const folderName = `FilterTest-${uid()}`;
       await page.goto("/notes");
-      await page.getByText("Unfiled").first().click();
-      // The heading should show "Unfiled notes"
-      await expect(page.locator("h1")).toContainText("Unfiled");
+
+      // Create a folder to click on
+      await page.locator('button[title="New folder"]').click();
+      const input = page.locator('input[placeholder="Folder name..."]');
+      await input.fill(folderName);
+      await input.press("Enter");
+      await expect(page.getByText(folderName).first()).toBeVisible({
+        timeout: 5000,
+      });
+
+      // Click it → heading should reflect folder name
+      await page.getByText(folderName).first().click();
+      await expect(page.locator("main h1")).toContainText(folderName);
     });
   });
 

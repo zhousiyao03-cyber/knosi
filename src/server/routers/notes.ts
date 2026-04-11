@@ -1,7 +1,7 @@
 import { router, protectedProcedure, publicProcedure } from "../trpc";
 import { db } from "../db";
 import { notes, noteLinks } from "../db/schema";
-import { and, desc, eq, isNull, isNotNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, ne, or, sql } from "drizzle-orm";
 import { extractWikiLinks } from "../notes/link-extractor";
 import { z } from "zod/v4";
 import crypto from "crypto";
@@ -72,43 +72,13 @@ async function syncNoteLinks(noteId: string, content: string | null) {
 }
 
 export const notesRouter = router({
-  /** Aggregate all tags across all user notes with counts */
-  listTags: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await db
-      .select({ tags: notes.tags })
-      .from(notes)
-      .where(and(eq(notes.userId, ctx.userId), isNotNull(notes.tags)));
-
-    const tagCounts = new Map<string, number>();
-    for (const row of rows) {
-      try {
-        const parsed = JSON.parse(row.tags!);
-        if (Array.isArray(parsed)) {
-          for (const tag of parsed) {
-            if (typeof tag === "string") {
-              tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
-            }
-          }
-        }
-      } catch {
-        // skip malformed
-      }
-    }
-
-    return Array.from(tagCounts.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  }),
-
   list: protectedProcedure
     .input(
       z
         .object({
           limit: z.number().int().min(1).max(100).default(30),
           offset: z.number().int().min(0).default(0),
-          type: z.enum(["note", "journal", "summary"]).optional(),
           folderId: z.string().optional(),
-          noFolder: z.boolean().optional(),
         })
         .optional()
     )
@@ -118,14 +88,8 @@ export const notesRouter = router({
       await normalizeJournalTitlesForUser(ctx.userId);
 
       const clauses = [eq(notes.userId, ctx.userId)];
-      if (input?.type) {
-        clauses.push(eq(notes.type, input.type));
-      }
       if (input?.folderId) {
         clauses.push(eq(notes.folderId, input.folderId));
-      }
-      if (input?.noFolder) {
-        clauses.push(isNull(notes.folderId));
       }
 
       const items = await db
@@ -208,10 +172,8 @@ export const notesRouter = router({
         title: z.string(),
         content: z.string().optional(),
         plainText: z.string().optional(),
-        type: z.enum(["note", "journal", "summary"]).default("note"),
         icon: noteIconSchema,
         cover: noteCoverSchema,
-        tags: z.string().optional(),
         folderId: z.string().nullable().optional(),
       })
     )
@@ -233,10 +195,8 @@ export const notesRouter = router({
         title: z.string().optional(),
         content: z.string().optional(),
         plainText: z.string().optional(),
-        type: z.enum(["note", "journal", "summary"]).optional(),
         icon: noteIconSchema,
         cover: noteCoverSchema,
-        tags: z.string().optional(),
         folderId: z.string().nullable().optional(),
       })
     )

@@ -27,23 +27,9 @@ import {
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
-import { NOTE_TYPE_LABELS } from "@/lib/note-appearance";
 import { FolderTree } from "./folder-tree";
-import { NotesSidebar } from "./notes-sidebar";
 import { DndTreeOverlay } from "./dnd-tree-overlay";
 import { ResizableSidebar } from "./resizable-sidebar";
-
-function parseTags(tags: string | null | undefined) {
-  if (!tags) return [] as string[];
-  try {
-    const value = JSON.parse(tags);
-    return Array.isArray(value)
-      ? value.filter((tag): tag is string => typeof tag === "string")
-      : [];
-  } catch {
-    return [];
-  }
-}
 
 const PAGE_SIZE = 30;
 
@@ -100,8 +86,7 @@ function DraggableNoteCard({
 export function NotesPageClient() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  // null = all, "" = unfiled, string = folderId
+  // null = all notes (root view); string = folderId
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const { toast } = useToast();
@@ -204,9 +189,7 @@ export function NotesPageClient() {
   const activeFolderName =
     activeFolderId === null
       ? null
-      : activeFolderId === ""
-        ? "Unfiled notes"
-        : folderData.find((f) => f.id === activeFolderId)?.name ?? null;
+      : folderData.find((f) => f.id === activeFolderId)?.name ?? null;
 
   // Paginated notes
   const [offset, setOffset] = useState(0);
@@ -214,32 +197,20 @@ export function NotesPageClient() {
   const [hasMore, setHasMore] = useState(true);
   const prevKeyRef = useRef("");
 
-  const typeParam =
-    typeFilter !== "all"
-      ? (typeFilter as "note" | "journal" | "summary")
-      : undefined;
-
   const queryInput: {
     limit: number;
     offset: number;
-    type?: "note" | "journal" | "summary";
     folderId?: string;
-    noFolder?: boolean;
   } = {
     limit: PAGE_SIZE,
     offset,
-    type: typeParam,
   };
 
-  if (activeFolderId !== null) {
-    if (activeFolderId === "") {
-      queryInput.noFolder = true;
-    } else {
-      queryInput.folderId = activeFolderId;
-    }
+  if (activeFolderId) {
+    queryInput.folderId = activeFolderId;
   }
 
-  const queryKey = `${typeFilter}|${activeFolderId}`;
+  const queryKey = `${activeFolderId}`;
 
   const { data, isLoading, isFetching } = trpc.notes.list.useQuery(queryInput);
 
@@ -263,14 +234,6 @@ export function NotesPageClient() {
     setHasMore(true);
     prevKeyRef.current = "";
   }, []);
-
-  const handleFilterChange = useCallback(
-    (newType: string) => {
-      setTypeFilter(newType);
-      resetAndRefresh();
-    },
-    [resetAndRefresh]
-  );
 
   const handleFolderChange = useCallback(
     (folderId: string | null) => {
@@ -343,8 +306,8 @@ export function NotesPageClient() {
     <div className="flex gap-6">
       {/* Desktop multi-panel sidebar */}
       <ResizableSidebar className="hidden md:block">
-        <div className="sticky top-6 h-[calc(100vh-120px)]">
-          <NotesSidebar
+        <div className="sticky top-6 h-[calc(100vh-120px)] overflow-y-auto">
+          <FolderTree
             activeFolderId={activeFolderId}
             onSelectFolder={handleFolderChange}
             onCreateNote={handleCreateNote}
@@ -438,8 +401,8 @@ export function NotesPageClient() {
           </div>
         </div>
 
-        <div className="mb-4 flex items-center gap-3">
-          <div className="relative flex-1">
+        <div className="mb-4">
+          <div className="relative">
             <Search
               size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -452,16 +415,6 @@ export function NotesPageClient() {
               className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             />
           </div>
-          <select
-            value={typeFilter}
-            onChange={(e) => handleFilterChange(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          >
-            <option value="all">All types</option>
-            <option value="note">Note</option>
-            <option value="journal">Daily note</option>
-            <option value="summary">Summary</option>
-          </select>
         </div>
 
         {isLoading && allItems.length === 0 ? (
@@ -478,7 +431,6 @@ export function NotesPageClient() {
         ) : (
           <div className="space-y-2 pl-7">
             {filtered.map((note) => {
-              const tags = parseTags(note.tags);
               return (
                 <DraggableNoteCard key={note.id} noteId={note.id}>
                 <div
@@ -504,14 +456,6 @@ export function NotesPageClient() {
                         <h3 className="truncate font-medium text-stone-900 dark:text-stone-100">
                           {note.title || "New page"}
                         </h3>
-                        {note.type && note.type !== "note" && (
-                          <span
-                            data-testid="note-type-badge"
-                            className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300"
-                          >
-                            {NOTE_TYPE_LABELS[note.type] ?? note.type}
-                          </span>
-                        )}
                       </div>
                       {note.plainText && (
                         <p className="mt-1 line-clamp-1 text-xs text-stone-500 dark:text-stone-400">
@@ -531,14 +475,6 @@ export function NotesPageClient() {
                             </span>
                           ) : null;
                         })()}
-                        {tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
-                          >
-                            {tag}
-                          </span>
-                        ))}
                       </div>
                     </div>
                   </div>

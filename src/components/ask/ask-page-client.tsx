@@ -423,8 +423,6 @@ function AskPageStream() {
         latestAnswer.cleanText,
         latestAnswer.sources
       ),
-      type: "summary",
-      tags: JSON.stringify(["ask-ai"]),
     });
   };
 

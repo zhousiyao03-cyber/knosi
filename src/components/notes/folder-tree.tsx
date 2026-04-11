@@ -8,7 +8,6 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
-  FileText,
   GripVertical,
   MoreHorizontal,
 } from "lucide-react";
@@ -269,14 +268,6 @@ export function FolderTree({
     }
   };
 
-  const staticItemClass = (isActive: boolean) =>
-    cn(
-      "flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm transition-colors cursor-pointer",
-      isActive
-        ? "bg-stone-100 font-medium text-stone-900 dark:bg-stone-800 dark:text-stone-100"
-        : "text-stone-600 hover:bg-stone-50 dark:text-stone-400 dark:hover:bg-stone-900"
-    );
-
   // Droppable "root" target — dropping a folder here moves it to top-level
   const {
     isOver: isOverRoot,
@@ -287,11 +278,27 @@ export function FolderTree({
   });
 
   return (
-    <div className="space-y-0.5">
+    <div
+      ref={setRootDropRef}
+      className={cn(
+        "space-y-0.5 rounded-lg transition-colors",
+        isOverRoot && "ring-2 ring-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:ring-blue-500"
+      )}
+      onClick={(e) => {
+        // Click on empty area (the wrapper itself) → show root
+        if (e.target === e.currentTarget) {
+          onSelectFolder(null);
+        }
+      }}
+    >
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+        <button
+          onClick={() => onSelectFolder(null)}
+          className="text-xs font-semibold uppercase tracking-wider text-stone-400 transition-colors hover:text-stone-600 dark:hover:text-stone-300"
+          title="Show all notes"
+        >
           Explorer
-        </h2>
+        </button>
         <button
           onClick={() => {
             setCreatingIn(null);
@@ -303,33 +310,6 @@ export function FolderTree({
           <FolderPlus size={14} />
         </button>
       </div>
-
-      {/* All notes — also acts as drop target for moving folders/notes to root */}
-      <div
-        ref={setRootDropRef}
-        onClick={() => onSelectFolder(null)}
-        className={cn(
-          staticItemClass(activeFolderId === null),
-          isOverRoot &&
-            "ring-2 ring-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:ring-blue-500"
-        )}
-      >
-        <FileText size={14} className="shrink-0" />
-        <span className="flex-1 truncate">All notes</span>
-      </div>
-
-      {/* Unfiled */}
-      <button
-        onClick={() => onSelectFolder("")}
-        className={staticItemClass(activeFolderId === "")}
-      >
-        <FileText size={14} className="shrink-0" />
-        <span className="flex-1 truncate">Unfiled</span>
-      </button>
-
-      {flatNodes.length > 0 && (
-        <div className="my-1.5 border-t border-stone-200 dark:border-stone-700" />
-      )}
 
       {/* Folder tree nodes */}
       {flatNodes.map((node) => {
