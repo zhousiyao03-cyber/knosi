@@ -36,13 +36,13 @@ import {
 const WEEK_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function getCellColor(totalSecs: number) {
-  if (totalSecs <= 0) return "bg-stone-100 dark:bg-stone-800/80";
+  if (totalSecs <= 0) return "bg-stone-100 dark:bg-stone-900";
   const h = totalSecs / 3600;
-  if (h < 1) return "bg-sky-100 dark:bg-sky-950";
-  if (h < 3) return "bg-sky-300 dark:bg-sky-800";
-  if (h < 5) return "bg-sky-500 dark:bg-sky-600";
-  if (h < 8) return "bg-sky-600 dark:bg-sky-500";
-  return "bg-sky-700 dark:bg-sky-400";
+  if (h < 1) return "bg-stone-200 dark:bg-stone-800";
+  if (h < 3) return "bg-stone-400 dark:bg-stone-700";
+  if (h < 5) return "bg-stone-500 dark:bg-stone-500";
+  if (h < 8) return "bg-stone-700 dark:bg-stone-300";
+  return "bg-stone-900 dark:bg-stone-100";
 }
 
 function getDayOfWeekIndex(dateStr: string) {
@@ -117,7 +117,7 @@ export function FocusPageClient() {
     <div className="mx-auto max-w-5xl space-y-5">
       {drillDate && (
         <button type="button" onClick={() => setDrillDate(null)}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-500 transition-colors hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100">
           <ArrowLeft className="h-3.5 w-3.5" /> Back to overview
         </button>
       )}
@@ -127,11 +127,11 @@ export function FocusPageClient() {
       ) : (
         <>
           {/* ━━━ 30-day heatmap ━━━ */}
-          <section className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-950">
+          <section className="rounded-md border border-stone-200 bg-white/70 p-4 dark:border-stone-800 dark:bg-stone-950/50">
             <div className="mb-4 flex items-center justify-between">
-              <h1 className="text-base font-semibold text-stone-900 dark:text-stone-100">Focus — Last 30 days</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Focus — Last 30 days</h1>
               <button type="button" onClick={() => rangeStats.refetch()}
-                className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-800 dark:hover:text-stone-300">
+                className="rounded-md p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-800 dark:hover:text-stone-300">
                 <RefreshCcw className="h-4 w-4" />
               </button>
             </div>
@@ -161,17 +161,17 @@ export function FocusPageClient() {
                     ) : (
                       <button key={cell.day.date} type="button" onClick={() => setDrillDate(cell.day.date)}
                         title={`${formatFullDate(cell.day.date)} · ${formatFocusDuration(cell.day.totalSecs)}`}
-                        className={`h-4 w-4 rounded-[3px] transition-all hover:scale-125 ${getCellColor(cell.day.totalSecs)} ${cell.isToday ? "ring-2 ring-amber-400 ring-offset-1 ring-offset-white dark:ring-offset-stone-950" : ""}`} />
+                        className={`h-4 w-4 rounded-[3px] transition-colors ${getCellColor(cell.day.totalSecs)} ${cell.isToday ? "ring-1 ring-stone-900 ring-offset-1 ring-offset-white dark:ring-stone-100 dark:ring-offset-stone-950" : ""}`} />
                     ))}
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="mt-3 flex items-center justify-end gap-1.5 text-[11px] text-stone-400 dark:text-stone-500">
+            <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-stone-400 dark:text-stone-500">
               <span>Less</span>
-              {["bg-stone-100 dark:bg-stone-800/80", "bg-sky-100 dark:bg-sky-950", "bg-sky-300 dark:bg-sky-800", "bg-sky-500 dark:bg-sky-600", "bg-sky-600 dark:bg-sky-500", "bg-sky-700 dark:bg-sky-400"].map((cls, i) => (
-                <span key={i} className={`h-3 w-3 rounded-[3px] ${cls}`} />
+              {["bg-stone-100 dark:bg-stone-900", "bg-stone-200 dark:bg-stone-800", "bg-stone-400 dark:bg-stone-700", "bg-stone-500 dark:bg-stone-500", "bg-stone-700 dark:bg-stone-300", "bg-stone-900 dark:bg-stone-100"].map((cls, i) => (
+                <span key={i} className={`h-2.5 w-2.5 rounded-[2px] ${cls}`} />
               ))}
               <span>More</span>
             </div>
@@ -179,33 +179,33 @@ export function FocusPageClient() {
 
           {/* ━━━ Today card — dashboard style ━━━ */}
           <button type="button" onClick={() => setDrillDate(today)}
-            className="w-full rounded-2xl border border-sky-200 bg-sky-50/80 p-5 text-left transition-colors hover:border-sky-300 hover:bg-sky-50 dark:border-sky-900/50 dark:bg-sky-950/20 dark:hover:border-sky-800 dark:hover:bg-sky-950/30">
+            className="w-full rounded-md border border-stone-200 bg-white/70 p-4 text-left transition-colors hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950/50 dark:hover:bg-stone-900/40">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-xs font-medium uppercase tracking-widest text-sky-600 dark:text-sky-300/80">Today</div>
-                <div className="mt-2 text-2xl font-semibold text-stone-900 dark:text-stone-50">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">Today</div>
+                <div className="mt-1 text-xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
                   {todayStats ? formatFocusDuration(todayStats.totalSecs) : "--"}
                 </div>
               </div>
-              <span className="text-xs text-stone-400 dark:text-stone-500">Click to drill down →</span>
+              <span className="text-[11px] text-stone-400 dark:text-stone-500">Click to drill down →</span>
             </div>
-            <div className="mt-3 h-2 rounded-full bg-white/80 dark:bg-stone-900">
-              <div className="h-full rounded-full bg-gradient-to-r from-teal-400 to-sky-400 transition-all" style={{ width: `${Math.max(6, todayGoalPct)}%` }} />
+            <div className="mt-3 h-1.5 rounded-full bg-stone-100 dark:bg-stone-900">
+              <div className="h-full rounded-full bg-stone-900 transition-colors dark:bg-stone-100" style={{ width: `${Math.max(6, todayGoalPct)}%` }} />
             </div>
-            <div className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">{todayGoalPct}% / 8h goal</div>
+            <div className="mt-1.5 text-[11px] tabular-nums text-stone-500 dark:text-stone-400">{todayGoalPct}% / 8h goal</div>
           </button>
 
           {/* ━━━ Recent days ━━━ */}
           {days.filter((d) => d.totalSecs > 0 && d.date !== today).length > 0 && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-950">
-              <h2 className="mb-3 text-sm font-semibold text-stone-900 dark:text-stone-100">Recent days</h2>
+            <section className="rounded-md border border-stone-200 bg-white/70 p-4 dark:border-stone-800 dark:bg-stone-950/50">
+              <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">Recent days</h2>
               <div className="space-y-1">
                 {days.filter((d) => d.totalSecs > 0 && d.date !== today).slice(-7).reverse().map((day) => (
                   <button key={day.date} type="button" onClick={() => setDrillDate(day.date)}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-stone-50 dark:hover:bg-stone-900/60">
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-left transition-colors hover:bg-stone-50 dark:hover:bg-stone-900/60">
                     <span className="w-24 shrink-0 text-sm text-stone-600 dark:text-stone-300">{formatFullDate(day.date)}</span>
                     <div className="h-1.5 flex-1 rounded-full bg-stone-100 dark:bg-stone-800">
-                      <div className="h-full rounded-full bg-sky-400 dark:bg-sky-500" style={{ width: `${Math.max(2, Math.min(100, Math.round((day.totalSecs / (10 * 3600)) * 100)))}%` }} />
+                      <div className="h-full rounded-full bg-stone-700 dark:bg-stone-300" style={{ width: `${Math.max(2, Math.min(100, Math.round((day.totalSecs / (10 * 3600)) * 100)))}%` }} />
                     </div>
                     <span className="w-16 shrink-0 text-right text-sm tabular-nums text-stone-500 dark:text-stone-400">{formatFocusDuration(day.totalSecs)}</span>
                   </button>
@@ -257,43 +257,43 @@ function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
   return (
     <div className="space-y-5">
       {/* Header with goal bar */}
-      <section className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-950">
+      <section className="rounded-md border border-stone-200 bg-white/70 p-4 dark:border-stone-800 dark:bg-stone-950/50">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs font-medium uppercase tracking-widest text-sky-600 dark:text-sky-300/80">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">
               {isToday ? "Today" : formatFullDate(date)}
             </div>
-            <div className="mt-1 text-2xl font-semibold text-stone-900 dark:text-stone-50" data-testid="focus-total-secs">
+            <div className="mt-1 text-xl font-semibold tabular-nums text-stone-900 dark:text-stone-50" data-testid="focus-total-secs">
               {dailyStats ? formatFocusDuration(dailyStats.totalSecs) : "--"}
             </div>
           </div>
           <div className="flex items-center gap-4 text-right">
             <div>
-              <div className="text-[10px] font-medium uppercase tracking-wider text-teal-600 dark:text-teal-400">Work</div>
-              <div className="text-lg font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">Work</div>
+              <div className="text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-50">
                 {dailyStats ? formatFocusDuration(dailyStats.workHoursSecs) : "--"}
               </div>
             </div>
             {(dailyStats?.filteredOutSecs ?? 0) > 0 && (
               <div>
-                <div className="text-[10px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">Filtered</div>
-                <div className="text-lg font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">Filtered</div>
+                <div className="text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-50">
                   {formatFocusDuration(dailyStats?.filteredOutSecs ?? 0)}
                 </div>
               </div>
             )}
             <button type="button" onClick={() => dailyFull.refetch()}
-              className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-800 dark:hover:text-stone-300">
+              className="rounded-md p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-800 dark:hover:text-stone-300">
               <RefreshCcw className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         {/* 8h goal progress bar */}
-        <div className="mt-3 h-2 rounded-full bg-stone-100 dark:bg-stone-900">
-          <div className="h-full rounded-full bg-gradient-to-r from-teal-400 to-sky-400 transition-all" style={{ width: `${Math.max(4, goalPct)}%` }} />
+        <div className="mt-3 h-1.5 rounded-full bg-stone-100 dark:bg-stone-900">
+          <div className="h-full rounded-full bg-stone-900 transition-colors dark:bg-stone-100" style={{ width: `${Math.max(4, goalPct)}%` }} />
         </div>
-        <div className="mt-1.5 flex justify-between text-xs text-stone-400 dark:text-stone-500">
+        <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-stone-400 dark:text-stone-500">
           <span>{goalPct}% / 8h goal</span>
           <span data-testid="focus-session-count">{dailyStats?.sessionCount ?? 0} sessions · {dailyStats?.appSwitches ?? 0} switches · streak {dailyStats ? formatFocusDuration(dailyStats.longestStreakSecs) : "--"}</span>
         </div>
@@ -302,28 +302,28 @@ function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
       {/* Two-column: Left = Apps, Right = AI + Filtered + Selected app */}
       <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
         {/* Left: Apps list */}
-        <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
-          <h2 className="mb-3 text-sm font-semibold text-stone-900 dark:text-stone-100">Apps</h2>
+        <section className="rounded-md border border-stone-200 bg-white/70 p-4 dark:border-stone-800 dark:bg-stone-950/50">
+          <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">Apps</h2>
           <div className="space-y-1">
             {appGroups.length > 0 ? appGroups.map((app) => {
               const active = app.appName === selectedApp?.appName;
               return (
                 <button key={app.appName} type="button"
                   onClick={() => { setSelectedAppName(app.appName); setShowAppSessions(false); }}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${active ? "bg-sky-50 dark:bg-sky-950/30" : "hover:bg-stone-50 dark:hover:bg-stone-900/60"}`}>
+                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors ${active ? "bg-stone-100 dark:bg-stone-900/60" : "hover:bg-stone-50 dark:hover:bg-stone-900/60"}`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
-                      <span className={`truncate text-sm font-medium ${active ? "text-sky-700 dark:text-sky-300" : "text-stone-800 dark:text-stone-200"}`}>{app.appName}</span>
-                      <span className="shrink-0 text-xs text-stone-400 dark:text-stone-500">{app.sessionCount}x</span>
+                      <span className={`truncate text-sm font-medium ${active ? "text-stone-900 dark:text-stone-100" : "text-stone-800 dark:text-stone-200"}`}>{app.appName}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-stone-400 dark:text-stone-500">{app.sessionCount}x</span>
                     </div>
                     <div className="mt-1 h-1 rounded-full bg-stone-100 dark:bg-stone-800">
-                      <div className={`h-full rounded-full ${active ? "bg-sky-400" : "bg-stone-300 dark:bg-stone-600"}`} style={{ width: `${Math.max(4, app.percentage)}%` }} />
+                      <div className={`h-full rounded-full ${active ? "bg-stone-700 dark:bg-stone-300" : "bg-stone-300 dark:bg-stone-600"}`} style={{ width: `${Math.max(4, app.percentage)}%` }} />
                     </div>
                   </div>
                   <span className="shrink-0 text-sm tabular-nums text-stone-600 dark:text-stone-300">{formatFocusDuration(app.durationSecs)}</span>
                 </button>
               );
-            }) : <p className="py-8 text-center text-sm text-stone-400">No activity for this day.</p>}
+            }) : <p className="py-8 text-center text-sm text-stone-400 dark:text-stone-500">No activity for this day.</p>}
           </div>
         </section>
 
@@ -331,15 +331,15 @@ function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
         <div className="space-y-5">
           {/* AI Insight */}
           {dailyInsight.data && dailyInsight.data.insights.length > 0 && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
+            <section className="rounded-md border border-stone-200 bg-white/70 p-4 dark:border-stone-800 dark:bg-stone-950/50">
               <div className="mb-2 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">AI Insight</h2>
+                <Sparkles className="h-3 w-3 text-stone-400 dark:text-stone-500" />
+                <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">AI Insight</h2>
               </div>
               <ul className="space-y-1.5">
                 {dailyInsight.data.insights.map((insight, i) => (
                   <li key={i} className="flex gap-2 text-sm leading-6 text-stone-600 dark:text-stone-300">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-stone-400 dark:bg-stone-600" />
                     {insight}
                   </li>
                 ))}
@@ -349,19 +349,19 @@ function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
 
           {/* Filtered out */}
           {filteredRows.length > 0 && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
-              <h2 className="mb-3 text-sm font-semibold text-stone-900 dark:text-stone-100">
-                Filtered out <span className="ml-2 text-xs font-normal text-stone-400">{formatFocusDuration(dailyStats?.filteredOutSecs ?? 0)}</span>
+            <section className="rounded-md border border-stone-200 bg-white/70 p-4 dark:border-stone-800 dark:bg-stone-950/50">
+              <h2 className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">
+                Filtered out <span className="font-normal normal-case tracking-normal tabular-nums text-stone-400 dark:text-stone-500">{formatFocusDuration(dailyStats?.filteredOutSecs ?? 0)}</span>
               </h2>
               <div className="space-y-2">
                 {filteredRows.map((row) => (
                   <div key={row.reason} className="flex items-center gap-3">
                     <span className="w-20 shrink-0 text-xs text-stone-600 dark:text-stone-300">{row.label}</span>
                     <div className="h-1.5 flex-1 rounded-full bg-stone-100 dark:bg-stone-800">
-                      <div className="h-full rounded-full bg-amber-400 dark:bg-amber-500"
+                      <div className="h-full rounded-full bg-stone-400 dark:bg-stone-600"
                         style={{ width: `${Math.max(8, Math.round((row.secs / Math.max(dailyStats?.filteredOutSecs ?? 1, 1)) * 100))}%` }} />
                     </div>
-                    <span className="w-10 shrink-0 text-right text-xs tabular-nums text-stone-400">{formatFocusDuration(row.secs)}</span>
+                    <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-stone-400 dark:text-stone-500">{formatFocusDuration(row.secs)}</span>
                   </div>
                 ))}
               </div>
@@ -370,11 +370,11 @@ function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
 
           {/* Selected app detail */}
           {selectedApp && (
-            <section data-testid="focus-selected-app" className="rounded-2xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-950">
+            <section data-testid="focus-selected-app" className="rounded-md border border-stone-200 bg-white/70 dark:border-stone-800 dark:bg-stone-950/50">
               <div className="p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">{selectedApp.appName}</h2>
-                  <div className="flex items-center gap-3 text-xs text-stone-400 dark:text-stone-500">
+                  <div className="flex items-center gap-3 text-[11px] tabular-nums text-stone-400 dark:text-stone-500">
                     <span>{formatFocusDuration(selectedApp.durationSecs)}</span>
                     <span>{selectedApp.sessionCount} sessions</span>
                   </div>
@@ -382,8 +382,8 @@ function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
                 <div className="mt-3"><FocusTimeline sessions={selectedApp.sessions} compact /></div>
               </div>
               <button type="button" onClick={() => setShowAppSessions((v) => !v)}
-                className="flex w-full items-center justify-center gap-1.5 border-t border-stone-100 px-4 py-2.5 text-xs font-medium text-stone-400 hover:bg-stone-50 hover:text-stone-600 dark:border-stone-800 dark:hover:bg-stone-900/60 dark:hover:text-stone-300">
-                {showAppSessions ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                className="flex w-full items-center justify-center gap-1.5 border-t border-stone-100 px-4 py-2 text-[11px] font-medium text-stone-400 transition-colors hover:bg-stone-50 hover:text-stone-600 dark:border-stone-800 dark:hover:bg-stone-900/60 dark:hover:text-stone-300">
+                {showAppSessions ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 {showAppSessions ? "Hide sessions" : `Show ${selectedApp.sessionCount} sessions`}
               </button>
               {showAppSessions && (
@@ -395,11 +395,11 @@ function DayDrillDown({ date, timeZone }: { date: string; timeZone: string }) {
                           <div className="truncate text-sm text-stone-700 dark:text-stone-300">
                             {session.windowTitle ?? session.browserHost ?? getFocusSessionLabel(session)}
                           </div>
-                          <div className="text-xs text-stone-400 dark:text-stone-500">
+                          <div className="text-[11px] tabular-nums text-stone-400 dark:text-stone-500">
                             {formatClockLabel(session.startedAt)} - {formatClockLabel(session.endedAt)}
                           </div>
                         </div>
-                        <span className="shrink-0 text-xs tabular-nums text-stone-500 dark:text-stone-400">{formatFocusDuration(session.durationSecs)}</span>
+                        <span className="shrink-0 text-[11px] tabular-nums text-stone-500 dark:text-stone-400">{formatFocusDuration(session.durationSecs)}</span>
                       </div>
                     ))}
                   </div>
@@ -430,55 +430,55 @@ function DevicesSection() {
   });
 
   return (
-    <section className="rounded-2xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-950">
+    <section className="rounded-md border border-stone-200 bg-white/70 dark:border-stone-800 dark:bg-stone-950/50">
       <button type="button" onClick={() => setShow((v) => !v)} className="flex w-full items-center justify-between gap-2 p-4 text-left">
         <div className="flex items-center gap-2">
-          <KeyRound className="h-3.5 w-3.5 text-stone-400" />
-          <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">Devices</span>
-          <span className="text-xs text-stone-400">{devices.data?.filter((d) => !d.revokedAt).length ?? 0} active</span>
+          <KeyRound className="h-3 w-3 text-stone-400" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">Devices</span>
+          <span className="text-[11px] tabular-nums text-stone-400 dark:text-stone-500">{devices.data?.filter((d) => !d.revokedAt).length ?? 0} active</span>
         </div>
         {show ? <ChevronUp className="h-4 w-4 text-stone-400" /> : <ChevronDown className="h-4 w-4 text-stone-400" />}
       </button>
       {show && (
         <div className="border-t border-stone-100 p-4 pt-3 dark:border-stone-800">
           <button type="button" onClick={() => create.mutate()} disabled={create.isPending}
-            className="mb-3 w-full rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs font-medium text-stone-600 hover:border-sky-300 hover:text-sky-700 disabled:opacity-50 dark:border-stone-700 dark:text-stone-400">
+            className="mb-3 w-full rounded-md border border-dashed border-stone-200 px-3 py-2 text-xs font-medium text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-700 disabled:opacity-50 dark:border-stone-800 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-stone-200">
             {create.isPending ? "Generating..." : "+ Generate pairing code"}
           </button>
-          {create.error && <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">{create.error.message}</div>}
+          {create.error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">{create.error.message}</div>}
           {code && (
-            <div className="mb-3 rounded-lg bg-teal-50 p-3 dark:bg-teal-950/30">
+            <div className="mb-3 rounded-md border border-stone-200 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-900/50">
               <div className="flex items-center justify-between gap-2">
-                <code className="text-lg font-semibold tracking-widest text-stone-900 dark:text-stone-100">{code}</code>
+                <code className="text-base font-semibold tracking-widest tabular-nums text-stone-900 dark:text-stone-100">{code}</code>
                 <button type="button" onClick={async () => { await navigator.clipboard.writeText(code); setCopied(true); }}
-                  className="rounded-lg p-1.5 text-stone-400 hover:bg-white/80 hover:text-stone-600 dark:hover:bg-stone-800">
-                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  className="rounded-md p-1.5 text-stone-400 transition-colors hover:bg-white/80 hover:text-stone-600 dark:hover:bg-stone-800">
+                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 </button>
               </div>
-              <div className="mt-1 text-[11px] text-stone-500">Expires {expiresAt ? new Date(expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "--"}</div>
+              <div className="mt-1 text-[11px] tabular-nums text-stone-500 dark:text-stone-400">Expires {expiresAt ? new Date(expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "--"}</div>
             </div>
           )}
           <div className="space-y-2">
             {devices.data?.length ? devices.data.map((device) => {
               const status = getDeviceStatus(device);
               return (
-                <div key={device.id} className="flex items-center justify-between gap-3 rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-900/50">
+                <div key={device.id} className="flex items-center justify-between gap-3 rounded-md bg-stone-50 px-3 py-2 dark:bg-stone-900/50">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium text-stone-800 dark:text-stone-200">{device.name}</span>
-                      <span className={`text-[10px] font-medium uppercase ${status.tone}`}>{status.label}</span>
+                      <span className={`text-[10px] font-medium uppercase tracking-[0.08em] ${status.tone}`}>{status.label}</span>
                     </div>
-                    <div className="text-[11px] text-stone-400">{device.revokedAt ? `Revoked ${formatRelativeTime(device.revokedAt)}` : formatRelativeTime(device.lastSeenAt)}</div>
+                    <div className="text-[11px] text-stone-400 dark:text-stone-500">{device.revokedAt ? `Revoked ${formatRelativeTime(device.revokedAt)}` : formatRelativeTime(device.lastSeenAt)}</div>
                   </div>
                   {!device.revokedAt && (
                     <button type="button" onClick={() => revoke.mutate({ id: device.id })} disabled={revoke.isPending}
-                      className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-200 hover:text-red-600 disabled:opacity-50 dark:hover:bg-stone-800 dark:hover:text-red-400">
-                      <Trash2 className="h-3.5 w-3.5" />
+                      className="rounded-md p-1.5 text-stone-400 transition-colors hover:bg-stone-200 hover:text-red-600 disabled:opacity-50 dark:hover:bg-stone-800 dark:hover:text-red-400">
+                      <Trash2 className="h-3 w-3" />
                     </button>
                   )}
                 </div>
               );
-            }) : <p className="py-2 text-center text-xs text-stone-400">No devices yet.</p>}
+            }) : <p className="py-2 text-center text-xs text-stone-400 dark:text-stone-500">No devices yet.</p>}
           </div>
         </div>
       )}
@@ -490,10 +490,10 @@ function DevicesSection() {
 
 function MiniStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-stone-100 bg-stone-50/60 px-3 py-2 dark:border-stone-800/80 dark:bg-stone-900/40">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 dark:text-stone-500">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold text-stone-900 dark:text-stone-100">{value}</div>
-      {hint && <div className="text-[10px] text-stone-400 dark:text-stone-500">{hint}</div>}
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">{label}</div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-100">{value}</div>
+      {hint && <div className="text-[10px] tabular-nums text-stone-400 dark:text-stone-500">{hint}</div>}
     </div>
   );
 }
@@ -504,7 +504,7 @@ function HeatmapSkeleton() {
       {Array.from({ length: 6 }, (_, ci) => (
         <div key={ci} className="flex flex-col gap-1">
           {Array.from({ length: 7 }, (_, ri) => (
-            <div key={ri} className="h-4 w-4 animate-pulse rounded-[3px] bg-stone-100 dark:bg-stone-800/60" />
+            <div key={ri} className="h-4 w-4 animate-pulse rounded-[3px] bg-stone-100 dark:bg-stone-900" />
           ))}
         </div>
       ))}

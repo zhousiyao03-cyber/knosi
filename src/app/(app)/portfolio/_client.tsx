@@ -28,18 +28,18 @@ import { formatUSD, formatPercent, calculateDailyChangeAmount } from "./utils";
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <TrendingUp className="mb-4 h-12 w-12 text-stone-300 dark:text-stone-600" />
-      <p className="mb-2 text-lg font-medium text-stone-700 dark:text-stone-300">
+      <TrendingUp className="mb-4 h-8 w-8 text-stone-300 dark:text-stone-700" />
+      <p className="mb-2 text-sm text-stone-400 dark:text-stone-500">
         还没有持仓
       </p>
-      <p className="mb-6 text-sm text-stone-400 dark:text-stone-500">
+      <p className="mb-6 text-xs text-stone-400 dark:text-stone-500">
         添加你的第一个持仓标的开始追踪
       </p>
       <button
         onClick={onAdd}
-        className="flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2 text-sm text-white hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300"
+        className="inline-flex items-center gap-1.5 rounded-md bg-stone-900 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white"
       >
-        <Plus className="h-4 w-4" />
+        <Plus className="h-3.5 w-3.5" />
         添加持仓
       </button>
     </div>
@@ -100,12 +100,12 @@ function AddHoldingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-stone-900">
+      <div className="w-full max-w-md rounded-md border border-stone-200 bg-white p-6 shadow-xl dark:border-stone-800 dark:bg-stone-900">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
             添加持仓
           </h2>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-600">
+          <button onClick={onClose} className="text-stone-400 transition-colors hover:text-stone-600">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -113,20 +113,20 @@ function AddHoldingModal({
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="symbol" className="mb-1 block text-xs text-stone-500">标的代码 *</label>
+              <label htmlFor="symbol" className="mb-1 block text-[11px] text-stone-500">标的代码 *</label>
               <input
                 id="symbol"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm uppercase dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                className="w-full rounded-md border border-stone-200 bg-white/70 px-3 py-1.5 text-sm uppercase focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
                 placeholder="AAPL / BTC"
                 value={draft.symbol}
                 onChange={(e) => setDraft((d) => ({ ...d, symbol: e.target.value }))}
               />
             </div>
             <div>
-              <label htmlFor="assetType" className="mb-1 block text-xs text-stone-500">类型 *</label>
+              <label htmlFor="assetType" className="mb-1 block text-[11px] text-stone-500">类型 *</label>
               <select
                 id="assetType"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                className="w-full rounded-md border border-stone-200 bg-white/70 px-3 py-1.5 text-sm focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
                 value={draft.assetType}
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, assetType: e.target.value as AssetType }))
@@ -139,10 +139,10 @@ function AddHoldingModal({
           </div>
 
           <div>
-            <label htmlFor="name" className="mb-1 block text-xs text-stone-500">名称 *</label>
+            <label htmlFor="name" className="mb-1 block text-[11px] text-stone-500">名称 *</label>
             <input
               id="name"
-              className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+              className="w-full rounded-md border border-stone-200 bg-white/70 px-3 py-1.5 text-sm focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
               placeholder="Apple Inc. / Bitcoin"
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
@@ -151,26 +151,26 @@ function AddHoldingModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="quantity" className="mb-1 block text-xs text-stone-500">数量 *</label>
+              <label htmlFor="quantity" className="mb-1 block text-[11px] text-stone-500">数量 *</label>
               <input
                 id="quantity"
                 type="number"
                 min="0"
                 step="any"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                className="w-full rounded-md border border-stone-200 bg-white/70 px-3 py-1.5 text-sm focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
                 placeholder="10"
                 value={draft.quantity}
                 onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))}
               />
             </div>
             <div>
-              <label htmlFor="costPrice" className="mb-1 block text-xs text-stone-500">成本价 (USD) *</label>
+              <label htmlFor="costPrice" className="mb-1 block text-[11px] text-stone-500">成本价 (USD) *</label>
               <input
                 id="costPrice"
                 type="number"
                 min="0"
                 step="any"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                className="w-full rounded-md border border-stone-200 bg-white/70 px-3 py-1.5 text-sm focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
                 placeholder="150.00"
                 value={draft.costPrice}
                 onChange={(e) => setDraft((d) => ({ ...d, costPrice: e.target.value }))}
@@ -183,7 +183,7 @@ function AddHoldingModal({
           <button
             type="submit"
             disabled={addMutation.isPending}
-            className="w-full rounded-xl bg-stone-900 py-2 text-sm text-white hover:bg-stone-700 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300"
+            className="w-full rounded-md bg-stone-900 py-1.5 text-xs font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white"
           >
             {addMutation.isPending ? "保存中..." : "保存"}
           </button>
@@ -242,17 +242,17 @@ function EditHoldingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-stone-900">
+      <div className="w-full max-w-md rounded-md border border-stone-200 bg-white p-6 shadow-xl dark:border-stone-800 dark:bg-stone-900">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+            <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
               修改持仓
             </h2>
-            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+            <p className="mt-1 text-[11px] text-stone-500 dark:text-stone-400">
               {holding.symbol} · {holding.name}
             </p>
           </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-600">
+          <button onClick={onClose} className="text-stone-400 transition-colors hover:text-stone-600">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -260,7 +260,7 @@ function EditHoldingModal({
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="edit-quantity" className="mb-1 block text-xs text-stone-500">
+              <label htmlFor="edit-quantity" className="mb-1 block text-[11px] text-stone-500">
                 数量 *
               </label>
               <input
@@ -268,13 +268,13 @@ function EditHoldingModal({
                 type="number"
                 min="0"
                 step="any"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                className="w-full rounded-md border border-stone-200 bg-white/70 px-3 py-1.5 text-sm focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
                 value={draft.quantity}
                 onChange={(e) => setDraft((current) => ({ ...current, quantity: e.target.value }))}
               />
             </div>
             <div>
-              <label htmlFor="edit-cost-price" className="mb-1 block text-xs text-stone-500">
+              <label htmlFor="edit-cost-price" className="mb-1 block text-[11px] text-stone-500">
                 成本价 (USD) *
               </label>
               <input
@@ -282,7 +282,7 @@ function EditHoldingModal({
                 type="number"
                 min="0"
                 step="any"
-                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
+                className="w-full rounded-md border border-stone-200 bg-white/70 px-3 py-1.5 text-sm focus:border-stone-400 focus:outline-none dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100"
                 value={draft.costPrice}
                 onChange={(e) => setDraft((current) => ({ ...current, costPrice: e.target.value }))}
               />
@@ -294,7 +294,7 @@ function EditHoldingModal({
           <button
             type="submit"
             disabled={updateMutation.isPending}
-            className="w-full rounded-xl bg-stone-900 py-2 text-sm text-white hover:bg-stone-700 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300"
+            className="w-full rounded-md bg-stone-900 py-1.5 text-xs font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white"
           >
             {updateMutation.isPending ? "保存中..." : "保存修改"}
           </button>
@@ -338,9 +338,9 @@ function HoldingCard({
     <div
       onClick={onClick}
       className={cn(
-        "group cursor-pointer rounded-xl border p-3 transition-all",
+        "group cursor-pointer rounded-md border p-3 transition-colors",
         isSelected
-          ? "border-stone-300 bg-white shadow-sm dark:border-stone-700 dark:bg-stone-800"
+          ? "border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900"
           : "border-transparent hover:border-stone-200 hover:bg-white/60 dark:hover:border-stone-800 dark:hover:bg-stone-900/60"
       )}
     >
@@ -350,21 +350,21 @@ function HoldingCard({
             <span className="font-mono text-sm font-semibold text-stone-900 dark:text-stone-100">
               {holding.symbol}
             </span>
-            <span className="truncate text-xs text-stone-400">{holding.name}</span>
+            <span className="truncate text-[11px] text-stone-400 dark:text-stone-500">{holding.name}</span>
           </div>
-          <div className="mt-0.5 text-xs text-stone-500">
+          <div className="mt-0.5 text-[11px] tabular-nums text-stone-500 dark:text-stone-400">
             {holding.quantity} {holding.assetType === "crypto" ? "个" : "股"} @{" "}
             {formatUSD(holding.costPrice)}
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
+          <div className="text-sm font-medium tabular-nums text-stone-900 dark:text-stone-100">
             {currentPrice !== null ? formatUSD(currentPrice) : "—"}
           </div>
           {changePercent !== null && (
             <div
               className={cn(
-                "text-xs font-medium",
+                "text-[11px] font-medium tabular-nums",
                 changePercent >= 0 ? "text-emerald-600" : "text-red-500"
               )}
             >
@@ -377,7 +377,7 @@ function HoldingCard({
       {pnl !== null && (
         <div
           className={cn(
-            "mt-2 flex items-center gap-1 text-xs font-medium",
+            "mt-2 flex items-center gap-1 text-[11px] font-medium tabular-nums",
             pnl >= 0 ? "text-emerald-600" : "text-red-500"
           )}
         >
@@ -393,7 +393,7 @@ function HoldingCard({
       {dailyChange !== null && (
         <div
           className={cn(
-            "mt-1 text-xs font-medium",
+            "mt-1 text-[11px] font-medium tabular-nums",
             dailyChange >= 0 ? "text-emerald-600" : "text-red-500"
           )}
         >
@@ -404,18 +404,18 @@ function HoldingCard({
 
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-stone-500 dark:text-stone-400">
         <div>
-          <div className="text-[11px] uppercase tracking-wide text-stone-400 dark:text-stone-500">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">
             持仓金额
           </div>
-          <div className="mt-0.5 font-medium text-stone-700 dark:text-stone-200">
+          <div className="mt-0.5 font-medium tabular-nums text-stone-700 dark:text-stone-200">
             {formatUSD(displayValue)}
           </div>
         </div>
         <div>
-          <div className="text-[11px] uppercase tracking-wide text-stone-400 dark:text-stone-500">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">
             占组合
           </div>
-          <div className="mt-0.5 font-medium text-stone-700 dark:text-stone-200">
+          <div className="mt-0.5 font-medium tabular-nums text-stone-700 dark:text-stone-200">
             {portfolioWeight !== null ? formatPercent(portfolioWeight) : "—"}
           </div>
         </div>
@@ -428,7 +428,7 @@ function HoldingCard({
               e.stopPropagation();
               onDelete();
             }}
-            className="text-xs text-red-500 hover:text-red-700"
+            className="text-[11px] text-red-500 transition-colors hover:text-red-700"
           >
             确认删除
           </button>
@@ -437,7 +437,7 @@ function HoldingCard({
               e.stopPropagation();
               setConfirmingDelete(false);
             }}
-            className="text-xs text-stone-400 hover:text-stone-600"
+            className="text-[11px] text-stone-400 transition-colors hover:text-stone-600"
           >
             取消
           </button>
@@ -449,7 +449,7 @@ function HoldingCard({
               e.stopPropagation();
               onEdit();
             }}
-            className="flex items-center gap-1 text-xs text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+            className="flex items-center gap-1 text-[11px] text-stone-400 transition-colors hover:text-stone-700 dark:hover:text-stone-200"
           >
             <Pencil className="h-3 w-3" />
             修改
@@ -459,7 +459,7 @@ function HoldingCard({
               e.stopPropagation();
               setConfirmingDelete(true);
             }}
-            className="text-xs text-red-400 hover:text-red-600"
+            className="text-[11px] text-red-400 transition-colors hover:text-red-600"
           >
             删除
           </button>
@@ -477,12 +477,12 @@ function AnalysisBlock({
   lines: string[];
 }) {
   return (
-    <div className="rounded-xl border border-stone-200/80 bg-stone-50/70 p-4 dark:border-stone-800 dark:bg-stone-900/60">
-      <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">{title}</h3>
+    <div className="rounded-md border border-stone-200/70 bg-stone-50/70 p-4 dark:border-stone-800/80 dark:bg-stone-900/60">
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">{title}</h3>
       <div className="mt-3 space-y-2 text-sm text-stone-600 dark:text-stone-300">
         {lines.map((line, index) => (
           <div key={`${title}-${index}`} className="flex gap-2">
-            <span className="mt-1 shrink-0 text-stone-300">•</span>
+            <span className="mt-1 shrink-0 text-stone-300 dark:text-stone-600">•</span>
             <span>{line}</span>
           </div>
         ))}
@@ -509,23 +509,23 @@ function PortfolioAnalysisCard({
   isAiGenerated: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900">
+    <div className="rounded-md border border-stone-200 bg-white/70 p-5 dark:border-stone-800 dark:bg-stone-950/50">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="text-xs uppercase tracking-[0.18em] text-stone-400">Portfolio 分析</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">Portfolio 分析</div>
             <span
               className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                "rounded px-1.5 py-0.5 text-[10px] font-medium",
                 isAiGenerated
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                  ? "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300"
                   : "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400"
               )}
             >
               {isAiGenerated ? "AI 生成" : "规则兜底"}
             </span>
           </div>
-          <h2 className="mt-1 text-lg font-semibold text-stone-900 dark:text-stone-100">
+          <h2 className="mt-1 text-base font-semibold text-stone-900 dark:text-stone-100">
             组合诊断与建议
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600 dark:text-stone-300">
@@ -533,34 +533,34 @@ function PortfolioAnalysisCard({
           </p>
         </div>
         <div className="grid min-w-[220px] grid-cols-2 gap-3 text-sm">
-          <div className="rounded-xl border border-stone-200/80 bg-stone-50/80 p-3 dark:border-stone-800 dark:bg-stone-950/70">
-            <div className="text-xs text-stone-400">当前市值</div>
-            <div className="mt-1 font-semibold text-stone-900 dark:text-stone-100">
+          <div className="rounded-md border border-stone-200/70 bg-stone-50/80 p-3 dark:border-stone-800/80 dark:bg-stone-900/60">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">当前市值</div>
+            <div className="mt-1 font-semibold tabular-nums text-stone-900 dark:text-stone-100">
               {formatUSD(totalValue)}
             </div>
           </div>
-          <div className="rounded-xl border border-stone-200/80 bg-stone-50/80 p-3 dark:border-stone-800 dark:bg-stone-950/70">
-            <div className="text-xs text-stone-400">累计盈亏</div>
+          <div className="rounded-md border border-stone-200/70 bg-stone-50/80 p-3 dark:border-stone-800/80 dark:bg-stone-900/60">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">累计盈亏</div>
             <div className={cn(
-              "mt-1 font-semibold",
+              "mt-1 font-semibold tabular-nums",
               totalPnl !== null && totalPnl >= 0 ? "text-emerald-600" : "text-red-500"
             )}>
               {totalPnl !== null ? `${totalPnl >= 0 ? "+" : "-"}${formatUSD(Math.abs(totalPnl))}` : "—"}
               {totalPnlPercent !== null && ` (${formatPercent(totalPnlPercent)})`}
             </div>
           </div>
-          <div className="rounded-xl border border-stone-200/80 bg-stone-50/80 p-3 dark:border-stone-800 dark:bg-stone-950/70">
-            <div className="text-xs text-stone-400">今日变化</div>
+          <div className="rounded-md border border-stone-200/70 bg-stone-50/80 p-3 dark:border-stone-800/80 dark:bg-stone-900/60">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">今日变化</div>
             <div className={cn(
-              "mt-1 font-semibold",
+              "mt-1 font-semibold tabular-nums",
               totalDailyChange !== null && totalDailyChange >= 0 ? "text-emerald-600" : "text-red-500"
             )}>
               {totalDailyChange !== null ? `${totalDailyChange >= 0 ? "+" : "-"}${formatUSD(Math.abs(totalDailyChange))}` : "—"}
             </div>
           </div>
-          <div className="rounded-xl border border-stone-200/80 bg-stone-50/80 p-3 dark:border-stone-800 dark:bg-stone-950/70">
-            <div className="text-xs text-stone-400">持仓数量</div>
-            <div className="mt-1 font-semibold text-stone-900 dark:text-stone-100">
+          <div className="rounded-md border border-stone-200/70 bg-stone-50/80 p-3 dark:border-stone-800/80 dark:bg-stone-900/60">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">持仓数量</div>
+            <div className="mt-1 font-semibold tabular-nums text-stone-900 dark:text-stone-100">
               {holdingsCount}
             </div>
           </div>
@@ -596,7 +596,7 @@ function HoldingAnalysisCard({
 }) {
   if (!snapshot || !analysis) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-400 dark:border-stone-800 dark:bg-stone-900">
+      <div className="rounded-md border border-stone-200 bg-white/70 p-5 text-sm text-stone-400 dark:border-stone-800 dark:bg-stone-950/50 dark:text-stone-500">
         点击左侧标的查看单标分析。
       </div>
     );
@@ -605,30 +605,30 @@ function HoldingAnalysisCard({
   const { holding } = snapshot;
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900">
+    <div className="rounded-md border border-stone-200 bg-white/70 p-5 dark:border-stone-800 dark:bg-stone-950/50">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="text-xs uppercase tracking-[0.18em] text-stone-400">单标分析</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">单标分析</div>
             <span
               className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                "rounded px-1.5 py-0.5 text-[10px] font-medium",
                 isAiGenerated
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                  ? "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300"
                   : "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400"
               )}
             >
               {isAiGenerated ? "AI 生成" : "规则兜底"}
             </span>
           </div>
-          <h3 className="mt-1 text-base font-semibold text-stone-900 dark:text-stone-100">
+          <h3 className="mt-1 text-sm font-semibold text-stone-900 dark:text-stone-100">
             {holding.symbol} · {holding.name}
           </h3>
         </div>
         <button
           onClick={() => onRefresh(holding.symbol)}
           disabled={isRefreshing}
-          className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-100 disabled:opacity-50 dark:text-stone-400 dark:hover:bg-stone-800"
+          className="inline-flex items-center gap-1 rounded-md border border-stone-200 px-2.5 py-1.5 text-xs text-stone-600 transition-colors hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-900"
         >
           <RefreshCw className={cn("h-3 w-3", isRefreshing && "animate-spin")} />
           刷新
@@ -637,20 +637,20 @@ function HoldingAnalysisCard({
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <AnalysisBlock title="持仓诊断" lines={analysis.diagnosis} />
-        <div className="rounded-xl border border-stone-200/80 bg-stone-50/70 p-4 dark:border-stone-800 dark:bg-stone-900/60">
-          <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">建议</h3>
+        <div className="rounded-md border border-stone-200/70 bg-stone-50/70 p-4 dark:border-stone-800/80 dark:bg-stone-900/60">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">建议</h3>
           <p className="mt-3 text-sm leading-6 text-stone-600 dark:text-stone-300">
             {analysis.suggestion}
           </p>
           {news && (
             <div className="mt-4 border-t border-stone-200 pt-4 text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">
-              <div className="mb-2 font-medium text-stone-700 dark:text-stone-200">新闻线索</div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">新闻线索</div>
               {news.summary.split("\n").slice(0, 2).map((line, index) => {
                 const stripped = line.replace(/^[-•*]\s*/, "").trim();
                 if (!stripped) return null;
                 return (
                   <div key={`${holding.symbol}-news-${index}`} className="mb-2 flex gap-2">
-                    <span className="mt-1 shrink-0 text-stone-300">•</span>
+                    <span className="mt-1 shrink-0 text-stone-300 dark:text-stone-600">•</span>
                     <span>{stripped}</span>
                   </div>
                 );
@@ -888,7 +888,7 @@ export function PortfolioClient() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
+        <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
           投资组合
         </h1>
       </div>
@@ -901,21 +901,21 @@ export function PortfolioClient() {
           <div className="md:w-72 md:shrink-0">
             {/* 汇总卡片 */}
             {totalPnl !== null && (
-              <div className="mb-4 rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-                <div className="text-xs text-stone-400">总市值</div>
-                <div className="mt-0.5 text-xl font-semibold text-stone-900 dark:text-stone-100">
+              <div className="mb-4 rounded-md border border-stone-200 bg-white/70 p-4 dark:border-stone-800 dark:bg-stone-950/50">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">总市值</div>
+                <div className="mt-0.5 text-xl font-semibold tabular-nums text-stone-900 dark:text-stone-100">
                   {formatUSD(totalPortfolioValueForDisplay)}
                 </div>
                 <div
                   className={cn(
-                    "mt-1 flex items-center gap-1 text-sm font-medium",
+                    "mt-1 flex items-center gap-1 text-sm font-medium tabular-nums",
                     totalPnl >= 0 ? "text-emerald-600" : "text-red-500"
                   )}
                 >
                   {totalPnl >= 0 ? (
-                    <TrendingUp className="h-3.5 w-3.5" />
+                    <TrendingUp className="h-3 w-3" />
                   ) : (
-                    <TrendingDown className="h-3.5 w-3.5" />
+                    <TrendingDown className="h-3 w-3" />
                   )}
                   {formatUSD(Math.abs(totalPnl))}{" "}
                   {totalPnlPercent !== null && `(${formatPercent(totalPnlPercent)})`}
@@ -924,7 +924,7 @@ export function PortfolioClient() {
                 {totalDailyChangeDisplay !== null && (
                   <div
                     className={cn(
-                      "mt-1 text-xs font-medium",
+                      "mt-1 text-[11px] font-medium tabular-nums",
                       totalDailyChangeDisplay >= 0 ? "text-emerald-600" : "text-red-500"
                     )}
                   >
@@ -942,7 +942,7 @@ export function PortfolioClient() {
                   {[1, 2, 3].map((i) => (
                     <div
                       key={i}
-                      className="h-16 animate-pulse rounded-xl bg-stone-100 dark:bg-stone-800"
+                      className="h-16 animate-pulse rounded-md bg-stone-100 dark:bg-stone-900"
                     />
                   ))}
                 </div>
@@ -965,7 +965,7 @@ export function PortfolioClient() {
             {sortedHoldings.length > defaultVisibleHoldingsCount && (
               <button
                 onClick={() => setShowAllHoldings((current) => !current)}
-                className="mt-3 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-700 dark:border-stone-800 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-stone-200"
+                className="mt-3 w-full rounded-md border border-stone-200 px-2.5 py-1.5 text-xs text-stone-500 transition-colors hover:bg-stone-50 hover:text-stone-700 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-200"
               >
                 {showAllHoldings
                   ? "收起持仓列表"
@@ -975,9 +975,9 @@ export function PortfolioClient() {
 
             <button
               onClick={() => setShowAddModal(true)}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-stone-200 py-2.5 text-sm text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-600 dark:border-stone-800 dark:hover:border-stone-700 dark:hover:text-stone-300"
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-stone-200 py-2 text-xs text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-600 dark:border-stone-800 dark:hover:border-stone-700 dark:hover:text-stone-300"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
               添加持仓
             </button>
           </div>
