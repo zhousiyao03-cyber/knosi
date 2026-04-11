@@ -16,6 +16,7 @@ import {
   extractTomorrowPlanItems,
 } from "@/lib/note-templates";
 import { normalizeJournalTitlesForUser } from "../notes/journal-titles";
+import { invalidateDashboardForUser } from "../cache/instances";
 
 const noteCoverSchema = z.string().trim().nullable().optional();
 const noteIconSchema = z.string().trim().max(8).nullable().optional();
@@ -163,6 +164,7 @@ export const notesRouter = router({
       );
     }
 
+    invalidateDashboardForUser(ctx.userId);
     return { id, created: true };
   }),
 
@@ -185,6 +187,7 @@ export const notesRouter = router({
         void syncNoteKnowledgeIndex(createdNote, "note-create").catch(() => undefined);
         void syncNoteLinks(id, input.content ?? null).catch(() => undefined);
       }
+      invalidateDashboardForUser(ctx.userId);
       return { id };
     }),
 
@@ -215,6 +218,7 @@ export const notesRouter = router({
         }
       }
 
+      invalidateDashboardForUser(ctx.userId);
       return { id };
     }),
 
@@ -223,6 +227,7 @@ export const notesRouter = router({
     .mutation(async ({ input, ctx }) => {
       await db.delete(notes).where(and(eq(notes.id, input.id), eq(notes.userId, ctx.userId)));
       void removeKnowledgeSourceIndex("note", input.id).catch(() => undefined);
+      invalidateDashboardForUser(ctx.userId);
       return { success: true };
     }),
 

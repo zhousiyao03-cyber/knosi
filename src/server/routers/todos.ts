@@ -4,6 +4,7 @@ import { todos } from "../db/schema";
 import { and, eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import crypto from "crypto";
+import { invalidateDashboardForUser } from "../cache/instances";
 
 export const todosRouter = router({
   list: protectedProcedure
@@ -46,6 +47,7 @@ export const todosRouter = router({
     .mutation(async ({ input, ctx }) => {
       const id = crypto.randomUUID();
       await db.insert(todos).values({ id, userId: ctx.userId, ...input });
+      invalidateDashboardForUser(ctx.userId);
       return { id };
     }),
 
@@ -67,6 +69,7 @@ export const todosRouter = router({
         .update(todos)
         .set({ ...data, updatedAt: new Date() })
         .where(and(eq(todos.id, id), eq(todos.userId, ctx.userId)));
+      invalidateDashboardForUser(ctx.userId);
       return { id };
     }),
 
@@ -74,6 +77,7 @@ export const todosRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       await db.delete(todos).where(and(eq(todos.id, input.id), eq(todos.userId, ctx.userId)));
+      invalidateDashboardForUser(ctx.userId);
       return { success: true };
     }),
 });

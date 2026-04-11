@@ -86,10 +86,64 @@ export function snapshotMetrics() {
   return {
     generatedAt: new Date().toISOString(),
     procedures: entries,
+    caches: snapshotCacheMetrics(),
   };
+}
+
+// ── Cache metrics ────────────────────────────────────────────────
+// 按 cache 命名空间聚合 hit/miss/invalidate/clear 次数，便于观察
+// 缓存命中率。hit 率越高说明缓存效果越好。
+
+type CacheStats = {
+  name: string;
+  hits: number;
+  misses: number;
+  invalidations: number;
+  clears: number;
+};
+
+const cacheStore = new Map<string, CacheStats>();
+
+function getOrCreateCache(name: string): CacheStats {
+  let entry = cacheStore.get(name);
+  if (!entry) {
+    entry = { name, hits: 0, misses: 0, invalidations: 0, clears: 0 };
+    cacheStore.set(name, entry);
+  }
+  return entry;
+}
+
+export type CacheEventArgs = {
+  name: string;
+  event: "hit" | "miss" | "invalidate" | "clear";
+};
+
+export function recordCacheEvent({ name, event }: CacheEventArgs) {
+  const entry = getOrCreateCache(name);
+  if (event === "hit") entry.hits += 1;
+  else if (event === "miss") entry.misses += 1;
+  else if (event === "invalidate") entry.invalidations += 1;
+  else entry.clears += 1;
+}
+
+export function snapshotCacheMetrics() {
+  const entries = Array.from(cacheStore.values()).map((entry) => {
+    const total = entry.hits + entry.misses;
+    return {
+      cache: entry.name,
+      hits: entry.hits,
+      misses: entry.misses,
+      invalidations: entry.invalidations,
+      clears: entry.clears,
+      hitRate: total === 0 ? 0 : entry.hits / total,
+    };
+  });
+  entries.sort((a, b) => b.hits + b.misses - (a.hits + a.misses));
+  return entries;
 }
 
 /** 仅测试用 */
 export function _resetMetrics() {
   store.clear();
+  cacheStore.clear();
 }

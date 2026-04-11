@@ -140,6 +140,9 @@ dependencies:
   lowlight:
     specifier: ^3.3.0
     version: 3.3.0
+  lru-cache:
+    specifier: ^11.3.3
+    version: 11.3.3
   lucide-react:
     specifier: ^0.577.0
     version: 0.577.0(react@19.2.4)
@@ -7937,6 +7940,11 @@ packages:
       '@types/hast': 3.0.4
       devlop: 1.1.0
       highlight.js: 11.11.1
+    dev: false
+
+  /lru-cache@11.3.3:
+    resolution: {integrity: sha512-JvNw9Y81y33E+BEYPr0U7omo+U9AySnsMsEiXgwT6yqd31VQWTLNQqmT4ou5eqPFUrTfIDFta2wKhB1hyohtAQ==}
+    engines: {node: 20 || >=22}
     dev: false
 
   /lru-cache@5.1.1:
