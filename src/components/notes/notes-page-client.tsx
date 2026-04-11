@@ -507,12 +507,15 @@ export function NotesPageClient() {
                         <span className="text-xs text-stone-400">
                           {formatDate(note.updatedAt)}
                         </span>
-                        {activeFolderId === null && note.folder && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500 dark:bg-stone-800 dark:text-stone-400">
-                            <Folder size={10} />
-                            {note.folder}
-                          </span>
-                        )}
+                        {activeFolderId === null && note.folderId && (() => {
+                          const f = folderData.find((fd) => fd.id === note.folderId);
+                          return f ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500 dark:bg-stone-800 dark:text-stone-400">
+                              <Folder size={10} />
+                              {f.name}
+                            </span>
+                          ) : null;
+                        })()}
                         {tags.map((tag) => (
                           <span
                             key={tag}

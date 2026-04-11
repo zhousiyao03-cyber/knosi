@@ -72,20 +72,6 @@ async function syncNoteLinks(noteId: string, content: string | null) {
 }
 
 export const notesRouter = router({
-  listFolders: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await db
-      .select({
-        folder: notes.folder,
-        count: sql<number>`count(*)`.as("count"),
-      })
-      .from(notes)
-      .where(and(eq(notes.userId, ctx.userId), isNotNull(notes.folder)))
-      .groupBy(notes.folder)
-      .orderBy(notes.folder);
-
-    return rows.map((r) => ({ name: r.folder!, count: r.count }));
-  }),
-
   /** Aggregate all tags across all user notes with counts */
   listTags: protectedProcedure.query(async ({ ctx }) => {
     const rows = await db
@@ -121,7 +107,6 @@ export const notesRouter = router({
           limit: z.number().int().min(1).max(100).default(30),
           offset: z.number().int().min(0).default(0),
           type: z.enum(["note", "journal", "summary"]).optional(),
-          folder: z.string().optional(),
           folderId: z.string().optional(),
           noFolder: z.boolean().optional(),
         })
@@ -138,8 +123,6 @@ export const notesRouter = router({
       }
       if (input?.folderId) {
         clauses.push(eq(notes.folderId, input.folderId));
-      } else if (input?.folder) {
-        clauses.push(eq(notes.folder, input.folder));
       }
       if (input?.noFolder) {
         clauses.push(isNull(notes.folderId));
@@ -229,7 +212,6 @@ export const notesRouter = router({
         icon: noteIconSchema,
         cover: noteCoverSchema,
         tags: z.string().optional(),
-        folder: z.string().trim().nullable().optional(),
         folderId: z.string().nullable().optional(),
       })
     )
@@ -255,7 +237,6 @@ export const notesRouter = router({
         icon: noteIconSchema,
         cover: noteCoverSchema,
         tags: z.string().optional(),
-        folder: z.string().trim().nullable().optional(),
         folderId: z.string().nullable().optional(),
       })
     )
