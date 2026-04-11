@@ -94,22 +94,26 @@ export function validateImageFile(file: File) {
   return null;
 }
 
-export function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
+export async function uploadImageFile(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
 
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-        return;
-      }
-
-      reject(new Error("图片读取失败"));
-    };
-
-    reader.onerror = () => reject(new Error("图片读取失败"));
-    reader.readAsDataURL(file);
+  const response = await fetch("/api/upload/image", {
+    method: "POST",
+    body: formData,
   });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("请先登录后再上传图片。");
+    if (response.status === 413) throw new Error("单张图片不能超过 5MB。");
+    if (response.status === 415)
+      throw new Error("当前只支持 PNG、JPG、WEBP 和 GIF 图片。");
+    throw new Error("图片上传失败，请重试。");
+  }
+
+  const data = (await response.json()) as { url?: string };
+  if (!data.url) throw new Error("图片上传失败，请重试。");
+  return data.url;
 }
 
 export function insertImagesIntoView(

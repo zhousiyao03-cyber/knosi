@@ -49,7 +49,7 @@ import {
   parseEditorContent,
   extractPlainTextFromContent,
   validateImageFile,
-  readFileAsDataUrl,
+  uploadImageFile,
   insertImagesIntoView,
 } from "./editor-utils";
 
@@ -564,12 +564,12 @@ export function TiptapEditor({
               return;
             }
 
-            sources.push(await readFileAsDataUrl(file));
+            sources.push(await uploadImageFile(file));
           }
 
           insertImagesIntoView(view, sources);
-        })().catch(() => {
-          reportError("插入图片失败，请重试。");
+        })().catch((err: unknown) => {
+          reportError(err instanceof Error ? err.message : "插入图片失败，请重试。");
         });
 
         return true;
@@ -660,12 +660,12 @@ export function TiptapEditor({
               return;
             }
 
-            sources.push(await readFileAsDataUrl(file));
+            sources.push(await uploadImageFile(file));
           }
 
           insertImagesIntoView(view, sources, coordinates?.pos);
-        })().catch(() => {
-          reportError("插入图片失败，请重试。");
+        })().catch((err: unknown) => {
+          reportError(err instanceof Error ? err.message : "插入图片失败，请重试。");
         });
 
         event.preventDefault();
@@ -843,12 +843,12 @@ export function TiptapEditor({
             return;
           }
 
-          sources.push(await readFileAsDataUrl(file));
+          sources.push(await uploadImageFile(file));
         }
 
         insertImagesIntoView(currentEditor.view, sources, insertPosition);
-      } catch {
-        reportError("插入图片失败，请重试。");
+      } catch (err: unknown) {
+        reportError(err instanceof Error ? err.message : "插入图片失败，请重试。");
       } finally {
         event.target.value = "";
       }

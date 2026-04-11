@@ -664,6 +664,17 @@ test.describe("Tier 3: 粘贴转换", () => {
   });
 
   test("23. 粘贴图片文件 → 插入图片", async ({ page }) => {
+    // Stub the upload API so the test does not need a real Blob token.
+    await page.route("**/api/upload/image", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          url: "https://blob.example.com/test-pasted.png",
+        }),
+      });
+    });
+
     const { editor } = await createNote(page);
     await editor.click();
 

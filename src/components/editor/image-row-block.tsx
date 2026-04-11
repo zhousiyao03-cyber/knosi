@@ -10,6 +10,8 @@ import {
 } from "@tiptap/react";
 import { ImagePlus, GripVertical } from "lucide-react";
 
+import { uploadImageFile } from "./editor-utils";
+
 const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set([
   "image/png",
@@ -21,15 +23,6 @@ const ACCEPTED_IMAGE_TYPES = new Set([
 interface GalleryImage {
   src: string;
   width?: number;
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 function ImageRowNodeView({ node, updateAttributes, editor, getPos }: NodeViewProps) {
@@ -61,7 +54,11 @@ function ImageRowNodeView({ node, updateAttributes, editor, getPos }: NodeViewPr
       for (const file of files) {
         if (!ACCEPTED_IMAGE_TYPES.has(file.type)) continue;
         if (file.size > MAX_IMAGE_FILE_SIZE) continue;
-        newSrcs.push(await readFileAsDataUrl(file));
+        try {
+          newSrcs.push(await uploadImageFile(file));
+        } catch {
+          // Skip failed uploads; user keeps previously uploaded images.
+        }
       }
       if (newSrcs.length) {
         updateImages([...images, ...newSrcs.map((src) => ({ src }))]);
