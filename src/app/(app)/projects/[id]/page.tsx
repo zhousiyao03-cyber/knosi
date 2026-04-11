@@ -54,7 +54,7 @@ export default function ProjectDetailPage({
     if (notes.length === 0) return;
     const firstNoteId = notes[0]?.id;
     if (firstNoteId) {
-      router.replace(`/projects/${id}/notes/${firstNoteId}`);
+      router.replace(`/notes/${firstNoteId}`);
     }
   }, [forceOverview, notes, notesLoading, selectedTag, id, router]);
 
