@@ -1,8 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db";
-import { analysisTasks, osProjectNotes, osProjects } from "@/server/db/schema";
+import {
+  analysisTasks,
+  folders,
+  notes,
+  osProjectNotes,
+  osProjects,
+} from "@/server/db/schema";
 import { markdownToTiptap } from "@/lib/markdown-to-tiptap";
+
+const SOURCE_READING_FOLDER_NAME = "源码阅读";
+
+/**
+ * Finds or creates the "源码阅读" folder for a given user. All source
+ * analysis / followup notes are dropped into this folder so they appear
+ * in the unified Notes UI alongside other notes.
+ */
+async function resolveSourceReadingFolderId(userId: string): Promise<string> {
+  const [existing] = await db
+    .select({ id: folders.id })
+    .from(folders)
+    .where(
+      and(
+        eq(folders.userId, userId),
+        eq(folders.name, SOURCE_READING_FOLDER_NAME),
+        sql`${folders.parentId} is null`
+      )
+    )
+    .limit(1);
+
+  if (existing) return existing.id;
+
+  const [maxSort] = await db
+    .select({ max: sql<number>`coalesce(max(${folders.sortOrder}), -1)` })
+    .from(folders)
+    .where(
+      and(eq(folders.userId, userId), sql`${folders.parentId} is null`)
+    );
+
+  const id = crypto.randomUUID();
+  await db.insert(folders).values({
+    id,
+    userId,
+    name: SOURCE_READING_FOLDER_NAME,
+    parentId: null,
+    sortOrder: (maxSort?.max ?? -1) + 1,
+  });
+  return id;
+}
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as {
@@ -64,6 +110,22 @@ export async function POST(request: NextRequest) {
   const contentMd = (body.result ?? "").replace(/^#\s+.+\n?/, "");
   const tiptapDoc = markdownToTiptap(contentMd);
 
+  // Look up project name for tagging
+  const [project] = await db
+    .select({ name: osProjects.name })
+    .from(osProjects)
+    .where(eq(osProjects.id, task.projectId))
+    .limit(1);
+  const projectName = project?.name ?? "";
+
+  const tagList = [
+    "源码阅读",
+    task.taskType === "analysis" ? "source-analysis" : "followup",
+    ...(projectName ? [projectName] : []),
+  ];
+
+  // Write to the legacy os_project_notes table (still used by the old
+  // /projects/[id] listing for backward compat).
   await db.insert(osProjectNotes).values({
     id: crypto.randomUUID(),
     projectId: task.projectId,
@@ -75,6 +137,21 @@ export async function POST(request: NextRequest) {
       task.taskType === "analysis" ? ["source-analysis"] : ["followup"]
     ),
     noteType: task.taskType === "analysis" ? "analysis" : "followup",
+  });
+
+  // Also write to the unified notes table so the analysis shows up in
+  // the Notes UI under the "源码阅读" folder. This is the new source of
+  // truth for reading; the legacy write above is a transitional measure.
+  const folderId = await resolveSourceReadingFolderId(task.userId);
+  await db.insert(notes).values({
+    id: crypto.randomUUID(),
+    userId: task.userId,
+    title: noteTitle,
+    content: JSON.stringify(tiptapDoc),
+    plainText: body.result ?? "",
+    type: "note",
+    tags: JSON.stringify(tagList),
+    folderId,
   });
 
   // Mark task completed
