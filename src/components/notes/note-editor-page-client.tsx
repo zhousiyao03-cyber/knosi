@@ -360,6 +360,23 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
     };
   }, [isCoverPickerOpen]);
 
+  // Keep the title textarea height in sync with its content on mount,
+  // when the title prop changes, and when the viewport width changes
+  // (the wrap point shifts between mobile and desktop).
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    const sync = () => {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    sync();
+    window.addEventListener("resize", sync);
+    return () => {
+      window.removeEventListener("resize", sync);
+    };
+  }, [title]);
+
   const handleContentChange = useCallback(
     (content: string, plainText: string) => {
       contentRef.current = { content, plainText };
