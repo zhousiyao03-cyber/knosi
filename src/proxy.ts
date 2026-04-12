@@ -15,7 +15,6 @@ export default auth((req) => {
     pathname === "/login" ||
     pathname === "/register" ||
     pathname.startsWith("/share/") ||
-    pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/icon") ||
     pathname.startsWith("/apple-icon") ||
     pathname.startsWith("/149e9513-01fa-4fb0-aad4-566afd725d1b/") ||
@@ -41,5 +40,7 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|webmanifest)$).*)",
+  ],
 };
