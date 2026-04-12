@@ -165,6 +165,7 @@ export async function POST(req: Request) {
       if (process.env.AUTH_BYPASS !== "true") {
         void recordAiUsage(userId).catch(() => undefined);
       }
+      after(getLangfuseSpanProcessor()?.forceFlush() ?? Promise.resolve());
       return Response.json({ taskId, mode: "daemon" });
     }
     // ────────────────────────────────────────────────────────────────
