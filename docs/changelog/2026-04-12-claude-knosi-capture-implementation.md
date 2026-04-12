@@ -117,6 +117,10 @@ Verification commands and results:
     - `oauth_access_tokens_token_hash_idx`
 - `npm publish --access public --registry=https://registry.npmjs.org/`
   - ✅ published `@knosi/cli@0.1.2`
+- `curl -i https://www.knosi.xyz/api/mcp`
+  - ✅ identified root cause for Claude connector showing “no tools available”: endpoint returned `405` for `GET`, while `POST tools/list` returned the expected tool set
+- `SQLITE_DB_PATH=/Users/bytedance/second-brain/data/second-brain.db pnpm build`
+  - ✅ passes after adding Streamable HTTP `GET` and `OPTIONS` support plus `Mcp-Session-Id` headers on `/api/mcp`
 
 Remaining risks / follow-up:
 - The remote MCP handler currently implements the minimal JSON-RPC methods needed for `initialize`, `tools/list`, and `tools/call`; if Claude’s connector runtime requires additional MCP protocol surfaces, we may need to extend it after real connector testing.
