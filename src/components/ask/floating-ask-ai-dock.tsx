@@ -7,11 +7,9 @@ import { useChat } from "@ai-sdk/react";
 import { TextStreamChatTransport } from "ai";
 import {
   ArrowUp,
-  BookOpen,
   Bookmark,
   ExternalLink,
   FileText,
-  Layers,
   Loader2,
   Minus,
   Pencil,
@@ -48,18 +46,6 @@ const QUICK_PROMPTS: Array<{
     icon: Sparkles,
     prompt: "Summarize my recent notes",
     scope: "notes",
-  },
-  {
-    title: "Review bookmarks",
-    icon: BookOpen,
-    prompt: "What is worth revisiting from my recent bookmarks?",
-    scope: "bookmarks",
-  },
-  {
-    title: "Review current project",
-    icon: Layers,
-    prompt: "What is the current tech stack of this project?",
-    scope: "all",
   },
   {
     title: "Help me write something",
