@@ -22,7 +22,7 @@ import { checkAiRateLimit, recordAiUsage } from "@/server/ai-rate-limit";
 import { enqueueChatTask } from "@/server/ai/chat-enqueue";
 import { shouldUseDaemonForChat } from "@/server/ai/daemon-mode";
 import { observe } from "@langfuse/tracing";
-import { langfuseSpanProcessor } from "@/instrumentation";
+import { getLangfuseSpanProcessor } from "@/instrumentation";
 
 export const maxDuration = 30;
 
@@ -238,7 +238,7 @@ export async function POST(req: Request) {
     }
 
     // Flush Langfuse traces after response is sent
-    after(langfuseSpanProcessor.forceFlush());
+    after(getLangfuseSpanProcessor()?.forceFlush() ?? Promise.resolve());
 
     return response;
   } catch (error) {
