@@ -165,7 +165,9 @@ export async function POST(req: Request) {
       if (process.env.AUTH_BYPASS !== "true") {
         void recordAiUsage(userId).catch(() => undefined);
       }
-      after(getLangfuseSpanProcessor()?.forceFlush() ?? Promise.resolve());
+      const sp = getLangfuseSpanProcessor();
+      console.log("[chat] daemon path, spanProcessor:", sp ? "exists" : "null");
+      after(sp?.forceFlush() ?? Promise.resolve());
       return Response.json({ taskId, mode: "daemon" });
     }
     // ────────────────────────────────────────────────────────────────
