@@ -1,5 +1,4 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { after } from "next/server";
 import { z } from "zod/v4";
 import { ASK_AI_SOURCE_SCOPES } from "@/lib/ask-ai";
 import { retrieveAgenticContext } from "@/server/ai/agentic-rag";
@@ -22,7 +21,6 @@ import { checkAiRateLimit, recordAiUsage } from "@/server/ai-rate-limit";
 import { enqueueChatTask } from "@/server/ai/chat-enqueue";
 import { shouldUseDaemonForChat } from "@/server/ai/daemon-mode";
 import { observe } from "@langfuse/tracing";
-import { getLangfuseSpanProcessor } from "@/instrumentation";
 
 export const maxDuration = 30;
 
@@ -165,9 +163,7 @@ export async function POST(req: Request) {
       if (process.env.AUTH_BYPASS !== "true") {
         void recordAiUsage(userId).catch(() => undefined);
       }
-      const sp = getLangfuseSpanProcessor();
-      console.log("[chat] daemon path, spanProcessor:", sp ? "exists" : "null");
-      after(sp?.forceFlush() ?? Promise.resolve());
+      // Traces flushed automatically by @vercel/otel
       return Response.json({ taskId, mode: "daemon" });
     }
     // ────────────────────────────────────────────────────────────────
@@ -239,9 +235,6 @@ export async function POST(req: Request) {
     if (process.env.AUTH_BYPASS !== "true" && userId) {
       void recordAiUsage(userId).catch(() => undefined);
     }
-
-    // Flush Langfuse traces after response is sent
-    after(getLangfuseSpanProcessor()?.forceFlush() ?? Promise.resolve());
 
     return response;
   } catch (error) {
