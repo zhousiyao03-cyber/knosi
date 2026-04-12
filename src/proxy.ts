@@ -29,6 +29,7 @@ export default auth((req) => {
     pathname === "/api/chat/progress" ||
     pathname === "/api/chat/complete" ||
     pathname.startsWith("/api/cron/") ||
+    pathname.startsWith("/api/jobs/") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon");
 
