@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 
 const POLL_INTERVAL_MS = 200;
 const STREAM_TIMEOUT_MS = 150 * 1000; // 2.5 min server-side guard
+const QUEUED_TIMEOUT_MS = 8 * 1000; // 8s — if still queued, daemon is likely offline
 
 export async function GET(request: NextRequest) {
   // --- Auth ---
@@ -53,6 +54,8 @@ export async function GET(request: NextRequest) {
 
       let seq = afterSeq;
       const deadline = Date.now() + STREAM_TIMEOUT_MS;
+      const queuedDeadline = Date.now() + QUEUED_TIMEOUT_MS;
+      let wasPickedUp = false;
 
       while (!cancelled && Date.now() < deadline) {
         // Fetch new deltas
@@ -94,9 +97,30 @@ export async function GET(request: NextRequest) {
           send("error", { error: current.error ?? "Task failed" });
           break;
         }
+        if (current.status !== "queued") {
+          wasPickedUp = true;
+        }
+        if (
+          !wasPickedUp &&
+          current.status === "queued" &&
+          Date.now() > queuedDeadline
+        ) {
+          send("error", {
+            error:
+              "The AI daemon did not pick up this task. Make sure the daemon is running on your local machine: run `knosi login` then `knosi`.",
+          });
+          break;
+        }
 
         // Wait before next poll
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      }
+
+      // Overall timeout — send error instead of silently closing
+      if (!cancelled && Date.now() >= deadline) {
+        send("error", {
+          error: "Request timed out. The AI daemon may be overloaded or offline.",
+        });
       }
 
       controller.close();
