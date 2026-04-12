@@ -11,6 +11,7 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
 
   const isPublicPath =
+    pathname === "/" ||
     pathname === "/login" ||
     pathname === "/register" ||
     pathname.startsWith("/share/") ||
