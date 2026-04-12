@@ -16,7 +16,7 @@ Every great insight you pull out of a Claude conversation disappears into the vo
 
 Write notes with a Notion-level editor, index your knowledge with hybrid RAG, and ask questions against your own corpus. Route "Ask AI" through your existing Claude subscription instead of burning extra API credits. Own your data, run it locally, or deploy to Vercel in five minutes.
 
-**Live demo:** [knosi.vercel.app](https://knosi.vercel.app)
+**Product:** [knosi.xyz](https://www.knosi.xyz)
 
 ---
 
