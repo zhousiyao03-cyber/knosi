@@ -115,6 +115,8 @@ Verification commands and results:
     - `oauth_authorization_codes_code_hash_idx`
     - `oauth_refresh_tokens_token_hash_idx`
     - `oauth_access_tokens_token_hash_idx`
+- `npm publish --access public --registry=https://registry.npmjs.org/`
+  - ✅ published `@knosi/cli@0.1.2`
 
 Remaining risks / follow-up:
 - The remote MCP handler currently implements the minimal JSON-RPC methods needed for `initialize`, `tools/list`, and `tools/call`; if Claude’s connector runtime requires additional MCP protocol surfaces, we may need to extend it after real connector testing.
