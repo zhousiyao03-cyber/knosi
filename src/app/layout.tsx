@@ -16,14 +16,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Second Brain",
-  description: "A personal knowledge management workspace",
-  applicationName: "Second Brain",
+  title: "Knosi",
+  description: "Turn your Claude tokens into a second brain you actually own.",
+  applicationName: "Knosi",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Second Brain",
+    title: "Knosi",
   },
 };
 

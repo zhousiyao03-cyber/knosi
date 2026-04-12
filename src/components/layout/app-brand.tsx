@@ -24,7 +24,7 @@ export function AppBrand({ compact = false, className }: AppBrandProps) {
       {compact ? null : (
         <div className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-stone-900 dark:text-stone-100">
-            Second Brain
+            Knosi
           </div>
         </div>
       )}

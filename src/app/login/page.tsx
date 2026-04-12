@@ -39,10 +39,10 @@ export default async function LoginPage({
             <AppBrand compact />
           </div>
           <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
-            Second Brain
+            Knosi
           </h1>
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-            Sign in to access your knowledge base
+            Sign in to your knowledge base
           </p>
         </div>
 

@@ -33,7 +33,7 @@ export default async function RegisterPage({
             <AppBrand compact />
           </div>
           <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
-            Create your Second Brain account
+            Create your Knosi account
           </h1>
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
             Create an account and jump straight into your workspace
