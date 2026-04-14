@@ -81,11 +81,30 @@ export async function POST(request: NextRequest) {
 
   if (body.method === "initialize") {
     const sessionId = request.headers.get("mcp-session-id") ?? randomUUID();
+    const clientProtocol =
+      typeof body.params?.protocolVersion === "string"
+        ? body.params.protocolVersion
+        : "2025-06-18";
+    const SUPPORTED = new Set(["2024-11-05", "2025-03-26", "2025-06-18"]);
+    const protocolVersion = SUPPORTED.has(clientProtocol)
+      ? clientProtocol
+      : "2025-06-18";
     return jsonRpcResult(body.id ?? null, {
-      protocolVersion: "2025-03-26",
+      protocolVersion,
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: "knosi-mcp", version: "0.1.0" },
     }, sessionId);
+  }
+
+  if (
+    body.method === "notifications/initialized" ||
+    body.method === "initialized"
+  ) {
+    return withMcpHeaders(new NextResponse(null, { status: 202 }));
+  }
+
+  if (body.method === "ping") {
+    return jsonRpcResult(body.id ?? null, {});
   }
 
   if (body.method === "tools/list") {
