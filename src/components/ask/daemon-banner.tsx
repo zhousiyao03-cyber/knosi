@@ -24,7 +24,7 @@ export function DaemonBanner() {
 
     async function refresh() {
       try {
-        const res = await fetch("/api/daemon/status?kind=chat");
+        const res = await fetch("/api/daemon/status?kind=daemon");
         if (!res.ok) return;
         const data = (await res.json()) as DaemonStatus;
         if (!cancelled) setStatusData(data);
