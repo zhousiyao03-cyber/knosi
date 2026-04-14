@@ -487,10 +487,10 @@ export function InlineAskAiPopover({
           )}
         >
           {appendStatus.state === "appending" && (
-            <>Appending to "{appendStatus.title}"...</>
+            <>Appending to &quot;{appendStatus.title}&quot;...</>
           )}
           {appendStatus.state === "appended" && (
-            <>Appended to "{appendStatus.title}" ✓</>
+            <>Appended to &quot;{appendStatus.title}&quot; ✓</>
           )}
           {appendStatus.state === "error" && (
             <>Failed to append: {appendStatus.message}</>

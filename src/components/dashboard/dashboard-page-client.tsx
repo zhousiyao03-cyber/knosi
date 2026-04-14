@@ -142,7 +142,7 @@ export function DashboardPageClient({
           <div>
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">
               <Activity className="h-3 w-3" />
-              Today's Focus
+              Today&apos;s Focus
             </div>
             <div className="mt-1.5 text-xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
               {focusStats ? formatFocusDuration(focusStats.totalSecs) : "—"}

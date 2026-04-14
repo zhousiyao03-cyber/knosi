@@ -28,6 +28,8 @@ export type AiCaptureDependencies = {
   randomUUID?: () => string;
   markdownToTiptap?: typeof markdownToTiptap;
   enqueueNoteIndexJob?: (noteId: string, reason: string) => Promise<unknown>;
+  invalidateNotesListForUser?: (userId: string) => void;
+  invalidateDashboardForUser?: (userId: string) => void;
   resolveOrCreateAiInboxFolder?: (
     userId: string,
     options?: {
@@ -205,6 +207,12 @@ export async function captureAiConversation(
     dependencies.createNote ?? (await getDefaultAiCaptureNoteWriter());
   const enqueueNoteIndexJobImpl =
     dependencies.enqueueNoteIndexJob ?? (await getDefaultEnqueueNoteIndexJob());
+  const invalidateNotesListImpl =
+    dependencies.invalidateNotesListForUser ??
+    (await import("../cache/instances")).invalidateNotesListForUser;
+  const invalidateDashboardImpl =
+    dependencies.invalidateDashboardForUser ??
+    (await import("../cache/instances")).invalidateDashboardForUser;
 
   const capturedAt = now();
   const title = deriveAiCaptureTitle({
@@ -238,6 +246,9 @@ export async function captureAiConversation(
   });
 
   await enqueueNoteIndexJobImpl(noteId, "ai-capture");
+
+  invalidateNotesListImpl(input.userId);
+  invalidateDashboardImpl(input.userId);
 
   return { noteId, folderId, title };
 }
