@@ -2,21 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, and, lt } from "drizzle-orm";
 import { db } from "@/server/db";
 import { chatTasks } from "@/server/db/schema";
-import { verifyCliToken } from "@/server/ai/cli-auth";
+import { validateBearerAccessToken } from "@/server/integrations/oauth";
 
 const ZOMBIE_TIMEOUT_MS = 5 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
-  // Authenticate the daemon via CLI token
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice(7).trim()
-    : "";
-
-  const userId = token ? await verifyCliToken(token) : null;
-  if (!userId) {
+  let userId: string;
+  try {
+    const auth = await validateBearerAccessToken({
+      authorization: request.headers.get("authorization"),
+    });
+    userId = auth.userId;
+  } catch {
     return NextResponse.json(
-      { error: "Invalid or missing CLI token. Run `knosi` to authenticate." },
+      { error: "Invalid or missing access token. Run `knosi login` to authenticate." },
       { status: 401 }
     );
   }

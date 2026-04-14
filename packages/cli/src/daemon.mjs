@@ -35,7 +35,7 @@ export async function runDaemon(args) {
 
   const CHAT_POLL_MS = 2_000;
   const STRUCTURED_POLL_MS = 1_000;
-  const HEARTBEAT_MS = 120_000;
+  const HEARTBEAT_MS = 60_000;
   const MAX_CONCURRENT_CHAT = 3;
   const MAX_CONCURRENT_STRUCTURED = 5;
 
@@ -53,18 +53,31 @@ export async function runDaemon(args) {
   let chatRunning = 0;
   let structuredRunning = 0;
 
+  let authFailureLogged = false;
+  function onPollError(err) {
+    if (err?.message === "AUTH_FAILED") {
+      if (!authFailureLogged) {
+        console.error(`[${ts()}] ✗ Authentication failed. Run \`knosi auth login\` to re-authenticate.`);
+        authFailureLogged = true;
+      }
+    }
+  }
+
   async function pollChat() {
     if (chatRunning >= MAX_CONCURRENT_CHAT) return;
     try {
       const task = await claimTask("chat");
       if (!task) return;
+      authFailureLogged = false;
       chatRunning++;
       handleChatTask(task)
         .catch(() => {})
         .finally(() => {
           chatRunning--;
         });
-    } catch {}
+    } catch (err) {
+      onPollError(err);
+    }
   }
 
   async function pollStructured() {
@@ -72,13 +85,16 @@ export async function runDaemon(args) {
     try {
       const task = await claimTask("structured");
       if (!task) return;
+      authFailureLogged = false;
       structuredRunning++;
       handleStructuredTask(task)
         .catch(() => {})
         .finally(() => {
           structuredRunning--;
         });
-    } catch {}
+    } catch (err) {
+      onPollError(err);
+    }
   }
 
   if (isOnce) {

@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { chatTasks } from "@/server/db/schema";
-import { verifyCliToken } from "@/server/ai/cli-auth";
+import { validateBearerAccessToken } from "@/server/integrations/oauth";
 
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-  if (!token || !(await verifyCliToken(token))) {
+  try {
+    await validateBearerAccessToken({
+      authorization: request.headers.get("authorization"),
+    });
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = (await request.json()) as {
