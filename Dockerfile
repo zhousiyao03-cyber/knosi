@@ -1,13 +1,13 @@
 # ── Stage 1: Install dependencies ─────────────────────
 FROM node:22-alpine AS deps
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@8.11.0 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # ── Stage 2: Build ────────────────────────────────────
 FROM node:22-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@8.11.0 --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -16,7 +16,7 @@ COPY . .
 ENV TURSO_DATABASE_URL=file:data/second-brain.db
 ENV AUTH_SECRET=change-me-in-production
 
-RUN pnpm build
+RUN mkdir -p data && pnpm db:push && pnpm build
 
 # ── Stage 3: Production runner ────────────────────────
 FROM node:22-alpine AS runner

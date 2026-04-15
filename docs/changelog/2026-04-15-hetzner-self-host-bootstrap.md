@@ -1,0 +1,69 @@
+# 2026-04-15 Hetzner Self-Host Bootstrap
+
+- date: 2026-04-15
+- task / goal: Start the migration from Vercel-hosted app delivery to a single-server Hetzner deployment by adding production self-hosting assets and bootstrapping the target server.
+- key changes:
+  - Added `docker-compose.prod.yml` for a single-host stack with Knosi, Redis, and Caddy.
+  - Added `.env.production.example` with the production env surface for self-hosting.
+  - Added `ops/hetzner/Caddyfile`, `ops/hetzner/bootstrap.sh`, and `ops/hetzner/knosi.cron.example` to cover reverse proxy, host bootstrap, and cron-driven job processing.
+  - Updated `ops/hetzner/Caddyfile` so the apex domain redirects to the canonical `www` host and the ACME email stays optional.
+  - Updated `Dockerfile` to pin `pnpm@8.11.0` and run `pnpm db:push` during the builder stage so Docker builds succeed against the current lockfile and Next.js page-data collection.
+  - Updated `.dockerignore` so Docker build context includes the Playwright helper files needed by TypeScript, but excludes `.env.production` from the image.
+  - Updated `README.md` with a Hetzner single-server deployment path and the new production files.
+  - Bootstrapped `ssh knosi` with a 4 GB swapfile, Docker, Docker Compose v2, active UFW rules for `22/80/443`, and `/srv/knosi`.
+  - Synced the current worktree contents to `/srv/knosi` so the target host now has the updated deployment assets.
+  - Generated `/srv/knosi/.env.production` from the existing production/local secrets, started `knosi + redis`, bound the app to `127.0.0.1:3000`, and installed host cron jobs for `jobs/tick` and `cleanup-stale-chat-tasks`.
+  - Enabled `vm.overcommit_memory=1` on the Hetzner host so Redis no longer warns on restart.
+  - Completed the first DNS cutover for `knosi.xyz` and `www.knosi.xyz`, started `caddy`, and issued Let's Encrypt certificates for both hostnames.
+- files touched:
+  - `README.md`
+  - `docker-compose.prod.yml`
+  - `.env.production.example`
+  - `ops/hetzner/Caddyfile`
+  - `ops/hetzner/bootstrap.sh`
+  - `ops/hetzner/knosi.cron.example`
+  - `docs/changelog/2026-04-15-hetzner-self-host-bootstrap.md`
+- verification commands and results:
+  - `bash -n ops/hetzner/bootstrap.sh`
+    - Exit `0`.
+  - `cp .env.production.example .env.production && docker compose -f docker-compose.prod.yml config`
+    - Rendered a valid 3-service stack: `knosi`, `redis`, `caddy`.
+  - `pnpm lint`
+    - Exit `0` with 8 pre-existing warnings and no new errors.
+  - `mkdir -p data && pnpm db:push`
+    - Exit `0`; created a temporary local SQLite schema for build verification.
+  - `pnpm build`
+    - Exit `0` after the temporary local database was initialized.
+  - `ssh knosi 'bash -s -- 4' < ops/hetzner/bootstrap.sh`
+    - Exit `0`; installed swap/Docker/UFW and created `/srv/knosi`.
+  - `ssh knosi 'free -h; swapon --show; docker --version; docker compose version; ufw status numbered; ls -ld /srv/knosi'`
+    - Confirmed `4.0 GiB` swap, Docker `29.1.3`, Docker Compose `2.40.3`, UFW active with only `22/80/443`, and `/srv/knosi` present.
+  - `tar --exclude='.git' --exclude='node_modules' --exclude='.next' --exclude='data' --exclude='.worktrees' -cf - . | ssh knosi 'cd /srv/knosi && tar -xf -'`
+    - Synced the current deployment worktree to the server.
+  - `ssh knosi 'test -f /srv/knosi/docker-compose.prod.yml && test -f /srv/knosi/ops/hetzner/bootstrap.sh && test -f /srv/knosi/docs/changelog/2026-04-15-hetzner-self-host-bootstrap.md && echo synced'`
+    - Confirmed the expected migration files are present on the server.
+  - `ssh knosi 'cd /srv/knosi && docker compose -f docker-compose.prod.yml build --no-cache knosi'`
+    - Exit `0`; verified the production image build on the Hetzner host after the Dockerfile and `.dockerignore` fixes.
+  - `ssh knosi 'cd /srv/knosi && docker compose -f docker-compose.prod.yml up -d redis knosi'`
+    - Exit `0`; `knosi` and `redis` are running.
+  - `ssh knosi 'curl -I -sS http://127.0.0.1:3000/login'`
+    - Returned `HTTP/1.1 200 OK`.
+  - `ssh knosi '. /srv/knosi/.env.production && curl -sS -H "Authorization: Bearer ${JOBS_TICK_TOKEN}" "http://127.0.0.1:3000/api/jobs/tick?max=1"'`
+    - Returned `{"processed":0,"errors":0}`.
+  - `ssh knosi 'systemctl is-enabled cron && systemctl is-active cron && sed -n "1,20p" /etc/cron.d/knosi'`
+    - Confirmed cron is enabled/active and the Knosi cron entries are installed.
+  - `ssh knosi 'sysctl vm.overcommit_memory && cd /srv/knosi && docker compose -f docker-compose.prod.yml logs --tail=40 knosi redis'`
+    - Confirmed `vm.overcommit_memory = 1`, Next.js is ready, and the latest logs no longer include the earlier `.env.production` permission warning.
+  - `dig @1.1.1.1 +short knosi.xyz A && dig @1.1.1.1 +short www.knosi.xyz A`
+    - Confirmed public DNS now resolves to `195.201.117.172` for both the apex and `www`.
+  - `ssh knosi 'cd /srv/knosi && docker compose -f docker-compose.prod.yml up -d caddy && docker compose -f docker-compose.prod.yml ps caddy'`
+    - Started `caddy`; the service is running and exposes `80/443`.
+  - `ssh knosi 'cd /srv/knosi && docker compose -f docker-compose.prod.yml logs --since=60s --tail=80 caddy'`
+    - Confirmed automatic TLS for `knosi.xyz` and `www.knosi.xyz`; Let's Encrypt certificates were obtained successfully.
+  - `curl --resolve www.knosi.xyz:443:195.201.117.172 -I -sS https://www.knosi.xyz/login`
+    - Returned `HTTP/2 200` from the Hetzner host via `Caddy`.
+  - `curl --resolve knosi.xyz:443:195.201.117.172 -I -sS https://knosi.xyz`
+    - Returned `HTTP/2 301` redirecting the apex domain to `https://www.knosi.xyz/`.
+- remaining risks or follow-up items:
+  - Some clients may still hit the old Vercel deployment for `www.knosi.xyz` until their cached DNS entry expires; the record had a 10-minute TTL when the cutover started.
+  - Vercel-specific integrations still exist in the app runtime and should be evaluated in a later migration batch: `@vercel/blob`, `@vercel/analytics`, `@vercel/speed-insights`, `@vercel/otel`, and the runtime-cache wrapper.

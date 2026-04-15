@@ -14,7 +14,7 @@
 
 Every great insight you pull out of a Claude conversation disappears into the void the moment you close the tab. Knosi closes that loop — it's a self-hosted knowledge platform built for developers who live in AI tools and want a permanent, searchable home for what they learn.
 
-Write notes with a Notion-level editor, index your knowledge with hybrid RAG, and ask questions against your own corpus. Route "Ask AI" through your existing Claude subscription instead of burning extra API credits. Own your data, run it locally, or deploy to Vercel in five minutes.
+Write notes with a Notion-level editor, index your knowledge with hybrid RAG, and ask questions against your own corpus. Route "Ask AI" through your existing Claude subscription instead of burning extra API credits. Own your data, run it locally, self-host it with Docker Compose, or deploy to Vercel.
 
 **Product:** [knosi.xyz](https://www.knosi.xyz)
 
@@ -111,6 +111,63 @@ Password: test123456
 
 This account is only created when `NODE_ENV=development` and has no effect in production.
 
+### Option C: Hetzner single-server deployment
+
+The repository now includes a production-oriented Docker Compose stack for a single Ubuntu server:
+
+- [`docker-compose.prod.yml`](docker-compose.prod.yml) — app + Redis + Caddy
+- [`ops/hetzner/Caddyfile`](ops/hetzner/Caddyfile) — HTTPS reverse proxy
+- [`ops/hetzner/bootstrap.sh`](ops/hetzner/bootstrap.sh) — swap, Docker, firewall, `/srv/knosi`
+- [`ops/hetzner/deploy.sh`](ops/hetzner/deploy.sh) — server-side deployment entrypoint
+- [`ops/hetzner/rsync-excludes.txt`](ops/hetzner/rsync-excludes.txt) — sync exclusions for GitHub Actions
+- [`ops/hetzner/knosi.cron.example`](ops/hetzner/knosi.cron.example) — cron jobs for queue processing
+- [`.env.production.example`](.env.production.example) — production env template
+- [`.github/workflows/deploy-hetzner.yml`](.github/workflows/deploy-hetzner.yml) — push-to-main auto deploy
+
+Recommended first migration cut:
+
+1. Keep `TURSO_DATABASE_URL` pointed at Turso.
+2. Keep `@vercel/blob` only if you still need the current image-upload route.
+3. Move app hosting, reverse proxy, Redis, and cron to your own server first.
+
+Example flow on a fresh Ubuntu host:
+
+```bash
+ssh root@your-server
+git clone https://github.com/zhousiyao03-cyber/knosi.git /srv/knosi
+cd /srv/knosi
+
+bash ops/hetzner/bootstrap.sh 4
+cp .env.production.example .env.production
+# edit .env.production
+
+# APP_DOMAIN=www.knosi.xyz
+# ROOT_DOMAIN=knosi.xyz
+# ACME_EMAIL=you@example.com
+
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Then install the cron entries:
+
+```bash
+crontab -e
+# paste ops/hetzner/knosi.cron.example and fill in the secrets
+```
+
+Automatic deployments:
+
+1. Add these repository secrets in GitHub:
+   - `HETZNER_HOST` — your server IP or hostname
+   - `HETZNER_USER` — the SSH user that owns the deployment
+   - `HETZNER_SSH_KEY` — the private key for that SSH user
+   - `HETZNER_SSH_PORT` — optional, defaults to `22`
+   - If you followed the current Hetzner bootstrap flow exactly, the live server currently uses `root` for deployments, so `HETZNER_USER=root` is the drop-in value until you introduce a dedicated deploy user.
+2. Push to `main`.
+3. GitHub Actions will lint, `rsync` the repository to `/srv/knosi`, then run `ops/hetzner/deploy.sh` on the server.
+
+The deployment script validates `docker-compose.prod.yml`, rebuilds the `knosi` image, restarts `redis + knosi + caddy`, and waits for `http://127.0.0.1:3000/login` to return `200`.
+
 ---
 
 ## Environment Variables
@@ -144,6 +201,22 @@ AUTH_GOOGLE_SECRET=your-google-oauth-client-secret
 ```bash
 TURSO_DATABASE_URL=libsql://your-db-name-your-org.turso.io
 TURSO_AUTH_TOKEN=your-turso-auth-token
+```
+
+### Production Self-Hosting
+
+```bash
+APP_DOMAIN=knosi.example.com
+ACME_EMAIL=ops@example.com
+AUTH_TRUST_HOST=true
+CRON_SECRET=your-random-secret
+JOBS_TICK_TOKEN=your-random-secret
+```
+
+If you keep image uploads on Vercel Blob during the first migration cut:
+
+```bash
+BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxx
 ```
 
 ### Feature Flags
@@ -309,7 +382,7 @@ Set both to `true` to show the module in the sidebar and enable its routes.
 | Diagrams | Mermaid + Excalidraw |
 | Content fetching | @mozilla/readability + linkedom |
 | Testing | Playwright (E2E) |
-| Deployment | Vercel |
+| Deployment | Docker Compose / Vercel |
 
 ---
 

@@ -1,0 +1,40 @@
+# 2026-04-15 Hetzner Auto Deploy
+
+- date: 2026-04-15
+- task / goal: Add push-to-main automatic deployment for the Hetzner single-server production setup.
+- key changes:
+  - Added `.github/workflows/deploy-hetzner.yml` to lint on GitHub Actions, sync the repository to the Hetzner host with `rsync`, and run the server-side deployment script after every push to `main`.
+  - Added `ops/hetzner/deploy.sh` to validate the compose stack, rebuild the `knosi` image, restart the production services, and wait for the local health check to return `200`.
+  - Added `ops/hetzner/rsync-excludes.txt` so automated syncs do not overwrite `.env.production` or push build/test artifacts to the server.
+  - Updated `ops/hetzner/bootstrap.sh` to install `rsync` on future Hetzner hosts.
+  - Updated `README.md` with the GitHub repository secrets required for automatic deployment.
+  - Generated a dedicated local SSH key for GitHub Actions and installed its public key on the Hetzner host so the workflow can deploy over SSH after the repo secrets are added.
+- files touched:
+  - `.github/workflows/deploy-hetzner.yml`
+  - `ops/hetzner/deploy.sh`
+  - `ops/hetzner/rsync-excludes.txt`
+  - `ops/hetzner/bootstrap.sh`
+  - `README.md`
+  - `docs/changelog/2026-04-15-hetzner-auto-deploy.md`
+- verification commands and results:
+  - `bash -n ops/hetzner/deploy.sh`
+    - Exit `0`.
+  - `bash -n ops/hetzner/bootstrap.sh`
+    - Exit `0`.
+  - `pnpm lint`
+    - Exit `0` with the same 8 pre-existing warnings and no new errors.
+  - `rsync -az --delete --exclude-from=ops/hetzner/rsync-excludes.txt -e ssh ./ knosi:/srv/knosi --dry-run`
+    - Exit `0`; the sync plan completed without errors.
+  - `ssh knosi 'APP_DIR=/srv/knosi /srv/knosi/ops/hetzner/deploy.sh'`
+    - Exit `0`; rebuilt the `knosi` image, recreated the app container, and the health check recovered after the first retry.
+  - `ssh -i ~/.ssh/knosi_github_actions root@195.201.117.172 'echo github-actions-key-ok'`
+    - Returned `github-actions-key-ok`, confirming the deploy key can log into the host.
+  - `ssh -i ~/.ssh/knosi_github_actions root@195.201.117.172 'curl -I -sS http://127.0.0.1:3000/login'`
+    - Returned `HTTP/1.1 200 OK`.
+  - `curl --resolve www.knosi.xyz:443:195.201.117.172 -I -sS https://www.knosi.xyz/login`
+    - Returned `HTTP/2 200` through `Caddy`.
+  - `curl --resolve knosi.xyz:443:195.201.117.172 -I -sS https://knosi.xyz`
+    - Returned `HTTP/2 301` redirecting to `https://www.knosi.xyz/`.
+- remaining risks or follow-up items:
+  - GitHub Actions cannot deploy until the repository secrets for the Hetzner SSH connection are added.
+  - The current flow rebuilds and replaces the `knosi` container before the post-deploy health check, so it detects bad deploys but does not automatically roll back yet.

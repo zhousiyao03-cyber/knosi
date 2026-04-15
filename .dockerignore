@@ -5,8 +5,11 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 .env*.local
+.env.production
 .claude
 docs
-e2e
+e2e/*
+!e2e/auth-test-db.ts
+!e2e/test-db.ts
 *.md
 !README.md
