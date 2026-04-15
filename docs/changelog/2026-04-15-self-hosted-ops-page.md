@@ -60,9 +60,31 @@
     - Exit `0`; Playwright verified the owner-bypassed test user can open `/settings/ops` and see all five cards.
   - `ssh knosi "cd /srv/knosi && docker compose -f docker-compose.prod.yml exec -T knosi node -e \"(async()=>{ const { createClient } = await import('@@libsql/client'.replace('@@','@')); const client = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN }); const result = await client.execute('select id, email from users order by email asc'); console.log(JSON.stringify(result.rows, null, 2)); await client.close(); })().catch((err)=>{ console.error(err); process.exit(1); });\""`
     - Exit `0`; inspected production users before setting `OPS_OWNER_EMAIL` and confirmed the owner email exists in Turso.
-  - Production rollout and deployment verification
-    - Pending until the feature branch is synced to Hetzner, `OPS_OWNER_EMAIL` is written to `.env.production`, cron is updated with the host snapshot collector, and the `ops_job_heartbeats` table is verified in production.
+  - `ssh knosi 'python3 - <<'\"'\"'PY'\"'\"' ... OPS_OWNER_EMAIL=zhousiyao03@gmail.com ... PY'`
+    - Exit `0`; wrote the owner-only Ops email into `/srv/knosi/.env.production`.
+  - `ssh knosi '... | crontab -'` followed by `ssh knosi 'crontab -l'`
+    - Exit `0`; installed the host snapshot collector plus the existing `jobs/tick` and `cleanup-stale-chat-tasks` cron jobs on Hetzner.
+  - `URL=$(ssh knosi '...TURSO_DATABASE_URL...') TOKEN=$(ssh knosi '...TURSO_AUTH_TOKEN...') pnpm exec drizzle-kit push --dialect turso --schema src/server/db/schema.ts --url \"$URL\" --auth-token \"$TOKEN\" --verbose`
+    - Exit `0`; rolled the `ops_job_heartbeats` schema to production Turso and applied the new table.
+  - `TURSO_DATABASE_URL=\"$(ssh knosi '...')\" TURSO_AUTH_TOKEN=\"$(ssh knosi '...')\" node -e \"... select name from sqlite_master where type='table' and name='ops_job_heartbeats' ...\"`
+    - Exit `0`; verified production now contains `ops_job_heartbeats`.
+  - `COMMIT_SHA=$(git rev-parse HEAD) && ssh knosi \"APP_DIR=/srv/knosi NEXT_DEPLOYMENT_ID=$COMMIT_SHA GIT_SHA=$COMMIT_SHA DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ) /srv/knosi/ops/hetzner/deploy.sh\"`
+    - Exit `0`; manually rebuilt and restarted the Hetzner stack with the new Ops dashboard.
+  - `ssh knosi 'APP_DIR=/srv/knosi /srv/knosi/ops/hetzner/collect-ops-snapshot.sh && cat /srv/knosi/runtime/ops-snapshot.json'`
+    - Exit `0`; generated a live host snapshot with memory, disk, load, uptime, and container state.
+  - `ssh knosi 'set -a; . /srv/knosi/.env.production >/dev/null 2>&1; curl -fsS -H \"Authorization: Bearer ${JOBS_TICK_TOKEN}\" \"http://127.0.0.1:3000/api/jobs/tick?max=10\"; curl -fsS -H \"Authorization: Bearer ${CRON_SECRET}\" \"http://127.0.0.1:3000/api/cron/cleanup-stale-chat-tasks\"'`
+    - Exit `0`; wrote live heartbeat rows for the queue tick and stale-task cleanup jobs.
+  - `TURSO_DATABASE_URL=\"$(ssh knosi '...')\" TURSO_AUTH_TOKEN=\"$(ssh knosi '...')\" node -e \"... select job_name, last_status, last_message from ops_job_heartbeats ...\"`
+    - Exit `0`; verified production heartbeat rows for `jobs-tick` and `cleanup-stale-chat-tasks`.
+  - `curl -I -sS https://www.knosi.xyz/login`
+    - Returned `200 OK`; the public site stayed healthy after deployment.
+  - `curl -I -sS https://www.knosi.xyz/settings/ops`
+    - Returned `307` to `/login?next=%2Fsettings%2Fops`; the public owner-only route is protected in production.
+  - `curl -s https://www.knosi.xyz/login | rg -o 'data-dpl-id=\"[^\"]+\"' -m 1`
+    - Returned `data-dpl-id=\"2313ed570c1d6c6a457bd3840f178c453f0977d4\"`; the public site is serving the final pushed commit.
+  - `curl -s 'https://api.github.com/repos/zhousiyao03-cyber/knosi/actions/runs/24463564086' | jq '{status, conclusion, html_url}'`
+    - Returned `completed/success`; the push-to-main Hetzner deploy workflow also completed successfully after the manual rollout.
 - remaining risks or follow-up items:
   - The dashboard stays intentionally read-only; service restarts, shell access, and environment editing still require SSH.
   - Host metrics only refresh as often as the cron snapshot collector runs; stale snapshots are surfaced, but they are not push-based.
-  - The owner gate is single-email by design. If multi-admin support is needed later, the authorization helper and env model will need to expand.
+  - The owner gate is single-email by design and currently uses `zhousiyao03@gmail.com` as the production owner. If the primary login email changes or multi-admin support is needed later, the env model will need to expand.
