@@ -17,7 +17,12 @@ const {
   verifyPkceCodeVerifier,
   issueAuthorizationCode,
   OAuthError,
+  __resetAccessTokenValidationCacheForUnitTest,
 } = oauthModule;
+
+test.afterEach(() => {
+  __resetAccessTokenValidationCacheForUnitTest();
+});
 
 function createMemoryOAuthStore() {
   const authorizationCodes = new Map();
@@ -294,4 +299,68 @@ test("bearer validation enforces scopes", async () => {
       ),
     (error) => error instanceof OAuthError && error.code === "insufficient_scope"
   );
+});
+
+test("bearer validation reuses a short-lived cached access token record", async () => {
+  const store = createMemoryOAuthStore();
+  let accessLookups = 0;
+  const originalFindAccessTokenByHash = store.findAccessTokenByHash.bind(store);
+  store.findAccessTokenByHash = async (hash) => {
+    accessLookups += 1;
+    return originalFindAccessTokenByHash(hash);
+  };
+
+  const verifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN12345";
+  const challenge = createPkceCodeChallenge(verifier);
+
+  const issued = await issueAuthorizationCode(
+    {
+      clientId: "knosi-cli",
+      redirectUri: "http://localhost:6274/oauth/callback",
+      scopes: ["knowledge:read"],
+      codeChallenge: challenge,
+    },
+    {
+      store,
+      now: () => new Date("2026-04-12T09:00:00.000Z"),
+      randomBytes: (size) => Buffer.alloc(size, 9),
+    }
+  );
+
+  await approveAuthorizationCode(
+    { authorizationCode: issued.authorizationCode, userId: "user-cache" },
+    {
+      store,
+      now: () => new Date("2026-04-12T09:00:05.000Z"),
+    }
+  );
+
+  const exchanged = await exchangeAuthorizationCode(
+    {
+      authorizationCode: issued.authorizationCode,
+      clientId: "knosi-cli",
+      redirectUri: "http://localhost:6274/oauth/callback",
+      codeVerifier: verifier,
+    },
+    {
+      store,
+      now: () => new Date("2026-04-12T09:00:10.000Z"),
+      randomBytes: (size) => Buffer.alloc(size, 10),
+    }
+  );
+
+  const now = () => new Date("2026-04-12T09:00:11.000Z");
+
+  const first = await validateBearerAccessToken(
+    { authorization: `Bearer ${exchanged.accessToken}` },
+    { store, now }
+  );
+  const second = await validateBearerAccessToken(
+    { authorization: `Bearer ${exchanged.accessToken}` },
+    { store, now }
+  );
+
+  assert.equal(first.userId, "user-cache");
+  assert.equal(second.userId, "user-cache");
+  assert.equal(accessLookups, 1);
 });

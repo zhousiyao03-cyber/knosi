@@ -1,0 +1,34 @@
+# 2026-04-15 OAuth Access Token Validation Cache
+
+- date: 2026-04-15
+- task / goal: Reduce repeated `oauth_access_tokens` lookups caused by the daemon repeatedly hitting bearer-protected routes with the same access token.
+- key changes:
+  - Added a short-lived in-process cache for validated OAuth access token records inside `validateBearerAccessToken()`.
+  - Cache entries are keyed by the hashed bearer token and expire after 5 seconds or at the token's own expiry time, whichever comes first.
+  - Cleared the process-local cache when access tokens or refresh-token-linked access tokens are revoked so local revocations take effect immediately.
+  - Added focused test coverage proving repeated validations reuse the cached record without skipping revoke or scope enforcement behavior.
+- files touched:
+  - `README.md`
+  - `docs/changelog/2026-04-15-oauth-access-token-validation-cache.md`
+  - `src/server/integrations/oauth.test.mjs`
+  - `src/server/integrations/oauth.ts`
+- verification commands and results:
+  - `pnpm tsx --test src/server/integrations/oauth.test.mjs`
+    - Exit `0`; 6 tests passed, including the new access-token validation cache coverage.
+  - `pnpm lint`
+    - Exit `0`; same 8 pre-existing warnings remain, with no new warnings introduced by this change.
+  - `AUTH_SECRET=test-secret TURSO_DATABASE_URL=file:data/second-brain.db NEXT_DEPLOYMENT_ID=oauth-token-cache pnpm build`
+    - Exit `0`; production build completed successfully.
+  - `rsync -az --delete --exclude-from=ops/hetzner/rsync-excludes.txt ./ knosi:/srv/knosi/`
+    - Exit `0`; synced the cache change to Hetzner.
+  - `NEXT_DEPLOYMENT_ID=$(date -u +%Y%m%d%H%M%S) && ssh knosi "APP_DIR=/srv/knosi NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID /srv/knosi/ops/hetzner/deploy.sh"`
+    - Exit `0`; deployed to Hetzner with deployment id `20260415141347`.
+  - `ssh knosi 'curl -I -sS https://www.knosi.xyz/login'`
+    - Returned `200 OK` after deployment.
+  - `ssh knosi 'cd /srv/knosi && docker compose -f docker-compose.prod.yml logs --since=60s knosi | grep -c "oauth_access_tokens"'`
+    - Returned `3` after the deploy and a fresh Ask AI run, down from the much denser repeated lookups seen before the cache.
+  - `ssh knosi 'cd /srv/knosi && docker compose -f docker-compose.prod.yml logs --since=60s knosi | grep -c "update \\\"chat_tasks\\\" set \\\"status\\\" = ?, \\\"started_at\\\" = ? where (\\\"chat_tasks\\\".\\\"status\\\" = ? and \\\"chat_tasks\\\".\\\"task_type\\\" = ? and \\\"chat_tasks\\\".\\\"user_id\\\" = ? and \\\"chat_tasks\\\".\\\"started_at\\\" < ?)"'`
+    - Returned `0`; the old idle reclaim noise stayed gone after the daemon notification rollout.
+- remaining risks or follow-up items:
+  - The cache is process-local, so token revocations still depend on each app process noticing them independently. On the current single-instance Hetzner deployment this is acceptable, but multi-instance deployments would need a shared invalidation story.
+  - This optimization reduces redundant auth-table reads but does not change the daemon task queue semantics or the frequency of legitimate task-state reads during active jobs.

@@ -278,7 +278,7 @@ Or during local development:
 npm run daemon
 ```
 
-The daemon opens a lightweight notification stream for queued AI tasks, falls back to coarse claim checks if notifications are unavailable, executes tasks via your local Claude CLI, and streams results back. All AI-powered features work through this single daemon process.
+The daemon opens a lightweight notification stream for queued AI tasks, falls back to coarse claim checks if notifications are unavailable, executes tasks via your local Claude CLI, and streams results back. The server also keeps a very short in-process cache of validated daemon bearer tokens so repeated claim/progress/complete calls do not hammer the auth token table. All AI-powered features work through this single daemon process.
 
 **Requirements:** [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed and logged in (`claude login`).
 

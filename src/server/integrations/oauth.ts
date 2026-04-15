@@ -22,6 +22,14 @@ const REFRESH_TOKEN_PREFIX = "krt";
 const DEFAULT_AUTHORIZATION_CODE_TTL_SECS = 10 * 60;
 const DEFAULT_ACCESS_TOKEN_TTL_SECS = 24 * 60 * 60;
 const DEFAULT_REFRESH_TOKEN_TTL_SECS = 365 * 24 * 60 * 60;
+const ACCESS_TOKEN_VALIDATION_CACHE_TTL_MS = 5_000;
+
+type CachedAccessTokenValidation = {
+  cacheUntilMs: number;
+  record: OAuthAccessTokenRecord;
+};
+
+const accessTokenValidationCache = new Map<string, CachedAccessTokenValidation>();
 
 export class OAuthError extends Error {
   code: string;
@@ -155,6 +163,41 @@ export function hashOAuthToken(token: string) {
 
 export function getOAuthTokenPreview(token: string) {
   return token.slice(-6);
+}
+
+function getCachedAccessTokenValidation(tokenHash: string, now: Date) {
+  const cached = accessTokenValidationCache.get(tokenHash);
+  if (!cached) return null;
+  if (cached.cacheUntilMs <= now.getTime()) {
+    accessTokenValidationCache.delete(tokenHash);
+    return null;
+  }
+  return cached.record;
+}
+
+function setCachedAccessTokenValidation(tokenHash: string, record: OAuthAccessTokenRecord, now: Date) {
+  const cacheUntilMs = Math.min(
+    record.expiresAt.getTime(),
+    now.getTime() + ACCESS_TOKEN_VALIDATION_CACHE_TTL_MS
+  );
+
+  if (cacheUntilMs <= now.getTime()) {
+    accessTokenValidationCache.delete(tokenHash);
+    return;
+  }
+
+  accessTokenValidationCache.set(tokenHash, {
+    cacheUntilMs,
+    record: { ...record },
+  });
+}
+
+function clearCachedAccessTokenValidation(tokenHash: string) {
+  accessTokenValidationCache.delete(tokenHash);
+}
+
+export function __resetAccessTokenValidationCacheForUnitTest() {
+  accessTokenValidationCache.clear();
 }
 
 function parseBearerToken(authorization: string | null | undefined) {
@@ -673,6 +716,7 @@ export async function revokeOAuthAccessToken(
     revokedAt,
     updatedAt: revokedAt,
   });
+  clearCachedAccessTokenValidation(tokenHash);
 
   return true;
 }
@@ -700,6 +744,7 @@ export async function revokeOAuthRefreshToken(
         revokedAt,
         updatedAt: revokedAt,
       });
+      clearCachedAccessTokenValidation(accessToken.tokenHash);
     }
   }
 
@@ -722,13 +767,18 @@ export async function validateBearerAccessToken(
   }
 
   const tokenHash = hashOAuthToken(bearerToken);
-  const record = await store.findAccessTokenByHash(tokenHash);
+  const currentTime = now();
+  const cachedRecord = getCachedAccessTokenValidation(tokenHash, currentTime);
+  const record = cachedRecord ?? (await store.findAccessTokenByHash(tokenHash));
   if (!record) {
     throw new OAuthError("access_token_not_found", "Access token not found.");
   }
 
-  assertAccessTokenUsable(record, now());
+  assertAccessTokenUsable(record, currentTime);
   validateRequiredScopes(record.scopes, input.requiredScopes);
+  if (!cachedRecord) {
+    setCachedAccessTokenValidation(tokenHash, record, currentTime);
+  }
 
   return {
     ...record,
