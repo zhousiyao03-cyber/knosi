@@ -1,8 +1,9 @@
 /**
- * Migrate inlined base64 images in notes.content (Tiptap JSON) to Vercel Blob.
+ * Migrate inlined base64 images in notes.content (Tiptap JSON) to
+ * S3-compatible object storage.
  *
  * Scans every note, finds image nodes whose src is a `data:image/...;base64,...`
- * URL, uploads each to Vercel Blob, then rewrites the src to the returned URL.
+ * URL, uploads each object, then rewrites the src to the returned URL.
  * Also covers `imageRowBlock` nodes whose `images` attribute is a JSON-encoded
  * array of `{ src }` entries.
  *
@@ -13,28 +14,62 @@
  *   set -a && source .env.turso-prod.local && source .env.local && set +a \
  *     && node scripts/db/migrate-base64-images-to-blob.mjs
  *
+ * Required env:
+ *   TURSO_DATABASE_URL
+ *   S3_ENDPOINT
+ *   S3_REGION
+ *   S3_BUCKET
+ *   S3_ACCESS_KEY_ID
+ *   S3_SECRET_ACCESS_KEY
+ *
+ * Optional env:
+ *   S3_PUBLIC_BASE_URL
+ *   S3_FORCE_PATH_STYLE=true
+ *
  * Flags:
  *   --dry   Only report what would change, do not upload or write.
  */
+import { randomUUID } from "node:crypto";
 import { createClient } from "@libsql/client";
-import { put } from "@vercel/blob";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const DRY_RUN = process.argv.includes("--dry");
 
 const dbUrl = process.env.TURSO_DATABASE_URL;
 const dbToken = process.env.TURSO_AUTH_TOKEN;
-const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+const s3Endpoint = process.env.S3_ENDPOINT;
+const s3Region = process.env.S3_REGION;
+const s3Bucket = process.env.S3_BUCKET;
+const s3AccessKeyId = process.env.S3_ACCESS_KEY_ID;
+const s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+const s3PublicBaseUrl = process.env.S3_PUBLIC_BASE_URL;
+const s3ForcePathStyle = process.env.S3_FORCE_PATH_STYLE === "true";
 
 if (!dbUrl) {
   console.error("Missing TURSO_DATABASE_URL");
   process.exit(1);
 }
-if (!blobToken) {
-  console.error("Missing BLOB_READ_WRITE_TOKEN");
+if (
+  !s3Endpoint ||
+  !s3Region ||
+  !s3Bucket ||
+  !s3AccessKeyId ||
+  !s3SecretAccessKey
+) {
+  console.error("Missing one or more required S3_* variables");
   process.exit(1);
 }
 
 const client = createClient({ url: dbUrl, authToken: dbToken });
+const storage = new S3Client({
+  endpoint: s3Endpoint,
+  region: s3Region,
+  forcePathStyle: s3ForcePathStyle,
+  credentials: {
+    accessKeyId: s3AccessKeyId,
+    secretAccessKey: s3SecretAccessKey,
+  },
+});
 
 const EXT_BY_MIME = {
   "image/png": "png",
@@ -51,18 +86,39 @@ function parseDataUrl(dataUrl) {
   return { mime, buffer: Buffer.from(base64, "base64") };
 }
 
+function buildPublicObjectUrl(key) {
+  const normalizedKey = key.replace(/^\/+/, "");
+
+  if (s3PublicBaseUrl) {
+    return `${s3PublicBaseUrl.replace(/\/+$/, "")}/${normalizedKey}`;
+  }
+
+  if (s3ForcePathStyle) {
+    return `${s3Endpoint.replace(/\/+$/, "")}/${s3Bucket}/${normalizedKey}`;
+  }
+
+  const endpointUrl = new URL(s3Endpoint.replace(/\/+$/, ""));
+  endpointUrl.hostname = `${s3Bucket}.${endpointUrl.hostname}`;
+  endpointUrl.pathname = `/${normalizedKey}`;
+  return endpointUrl.toString();
+}
+
 async function uploadBase64(dataUrl, noteId) {
   const parsed = parseDataUrl(dataUrl);
   if (!parsed) return null;
   const ext = EXT_BY_MIME[parsed.mime] ?? "bin";
-  const pathname = `notes/migrated/${noteId}-${Date.now()}.${ext}`;
-  const result = await put(pathname, parsed.buffer, {
-    access: "public",
-    addRandomSuffix: true,
-    contentType: parsed.mime,
-    token: blobToken,
-  });
-  return result.url;
+  const key = `notes/migrated/${noteId}-${Date.now()}-${randomUUID()}.${ext}`;
+
+  await storage.send(
+    new PutObjectCommand({
+      Bucket: s3Bucket,
+      Key: key,
+      Body: parsed.buffer,
+      ContentType: parsed.mime,
+    })
+  );
+
+  return buildPublicObjectUrl(key);
 }
 
 async function transformNode(node, noteId, stats) {

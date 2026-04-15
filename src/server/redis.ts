@@ -5,7 +5,7 @@
  *
  * 1. **Lazy + Promise singleton**
  *    第一次调用 getRedis() 时才建立连接，之后复用同一个 promise。
- *    在 Next.js / Vercel Serverless 场景下这很关键：
+ *    在 Next.js 服务进程、容器重启或热更新场景下这很关键：
  *    - 每个 function 实例第一次调用时连一次，后续请求复用
  *    - 模块热更新（HMR）时不会重复连接（dev 环境下挂在 global 上）
  *
@@ -15,8 +15,8 @@
  *    不会因为 Redis 不可用就让整个应用挂掉。
  *
  * 3. **环境变量优先级**
- *    - REDIS_URL（Vercel 示例的标准命名）
- *    - second_brain_REDIS_URL（你 Vercel 项目里自定义注入的名字）
+ *    - REDIS_URL（标准命名）
+ *    - second_brain_REDIS_URL（兼容旧环境变量名）
  *    前者优先；都没有就返回 null。
  *
  * 4. **连接错误不抛**

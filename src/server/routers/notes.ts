@@ -21,7 +21,6 @@ import {
   invalidateDashboardForUser,
   invalidateNotesListForUser,
   notesListCache,
-  notesListTagForUser,
 } from "../cache/instances";
 
 const noteCoverSchema = z.string().trim().nullable().optional();
@@ -115,8 +114,7 @@ export const notesRouter = router({
           if (hasMore) items.pop();
 
           return { items, hasMore, offset };
-        },
-        [notesListTagForUser(ctx.userId)]
+        }
       );
     }),
 

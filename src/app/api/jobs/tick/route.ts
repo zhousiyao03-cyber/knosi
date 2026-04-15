@@ -40,7 +40,7 @@ async function isAuthorized(request: Request): Promise<boolean> {
 
   const header = request.headers.get("authorization");
 
-  // Vercel Cron 自动注入 CRON_SECRET
+  // 保留对 CRON_SECRET 的 Bearer 鉴权，兼容外部 cron 调度器。
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && header === `Bearer ${cronSecret}`) return true;
 

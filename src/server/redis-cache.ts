@@ -4,7 +4,7 @@
  * ── 和内存版 NamedCache 的关键差异 ──
  *
  * 1. **跨实例共享**
- *    Vercel serverless 每个 function 实例内存独立，内存缓存命中率很低。
+ *    单机自托管、多副本容器或 serverless 场景里的进程内内存都彼此隔离。
  *    Redis 让所有实例共享同一份缓存，命中率可以接近理论上限。
  *
  * 2. **序列化**
@@ -42,6 +42,7 @@ export type RedisCacheOptions = {
 export class RedisCache<T> {
   readonly name: string;
   private readonly ttlSeconds: number;
+  private testClient: Awaited<ReturnType<typeof getRedis>> | null | undefined;
 
   constructor({ name, ttlSeconds = 30 }: RedisCacheOptions) {
     this.name = name;
@@ -52,12 +53,27 @@ export class RedisCache<T> {
     return `sb:${this.name}:${rawKey}`;
   }
 
+  private async getClient() {
+    if (this.testClient !== undefined) {
+      return this.testClient;
+    }
+
+    return getRedis();
+  }
+
+  /** Test-only hook so unit tests can inject a fake Redis client. */
+  __setTestClientForUnitTest(
+    client: Awaited<ReturnType<typeof getRedis>> | null
+  ) {
+    this.testClient = client;
+  }
+
   /**
    * 读缓存，未命中时调用 loader 并回填。
    * 返回类型从 loader 推断。
    */
   async getOrLoad<R extends T>(rawKey: string, loader: () => Promise<R>): Promise<R> {
-    const client = await getRedis();
+    const client = await this.getClient();
     const fullKey = this.key(rawKey);
 
     // Redis 不可用 — 降级为直接走数据源，不做缓存
@@ -99,7 +115,7 @@ export class RedisCache<T> {
 
   /** 失效单个 key */
   async invalidate(rawKey: string) {
-    const client = await getRedis();
+    const client = await this.getClient();
     if (!client) return;
 
     try {
@@ -124,7 +140,7 @@ export class RedisCache<T> {
    * 用 SCAN 而不是 KEYS —— KEYS 会阻塞 Redis 主线程，生产环境禁用。
    */
   async clear() {
-    const client = await getRedis();
+    const client = await this.getClient();
     if (!client) return;
 
     try {
@@ -150,6 +166,44 @@ export class RedisCache<T> {
       logger.error(
         { event: "cache.clear_error", cache: this.name, err },
         "cache clear failed"
+      );
+    }
+  }
+
+  /** Delete every key that starts with the provided raw-key prefix. */
+  async invalidateWhere(rawKeyPrefix: string) {
+    const client = await this.getClient();
+    if (!client) return;
+
+    try {
+      const pattern = `${this.key(rawKeyPrefix)}*`;
+      let cursor = "0";
+      let totalDeleted = 0;
+
+      do {
+        const result = await client.scan(cursor, { MATCH: pattern, COUNT: 100 });
+        cursor = result.cursor;
+        if (result.keys.length > 0) {
+          totalDeleted += await client.del(result.keys);
+        }
+      } while (cursor !== "0");
+
+      if (totalDeleted > 0) {
+        recordCacheEvent({ name: this.name, event: "clear" });
+        logger.debug(
+          {
+            event: "cache.invalidate_prefix",
+            cache: this.name,
+            rawKeyPrefix,
+            deleted: totalDeleted,
+          },
+          "cache prefix invalidated"
+        );
+      }
+    } catch (err) {
+      logger.error(
+        { event: "cache.invalidate_prefix_error", cache: this.name, rawKeyPrefix, err },
+        "cache prefix invalidate failed"
       );
     }
   }

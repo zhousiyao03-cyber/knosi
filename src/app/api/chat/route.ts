@@ -163,7 +163,7 @@ export async function POST(req: Request) {
       if (process.env.AUTH_BYPASS !== "true") {
         void recordAiUsage(userId).catch(() => undefined);
       }
-      // Traces flushed automatically by @vercel/otel
+      // Traces are emitted by the instrumentation bootstrap when enabled.
       return Response.json({ taskId, mode: "daemon" });
     }
     // ────────────────────────────────────────────────────────────────

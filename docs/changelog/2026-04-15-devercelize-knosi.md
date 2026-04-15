@@ -1,0 +1,54 @@
+# 2026-04-15 De-Vercelize Knosi Runtime
+
+- date: 2026-04-15
+- task / goal: Remove the remaining production runtime dependencies on Vercel by switching uploads to S3-compatible object storage, replacing the notes list runtime cache with Redis, and removing the Vercel-only analytics and tracing bootstrap.
+- key changes:
+  - Replaced the `/api/upload/image` server route with a provider-neutral S3-compatible storage adapter and documented the new `S3_*` environment variables in both `.env.example` and `.env.production.example`.
+  - Added `src/server/storage/object-storage.ts` plus unit coverage for public URL generation and config validation; uploads now generate collision-resistant object keys and return the same `{ url }` response contract the editor already expects.
+  - Switched `notesListCache` from the deleted `src/server/vercel-cache.ts` wrapper to `RedisCache`, added prefix invalidation support to `src/server/redis-cache.ts`, and updated note list invalidation to clear all keys for a user without Vercel tag APIs.
+  - Removed `@vercel/analytics` and `@vercel/speed-insights` from the app shell, replaced `@vercel/otel` with a standard Node OpenTelemetry + Langfuse bootstrap, and cleaned up the remaining runtime comments/config entries that still referenced Vercel helpers.
+  - Updated the base64 image migration script so it also writes to S3-compatible storage instead of the removed Blob SDK.
+  - Updated `README.md` to describe self-hosted deployment and S3-compatible uploads instead of Vercel-managed runtime services.
+- files touched:
+  - `.env.example`
+  - `.env.production.example`
+  - `README.md`
+  - `next.config.ts`
+  - `package.json`
+  - `pnpm-lock.yaml`
+  - `scripts/db/migrate-base64-images-to-blob.mjs`
+  - `src/app/api/chat/route.ts`
+  - `src/app/api/jobs/tick/route.ts`
+  - `src/app/api/upload/image/route.ts`
+  - `src/app/layout.tsx`
+  - `src/instrumentation.ts`
+  - `src/instrumentation.test.mjs`
+  - `src/server/cache/instances.ts`
+  - `src/server/cache/redis-cache.test.mjs`
+  - `src/server/redis-cache.ts`
+  - `src/server/redis.ts`
+  - `src/server/routers/notes.ts`
+  - `src/server/storage/object-storage.ts`
+  - `src/server/storage/object-storage.test.mjs`
+  - `src/server/vercel-cache.ts`
+  - `docs/changelog/2026-04-15-devercelize-knosi.md`
+  - `docs/superpowers/plans/2026-04-15-devercelize-knosi.md`
+- verification commands and results:
+  - `pnpm tsx --test src/server/storage/object-storage.test.mjs`
+    - Exit `0`; all 3 storage adapter tests passed.
+  - `pnpm tsx --test src/server/cache/redis-cache.test.mjs`
+    - Exit `0`; prefix invalidation test passed and confirmed `invalidateWhere()` deletes every key under the requested raw-key prefix.
+  - `pnpm tsx --test src/instrumentation.test.mjs`
+    - Exit `0`; tracing config detection and no-op register behavior both passed.
+  - `node --check scripts/db/migrate-base64-images-to-blob.mjs`
+    - Exit `0`; the updated S3 migration script parsed successfully.
+  - `AUTH_SECRET=test-secret TURSO_DATABASE_URL=file:data/second-brain.db pnpm db:push`
+    - Exit `0`; created a temporary local SQLite schema for build verification.
+  - `pnpm lint`
+    - Exit `0`; same 8 pre-existing warnings remain, with no new errors or warnings introduced by this task.
+  - `AUTH_SECRET=test-secret TURSO_DATABASE_URL=file:data/second-brain.db pnpm build`
+    - Exit `0`; Next.js production build completed successfully after pointing the build at the temporary local SQLite database.
+- remaining risks or follow-up items:
+  - Production rollout is intentionally not performed yet. The live Hetzner environment still needs real `S3_*` credentials and a chosen S3-compatible bucket before this branch can be pushed to `main` without breaking image uploads.
+  - Historical assets already stored on Vercel Blob are not migrated by this change; existing URLs will continue to work, but future uploads require the new S3-compatible backend.
+  - The migration script name still contains `-blob` for continuity, even though it now writes to generic object storage. Renaming it can be a follow-up cleanup if desired.

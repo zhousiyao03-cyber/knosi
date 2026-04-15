@@ -14,7 +14,7 @@
 
 Every great insight you pull out of a Claude conversation disappears into the void the moment you close the tab. Knosi closes that loop — it's a self-hosted knowledge platform built for developers who live in AI tools and want a permanent, searchable home for what they learn.
 
-Write notes with a Notion-level editor, index your knowledge with hybrid RAG, and ask questions against your own corpus. Route "Ask AI" through your existing Claude subscription instead of burning extra API credits. Own your data, run it locally, self-host it with Docker Compose, or deploy to Vercel.
+Write notes with a Notion-level editor, index your knowledge with hybrid RAG, and ask questions against your own corpus. Route "Ask AI" through your existing Claude subscription instead of burning extra API credits. Own your data, run it locally, or self-host it with Docker Compose on your own server.
 
 **Product:** [knosi.xyz](https://www.knosi.xyz)
 
@@ -36,7 +36,7 @@ Write notes with a Notion-level editor, index your knowledge with hybrid RAG, an
 ### AI
 
 - **Ask AI** — Chunk-level hybrid RAG: semantic retrieval + keyword recall + adjacent-paragraph expansion + clickable source citations. Falls back gracefully to keyword-only when no embedding provider is configured.
-- **Claude Code Daemon** — Route Ask AI through your local Claude Pro/Max subscription. No extra API spend. Works against both local dev and the hosted Vercel deployment.
+- **Claude Code Daemon** — Route Ask AI through your local Claude Pro/Max subscription. No extra API spend. Works against both local dev and the self-hosted web deployment.
 - **Structured AI Calls** — Learning outline generation, OSS analysis, and portfolio news summarization use the configured provider independently of the chat daemon.
 - **Claude Capture Integrations** — Claude Web can connect through a remote MCP endpoint, and Claude Code can save explicit conversation excerpts through the Knosi CLI + personal skill flow. Both write raw captures into `AI Inbox`.
 
@@ -47,7 +47,7 @@ Write notes with a Notion-level editor, index your knowledge with hybrid RAG, an
 
 ### Optional Modules
 
-- **Portfolio Tracker** — Position management with Yahoo Finance and CoinGecko real-time prices, AI position analysis, and news aggregation via Marketaux or Google News RSS with Vercel Cron auto-refresh.
+- **Portfolio Tracker** — Position management with Yahoo Finance and CoinGecko real-time prices, AI position analysis, and news aggregation via Marketaux or Google News RSS with server-side cron auto-refresh.
 - **Search** — `Cmd+K` global note search with keyword highlighting.
 - **Dark Mode** — Global toggle, full dark mode coverage.
 
@@ -127,7 +127,7 @@ The repository now includes a production-oriented Docker Compose stack for a sin
 Recommended first migration cut:
 
 1. Keep `TURSO_DATABASE_URL` pointed at Turso.
-2. Keep `@vercel/blob` only if you still need the current image-upload route.
+2. Configure S3-compatible object storage for note image uploads.
 3. Move app hosting, reverse proxy, Redis, and cron to your own server first.
 
 Example flow on a fresh Ubuntu host:
@@ -213,10 +213,16 @@ CRON_SECRET=your-random-secret
 JOBS_TICK_TOKEN=your-random-secret
 ```
 
-If you keep image uploads on Vercel Blob during the first migration cut:
+Image uploads on self-hosted deployments use S3-compatible object storage:
 
 ```bash
-BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxx
+S3_ENDPOINT=https://s3.example.com
+S3_REGION=auto
+S3_BUCKET=knosi-assets
+S3_ACCESS_KEY_ID=your-access-key
+S3_SECRET_ACCESS_KEY=your-secret-key
+S3_PUBLIC_BASE_URL=https://assets.example.com
+# S3_FORCE_PATH_STYLE=true
 ```
 
 ### Feature Flags
@@ -378,11 +384,12 @@ Set both to `true` to show the module in the sidebar and enable its routes.
 | Database | Drizzle ORM + SQLite via libsql / Turso |
 | Auth | Auth.js v5 (GitHub / Google OAuth + email-password) |
 | AI | Vercel AI SDK v6 |
+| Object Storage | S3-compatible (R2 / MinIO / S3) |
 | Editor | Tiptap v3 (ProseMirror) |
 | Diagrams | Mermaid + Excalidraw |
 | Content fetching | @mozilla/readability + linkedom |
 | Testing | Playwright (E2E) |
-| Deployment | Docker Compose / Vercel |
+| Deployment | Docker Compose / Hetzner-style self-hosting |
 
 ---
 

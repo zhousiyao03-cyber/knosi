@@ -1,7 +1,8 @@
-import { put } from "@vercel/blob";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
+import { getObjectStorageFromEnv } from "@/server/storage/object-storage";
 
 const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set([
@@ -43,13 +44,18 @@ export async function POST(request: Request) {
   }
 
   const extension = EXTENSION_BY_MIME[file.type] ?? "bin";
-  const pathname = `notes/${session.user.id}/${Date.now()}.${extension}`;
+  const pathname = `notes/${session.user.id}/${Date.now()}-${randomUUID()}.${extension}`;
 
-  const blob = await put(pathname, file, {
-    access: "public",
-    addRandomSuffix: true,
-    contentType: file.type,
-  });
+  try {
+    const storage = getObjectStorageFromEnv();
+    const uploaded = await storage.uploadPublicObject({
+      key: pathname,
+      body: Buffer.from(await file.arrayBuffer()),
+      contentType: file.type,
+    });
 
-  return NextResponse.json({ url: blob.url });
+    return NextResponse.json({ url: uploaded.url });
+  } catch {
+    return NextResponse.json({ error: "upload failed" }, { status: 500 });
+  }
 }

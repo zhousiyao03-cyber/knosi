@@ -8,7 +8,6 @@ const nextConfig: NextConfig = {
     "@libsql/client",
     "@opentelemetry/api",
     "@opentelemetry/sdk-trace-node",
-    "@vercel/otel",
     "@langfuse/otel",
     "@langfuse/tracing",
     "@langfuse/core",
