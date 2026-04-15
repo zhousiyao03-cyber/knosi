@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
+import { verifyCliToken } from "@/server/ai/cli-auth";
 
 const DEVICE_TOKEN_PREFIX = "fct";
+const CLI_TOKEN_PREFIX = "knosi_";
 
 export function createFocusDeviceToken() {
   return `${DEVICE_TOKEN_PREFIX}_${randomBytes(24).toString("hex")}`;
@@ -47,6 +49,10 @@ export async function resolveIngestUserId(options: {
     bearerToken === configuredApiKey
   ) {
     return configuredUserId;
+  }
+
+  if (bearerToken.startsWith(CLI_TOKEN_PREFIX)) {
+    return verifyCliToken(bearerToken);
   }
 
   return options.findDeviceUserId({
