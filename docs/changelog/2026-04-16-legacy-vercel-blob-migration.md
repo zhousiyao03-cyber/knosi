@@ -1,0 +1,42 @@
+# 2026-04-16 Legacy Vercel Blob Migration
+
+- date: 2026-04-16
+- task / goal: Finish the last practical de-Vercelization tail by migrating historical note images that still referenced `*.vercel-storage.com`, plus any remaining inlined base64 images, into the current Cloudflare R2 bucket.
+- key changes:
+  - Upgraded `scripts/db/migrate-base64-images-to-blob.mjs` from a base64-only note migration into a broader rich-text image migrator.
+  - Added support for fetching and re-uploading legacy `*.blob.vercel-storage.com` / `*.vercel-storage.com` images to the configured S3-compatible bucket.
+  - Expanded the migration scope from only `notes` to `notes`, `learning_notes`, and `os_project_notes`.
+  - Added targeted tests for legacy URL detection, base64 parsing, and document rewriting in `scripts/db/migrate-base64-images-to-blob.test.mjs`.
+  - Documented the migration command in `README.md`.
+  - Ran the migration against production Turso and verified the old Vercel-hosted URLs were removed from the database.
+- files touched:
+  - `README.md`
+  - `docs/changelog/2026-04-16-legacy-vercel-blob-migration.md`
+  - `scripts/db/migrate-base64-images-to-blob.mjs`
+  - `scripts/db/migrate-base64-images-to-blob.test.mjs`
+- verification commands and results:
+  - `node --test scripts/db/migrate-base64-images-to-blob.test.mjs`
+    - Exit `0`; 3 tests passed covering legacy blob URL detection, base64 parsing, and image node rewriting.
+  - `node --check scripts/db/migrate-base64-images-to-blob.mjs`
+    - Exit `0`; the migration script parses successfully.
+  - `pnpm lint`
+    - Exit `0`; unchanged 8 pre-existing warnings remain and no new lint errors were introduced.
+  - `AUTH_SECRET=test-secret TURSO_DATABASE_URL=file:data/second-brain.db NEXT_DEPLOYMENT_ID=blob-tail-cleanup pnpm build`
+    - Exit `0`; production build still passes after the migration-script changes.
+  - `node scripts/db/migrate-base64-images-to-blob.mjs --dry` with production Turso + R2 env
+    - Exit `0`; dry run found:
+      - `notes`: 2 records / 4 legacy Vercel Blob images
+      - `learning_notes`: 1 record / 3 base64 images
+      - `os_project_notes`: 0 records
+  - `node scripts/db/migrate-base64-images-to-blob.mjs` with production Turso + R2 env
+    - Exit `0`; migrated all 7 images successfully with 0 failures.
+  - Production verification query via the live app container:
+    - `notes` entries containing `%blob.vercel-storage.com%` or `%vercel-storage.com%`: `0`
+    - `learning_notes` entries containing `%blob.vercel-storage.com%` or `%vercel-storage.com%`: `0`
+    - `notes` entries containing `%data:image/%`: `0`
+    - `learning_notes` entries containing `%data:image/%`: `0`
+  - Extracted a migrated `assets.knosi.xyz` URL from production note content and fetched it directly with `curl -I`
+    - Exit `0`; returned `HTTP/2 200` and `content-type: image/png`
+- remaining risks or follow-up items:
+  - The migration script is idempotent for already-migrated content, but it still fetches legacy blob URLs over the network when they remain in the database; if Vercel Blob access is revoked before a future run, any still-unmigrated legacy URLs would fail to fetch.
+  - This migration only covers structured note-like content tables. If future features store image URLs in additional tables, the script will need to be extended again.

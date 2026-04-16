@@ -1,18 +1,21 @@
 /**
- * Migrate inlined base64 images in notes.content (Tiptap JSON) to
- * S3-compatible object storage.
+ * Migrate note-like rich-text image sources to S3-compatible object storage.
  *
- * Scans every note, finds image nodes whose src is a `data:image/...;base64,...`
- * URL, uploads each object, then rewrites the src to the returned URL.
- * Also covers `imageRowBlock` nodes whose `images` attribute is a JSON-encoded
- * array of `{ src }` entries.
+ * Covers three cases:
+ * - inlined `data:image/...;base64,...` sources
+ * - legacy `*.blob.vercel-storage.com` sources
+ * - legacy `*.vercel-storage.com` sources
  *
- * Usage (local dev DB):
+ * Tables:
+ * - notes
+ * - learning_notes
+ * - os_project_notes
+ *
+ * Usage (dry run):
+ *   node --env-file=.env.local scripts/db/migrate-base64-images-to-blob.mjs --dry
+ *
+ * Usage (apply):
  *   node --env-file=.env.local scripts/db/migrate-base64-images-to-blob.mjs
- *
- * Usage (production Turso):
- *   set -a && source .env.turso-prod.local && source .env.local && set +a \
- *     && node scripts/db/migrate-base64-images-to-blob.mjs
  *
  * Required env:
  *   TURSO_DATABASE_URL
@@ -23,117 +26,190 @@
  *   S3_SECRET_ACCESS_KEY
  *
  * Optional env:
+ *   TURSO_AUTH_TOKEN
  *   S3_PUBLIC_BASE_URL
  *   S3_FORCE_PATH_STYLE=true
- *
- * Flags:
- *   --dry   Only report what would change, do not upload or write.
  */
+import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@libsql/client";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
-const DRY_RUN = process.argv.includes("--dry");
-
-const dbUrl = process.env.TURSO_DATABASE_URL;
-const dbToken = process.env.TURSO_AUTH_TOKEN;
-const s3Endpoint = process.env.S3_ENDPOINT;
-const s3Region = process.env.S3_REGION;
-const s3Bucket = process.env.S3_BUCKET;
-const s3AccessKeyId = process.env.S3_ACCESS_KEY_ID;
-const s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-const s3PublicBaseUrl = process.env.S3_PUBLIC_BASE_URL;
-const s3ForcePathStyle = process.env.S3_FORCE_PATH_STYLE === "true";
-
-if (!dbUrl) {
-  console.error("Missing TURSO_DATABASE_URL");
-  process.exit(1);
-}
-if (
-  !s3Endpoint ||
-  !s3Region ||
-  !s3Bucket ||
-  !s3AccessKeyId ||
-  !s3SecretAccessKey
-) {
-  console.error("Missing one or more required S3_* variables");
-  process.exit(1);
-}
-
-const client = createClient({ url: dbUrl, authToken: dbToken });
-const storage = new S3Client({
-  endpoint: s3Endpoint,
-  region: s3Region,
-  forcePathStyle: s3ForcePathStyle,
-  credentials: {
-    accessKeyId: s3AccessKeyId,
-    secretAccessKey: s3SecretAccessKey,
-  },
-});
-
+const CONTENT_TABLES = ["notes", "learning_notes", "os_project_notes"];
+const VERCEL_HOST_PATTERN = /(^|\.)(blob\.)?vercel-storage\.com$/i;
 const EXT_BY_MIME = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
   "image/gif": "gif",
+  "image/svg+xml": "svg",
 };
 
-function parseDataUrl(dataUrl) {
-  const match = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(dataUrl);
-  if (!match) return null;
-  const mime = match[1].toLowerCase();
-  const base64 = match[2];
-  return { mime, buffer: Buffer.from(base64, "base64") };
+function trimTrailingSlash(value) {
+  return value.replace(/\/+$/, "");
 }
 
-function buildPublicObjectUrl(key) {
-  const normalizedKey = key.replace(/^\/+/, "");
+function trimLeadingSlash(value) {
+  return value.replace(/^\/+/, "");
+}
 
-  if (s3PublicBaseUrl) {
-    return `${s3PublicBaseUrl.replace(/\/+$/, "")}/${normalizedKey}`;
+function buildPublicObjectUrl({
+  key,
+  publicBaseUrl,
+  endpoint,
+  bucket,
+  forcePathStyle,
+}) {
+  const normalizedKey = trimLeadingSlash(key);
+
+  if (publicBaseUrl) {
+    return `${trimTrailingSlash(publicBaseUrl)}/${normalizedKey}`;
   }
 
-  if (s3ForcePathStyle) {
-    return `${s3Endpoint.replace(/\/+$/, "")}/${s3Bucket}/${normalizedKey}`;
+  if (!endpoint || !bucket) {
+    throw new Error("S3 public URL requires either S3_PUBLIC_BASE_URL or endpoint + bucket");
   }
 
-  const endpointUrl = new URL(s3Endpoint.replace(/\/+$/, ""));
-  endpointUrl.hostname = `${s3Bucket}.${endpointUrl.hostname}`;
+  const normalizedEndpoint = trimTrailingSlash(endpoint);
+  if (forcePathStyle) {
+    return `${normalizedEndpoint}/${bucket}/${normalizedKey}`;
+  }
+
+  const endpointUrl = new URL(normalizedEndpoint);
+  endpointUrl.hostname = `${bucket}.${endpointUrl.hostname}`;
   endpointUrl.pathname = `/${normalizedKey}`;
   return endpointUrl.toString();
 }
 
-async function uploadBase64(dataUrl, noteId) {
-  const parsed = parseDataUrl(dataUrl);
-  if (!parsed) return null;
-  const ext = EXT_BY_MIME[parsed.mime] ?? "bin";
-  const key = `notes/migrated/${noteId}-${Date.now()}-${randomUUID()}.${ext}`;
+function createStorageFromEnv(env) {
+  const config = {
+    endpoint: env.S3_ENDPOINT,
+    region: env.S3_REGION,
+    bucket: env.S3_BUCKET,
+    accessKeyId: env.S3_ACCESS_KEY_ID,
+    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+    publicBaseUrl: env.S3_PUBLIC_BASE_URL,
+    forcePathStyle: env.S3_FORCE_PATH_STYLE === "true",
+  };
 
-  await storage.send(
-    new PutObjectCommand({
-      Bucket: s3Bucket,
-      Key: key,
-      Body: parsed.buffer,
-      ContentType: parsed.mime,
-    })
-  );
+  const required = ["endpoint", "region", "bucket", "accessKeyId", "secretAccessKey"];
+  for (const field of required) {
+    if (!config[field]) {
+      throw new Error(`Missing ${field} for S3 migration storage`);
+    }
+  }
 
-  return buildPublicObjectUrl(key);
+  const client = new S3Client({
+    endpoint: config.endpoint,
+    region: config.region,
+    forcePathStyle: config.forcePathStyle,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+    },
+  });
+
+  return {
+    async uploadPublicObject({ key, body, contentType }) {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: config.bucket,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+        })
+      );
+
+      return {
+        url: buildPublicObjectUrl({
+          key,
+          publicBaseUrl: config.publicBaseUrl,
+          endpoint: config.endpoint,
+          bucket: config.bucket,
+          forcePathStyle: config.forcePathStyle,
+        }),
+      };
+    },
+  };
 }
 
-async function transformNode(node, noteId, stats) {
+export function parseDataUrl(dataUrl) {
+  const match = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i.exec(dataUrl);
+  if (!match) return null;
+  return {
+    kind: "data-url",
+    mime: match[1].toLowerCase(),
+    buffer: Buffer.from(match[2], "base64"),
+  };
+}
+
+export function isLegacyVercelBlobUrl(value) {
+  try {
+    const url = new URL(value);
+    return VERCEL_HOST_PATTERN.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function guessExtension(url, mime) {
+  if (mime && EXT_BY_MIME[mime]) return EXT_BY_MIME[mime];
+
+  try {
+    const pathname = new URL(url).pathname;
+    const ext = pathname.split(".").pop()?.toLowerCase();
+    if (ext && ext.length <= 5) return ext;
+  } catch {
+    // ignore
+  }
+
+  return "bin";
+}
+
+async function fetchLegacyBlob(url, fetchImpl = fetch) {
+  const response = await fetchImpl(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch legacy blob: ${response.status} ${response.statusText}`);
+  }
+
+  const contentType = response.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream";
+  const arrayBuffer = await response.arrayBuffer();
+  return {
+    kind: "legacy-blob",
+    mime: contentType,
+    buffer: Buffer.from(arrayBuffer),
+  };
+}
+
+async function resolveImageSource(src, fetchImpl) {
+  const parsed = parseDataUrl(src);
+  if (parsed) return parsed;
+  if (isLegacyVercelBlobUrl(src)) return fetchLegacyBlob(src, fetchImpl);
+  return null;
+}
+
+async function uploadImageSource({ src, table, recordId, uploadCounter, storage, fetchImpl }) {
+  const resolved = await resolveImageSource(src, fetchImpl);
+  if (!resolved) return null;
+
+  const ext = guessExtension(src, resolved.mime);
+  const key = `${table}/migrated/${recordId}-${Date.now()}-${uploadCounter}-${randomUUID()}.${ext}`;
+  const { url } = await storage.uploadPublicObject({
+    key,
+    body: resolved.buffer,
+    contentType: resolved.mime,
+  });
+
+  return url;
+}
+
+async function transformNode(node, ctx) {
   if (!node || typeof node !== "object") return node;
 
   if (node.type === "image" && typeof node.attrs?.src === "string") {
-    if (node.attrs.src.startsWith("data:image/")) {
-      stats.found += 1;
-      if (DRY_RUN) return node;
-      const url = await uploadBase64(node.attrs.src, noteId);
-      if (url) {
-        stats.uploaded += 1;
-        return { ...node, attrs: { ...node.attrs, src: url } };
-      }
-      stats.failed += 1;
+    const nextSrc = await maybeMigrateSrc(node.attrs.src, ctx);
+    if (nextSrc) {
+      return { ...node, attrs: { ...node.attrs, src: nextSrc } };
     }
   }
 
@@ -142,108 +218,192 @@ async function transformNode(node, noteId, stats) {
       const parsed = JSON.parse(node.attrs.images);
       if (Array.isArray(parsed)) {
         let changed = false;
-        const next = [];
+        const nextImages = [];
         for (const entry of parsed) {
-          if (
-            entry &&
-            typeof entry.src === "string" &&
-            entry.src.startsWith("data:image/")
-          ) {
-            stats.found += 1;
-            if (DRY_RUN) {
-              next.push(entry);
+          if (entry && typeof entry.src === "string") {
+          const nextSrc = await maybeMigrateSrc(entry.src, ctx);
+            if (nextSrc) {
+              changed = true;
+              nextImages.push({ ...entry, src: nextSrc });
               continue;
             }
-            const url = await uploadBase64(entry.src, noteId);
-            if (url) {
-              stats.uploaded += 1;
-              changed = true;
-              next.push({ ...entry, src: url });
-            } else {
-              stats.failed += 1;
-              next.push(entry);
-            }
-          } else {
-            next.push(entry);
           }
+          nextImages.push(entry);
         }
+
         if (changed) {
           return {
             ...node,
-            attrs: { ...node.attrs, images: JSON.stringify(next) },
+            attrs: { ...node.attrs, images: JSON.stringify(nextImages) },
           };
         }
       }
     } catch {
-      // leave as-is
+      // leave malformed rows as-is
     }
   }
 
   if (Array.isArray(node.content)) {
-    const newContent = [];
     let changed = false;
+    const nextContent = [];
     for (const child of node.content) {
-      const transformed = await transformNode(child, noteId, stats);
-      if (transformed !== child) changed = true;
-      newContent.push(transformed);
+      const nextChild = await transformNode(child, ctx);
+      if (nextChild !== child) changed = true;
+      nextContent.push(nextChild);
     }
     if (changed) {
-      return { ...node, content: newContent };
+      return { ...node, content: nextContent };
     }
   }
 
   return node;
 }
 
-async function main() {
-  console.log(`Migration starting${DRY_RUN ? " (DRY RUN)" : ""}...`);
+async function maybeMigrateSrc(src, ctx) {
+  const matchesDataUrl = src.startsWith("data:image/");
+  const matchesLegacyBlob = isLegacyVercelBlobUrl(src);
+  if (!matchesDataUrl && !matchesLegacyBlob) {
+    return null;
+  }
+
+  ctx.stats.found += 1;
+  if (matchesDataUrl) ctx.stats.foundDataUrl += 1;
+  if (matchesLegacyBlob) ctx.stats.foundLegacyBlob += 1;
+
+  if (ctx.dryRun) return src;
+
+  try {
+    ctx.uploadCounter += 1;
+    const migratedUrl = await uploadImageSource({
+      src,
+      table: ctx.table,
+      recordId: ctx.recordId,
+      uploadCounter: ctx.uploadCounter,
+      storage: ctx.storage,
+      fetchImpl: ctx.fetchImpl,
+    });
+
+    if (migratedUrl) {
+      ctx.stats.uploaded += 1;
+      return migratedUrl;
+    }
+  } catch (error) {
+    ctx.stats.failed += 1;
+    console.warn(`[warn] failed to migrate image for ${ctx.table}:${ctx.recordId}:`, error);
+  }
+
+  return null;
+}
+
+export async function migrateContentDocument(doc, ctx) {
+  return transformNode(doc, ctx);
+}
+
+async function migrateTable(client, table, storage, dryRun) {
+  const stats = {
+    table,
+    scanned: 0,
+    mutated: 0,
+    found: 0,
+    foundDataUrl: 0,
+    foundLegacyBlob: 0,
+    uploaded: 0,
+    failed: 0,
+  };
 
   const { rows } = await client.execute(
-    "SELECT id, content FROM notes WHERE content IS NOT NULL"
+    `SELECT id, content FROM ${table} WHERE content IS NOT NULL`
   );
 
-  let totalNotes = 0;
-  let mutatedNotes = 0;
-  const stats = { found: 0, uploaded: 0, failed: 0 };
-
   for (const row of rows) {
-    totalNotes += 1;
-    const id = String(row.id);
+    stats.scanned += 1;
+    const recordId = String(row.id);
     const raw = row.content;
-    if (typeof raw !== "string" || !raw.includes("data:image/")) continue;
+    if (typeof raw !== "string") continue;
+    if (!raw.includes("data:image/") && !raw.includes("vercel-storage.com")) continue;
 
     let doc;
     try {
       doc = JSON.parse(raw);
     } catch {
-      console.warn(`[skip] note ${id} has invalid JSON content`);
+      console.warn(`[skip] ${table}:${recordId} has invalid JSON content`);
       continue;
     }
 
-    const before = stats.uploaded;
-    const nextDoc = await transformNode(doc, id, stats);
-    if (nextDoc !== doc && stats.uploaded > before) {
-      mutatedNotes += 1;
-      if (!DRY_RUN) {
+    const ctx = {
+      table,
+      recordId,
+      storage,
+      dryRun,
+      uploadCounter: 0,
+      stats,
+    };
+
+    const nextDoc = await migrateContentDocument(doc, ctx);
+    if (nextDoc !== doc) {
+      stats.mutated += 1;
+      if (!dryRun) {
         await client.execute({
-          sql: "UPDATE notes SET content = ? WHERE id = ?",
-          args: [JSON.stringify(nextDoc), id],
+          sql: `UPDATE ${table} SET content = ? WHERE id = ?`,
+          args: [JSON.stringify(nextDoc), recordId],
         });
-        console.log(`[ok] note ${id} updated`);
+        console.log(`[ok] ${table}:${recordId} updated`);
       }
     }
   }
 
-  console.log("\n=== Summary ===");
-  console.log(`Notes scanned:   ${totalNotes}`);
-  console.log(`Notes mutated:   ${mutatedNotes}`);
-  console.log(`Images found:    ${stats.found}`);
-  console.log(`Images uploaded: ${stats.uploaded}`);
-  console.log(`Images failed:   ${stats.failed}`);
-  if (DRY_RUN) console.log("(dry run — no DB writes, no uploads)");
+  return stats;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+export async function runMigration({ dryRun = false, env = process.env } = {}) {
+  if (!env.TURSO_DATABASE_URL) {
+    throw new Error("Missing TURSO_DATABASE_URL");
+  }
+
+  const client = createClient({
+    url: env.TURSO_DATABASE_URL,
+    authToken: env.TURSO_AUTH_TOKEN,
+  });
+  const storage = createStorageFromEnv(env);
+
+  const tableStats = [];
+  for (const table of CONTENT_TABLES) {
+    tableStats.push(await migrateTable(client, table, storage, dryRun));
+  }
+
+  await client.close();
+  return tableStats;
+}
+
+function printSummary(tableStats, dryRun) {
+  console.log(`Migration finished${dryRun ? " (DRY RUN)" : ""}.`);
+  console.log("");
+  for (const stats of tableStats) {
+    console.log(`=== ${stats.table} ===`);
+    console.log(`Scanned:          ${stats.scanned}`);
+    console.log(`Mutated:          ${stats.mutated}`);
+    console.log(`Images found:     ${stats.found}`);
+    console.log(`  data URLs:      ${stats.foundDataUrl}`);
+    console.log(`  legacy blobs:   ${stats.foundLegacyBlob}`);
+    console.log(`Uploaded:         ${stats.uploaded}`);
+    console.log(`Failed:           ${stats.failed}`);
+    console.log("");
+  }
+}
+
+async function main() {
+  const dryRun = process.argv.includes("--dry");
+  const tableStats = await runMigration({ dryRun });
+  printSummary(tableStats, dryRun);
+}
+
+if (
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === process.argv[1] &&
+  !process.execArgv.includes("--test")
+) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

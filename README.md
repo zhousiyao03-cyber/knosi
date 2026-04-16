@@ -235,6 +235,15 @@ S3_PUBLIC_BASE_URL=https://assets.example.com
 # S3_FORCE_PATH_STYLE=true
 ```
 
+Historical note images can be migrated into the same bucket with:
+
+```bash
+node --env-file=.env.local scripts/db/migrate-base64-images-to-blob.mjs --dry
+node --env-file=.env.local scripts/db/migrate-base64-images-to-blob.mjs
+```
+
+The migration script now handles both inlined `data:image/...` content and legacy `*.vercel-storage.com` image URLs stored in `notes`, `learning_notes`, and `os_project_notes`.
+
 ### Feature Flags
 
 ```bash
