@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { summarizeOverallStatus } from "./page-data";
+import { serializeOpsTimestamp, summarizeOverallStatus } from "./page-data";
 
 test("summarizeOverallStatus returns degraded when daemon is stale", () => {
   const result = summarizeOverallStatus({
@@ -46,4 +46,26 @@ test("summarizeOverallStatus returns healthy when all subsystems are healthy", (
   });
 
   assert.equal(result, "healthy");
+});
+
+test("serializeOpsTimestamp supports date instances", () => {
+  const value = new Date("2026-04-16T01:02:03.000Z");
+
+  assert.equal(serializeOpsTimestamp(value), "2026-04-16T01:02:03.000Z");
+});
+
+test("serializeOpsTimestamp supports epoch seconds from Turso", () => {
+  assert.equal(serializeOpsTimestamp(1776327020), "2026-04-16T08:10:20.000Z");
+});
+
+test("serializeOpsTimestamp supports timestamp strings", () => {
+  assert.equal(serializeOpsTimestamp("1776327020"), "2026-04-16T08:10:20.000Z");
+  assert.equal(serializeOpsTimestamp("2026-04-16T01:02:03.000Z"), "2026-04-16T01:02:03.000Z");
+});
+
+test("serializeOpsTimestamp returns null for invalid values", () => {
+  assert.equal(serializeOpsTimestamp(null), null);
+  assert.equal(serializeOpsTimestamp(undefined), null);
+  assert.equal(serializeOpsTimestamp(""), null);
+  assert.equal(serializeOpsTimestamp("not-a-date"), null);
 });

@@ -9,6 +9,35 @@ import { listOpsJobHeartbeats, normalizeJobHeartbeat } from "./job-heartbeats";
 import { readOpsHostSnapshot } from "./host-snapshot";
 import type { OpsOverallStatus, OpsServiceStatus } from "./types";
 
+export function serializeOpsTimestamp(value: Date | number | string | null | undefined) {
+  if (value == null) return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    const milliseconds = value >= 1_000_000_000_000 ? value : value * 1000;
+    const date = new Date(milliseconds);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (/^-?\d+$/.test(trimmed)) {
+    const numeric = Number(trimmed);
+    if (!Number.isFinite(numeric)) return null;
+    const milliseconds = numeric >= 1_000_000_000_000 ? numeric : numeric * 1000;
+    const date = new Date(milliseconds);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 export function summarizeOverallStatus(input: {
   services: Array<{ name: string; status: OpsServiceStatus }>;
   queue: { queued: number; running: number; failedRecent: number };
@@ -51,7 +80,7 @@ async function getQueueCounts() {
     failedRecent: failedRows[0]?.total ?? 0,
     recentTasks: recentTasks.map((task) => ({
       ...task,
-      activityAt: task.activityAt?.toISOString() ?? null,
+      activityAt: serializeOpsTimestamp(task.activityAt),
     })),
   };
 }
