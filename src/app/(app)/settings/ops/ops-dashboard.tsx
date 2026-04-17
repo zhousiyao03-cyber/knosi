@@ -140,6 +140,21 @@ export function OpsDashboard({ data }: { data: OpsPageData }) {
                 </dd>
               </div>
               <div className="flex items-center justify-between">
+                <dt className="font-medium text-stone-500 dark:text-stone-400">Available</dt>
+                <dd>{formatBytes(data.host.snapshot.host.memory.availableBytes)}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="font-medium text-stone-500 dark:text-stone-400">Cache</dt>
+                <dd>{formatBytes(data.host.snapshot.host.memory.buffCacheBytes)}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="font-medium text-stone-500 dark:text-stone-400">Swap</dt>
+                <dd>
+                  {formatBytes(data.host.snapshot.host.memory.swapUsedBytes)} /{" "}
+                  {formatBytes(data.host.snapshot.host.memory.swapTotalBytes)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
                 <dt className="font-medium text-stone-500 dark:text-stone-400">Disk</dt>
                 <dd>
                   {formatBytes(data.host.snapshot.host.disk.usedBytes)} /{" "}

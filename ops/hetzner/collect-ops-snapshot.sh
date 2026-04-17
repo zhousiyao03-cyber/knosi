@@ -10,8 +10,27 @@ mkdir -p "$RUNTIME_DIR"
 
 MEM_TOTAL_KB="$(awk '/MemTotal/ {print $2}' /proc/meminfo)"
 MEM_AVAILABLE_KB="$(awk '/MemAvailable/ {print $2}' /proc/meminfo)"
-MEM_USED_BYTES="$(( (MEM_TOTAL_KB - MEM_AVAILABLE_KB) * 1024 ))"
+MEM_FREE_KB="$(awk '/MemFree/ {print $2}' /proc/meminfo)"
+MEM_CACHE_KB="$(awk '/^Cached:/ {print $2}' /proc/meminfo)"
+MEM_BUFFERS_KB="$(awk '/^Buffers:/ {print $2}' /proc/meminfo)"
+MEM_SHARED_KB="$(awk '/^Shmem:/ {print $2}' /proc/meminfo)"
+MEM_BUFF_CACHE_KB="$(( MEM_CACHE_KB + MEM_BUFFERS_KB ))"
+MEM_USED_KB="$(( MEM_TOTAL_KB - MEM_AVAILABLE_KB ))"
+if [ "$MEM_USED_KB" -lt 0 ]; then
+  MEM_USED_KB=0
+fi
+MEM_USED_BYTES="$(( MEM_USED_KB * 1024 ))"
+MEM_FREE_BYTES="$(( MEM_FREE_KB * 1024 ))"
+MEM_AVAILABLE_BYTES="$(( MEM_AVAILABLE_KB * 1024 ))"
+MEM_BUFF_CACHE_BYTES="$(( MEM_BUFF_CACHE_KB * 1024 ))"
+MEM_SHARED_BYTES="$(( MEM_SHARED_KB * 1024 ))"
 MEM_TOTAL_BYTES="$(( MEM_TOTAL_KB * 1024 ))"
+
+SWAP_TOTAL_KB="$(awk '/SwapTotal/ {print $2}' /proc/meminfo)"
+SWAP_FREE_KB="$(awk '/SwapFree/ {print $2}' /proc/meminfo)"
+SWAP_USED_KB="$(( SWAP_TOTAL_KB - SWAP_FREE_KB ))"
+SWAP_USED_BYTES="$(( SWAP_USED_KB * 1024 ))"
+SWAP_TOTAL_BYTES="$(( SWAP_TOTAL_KB * 1024 ))"
 
 read -r LOAD1 LOAD5 LOAD15 _ < /proc/loadavg
 UPTIME_SECONDS="$(cut -d' ' -f1 /proc/uptime | cut -d'.' -f1)"
@@ -44,7 +63,13 @@ cat >"$TMP_FILE" <<EOF
     "loadAverage": [${LOAD1}, ${LOAD5}, ${LOAD15}],
     "memory": {
       "usedBytes": ${MEM_USED_BYTES},
-      "totalBytes": ${MEM_TOTAL_BYTES}
+      "totalBytes": ${MEM_TOTAL_BYTES},
+      "freeBytes": ${MEM_FREE_BYTES},
+      "availableBytes": ${MEM_AVAILABLE_BYTES},
+      "buffCacheBytes": ${MEM_BUFF_CACHE_BYTES},
+      "sharedBytes": ${MEM_SHARED_BYTES},
+      "swapUsedBytes": ${SWAP_USED_BYTES},
+      "swapTotalBytes": ${SWAP_TOTAL_BYTES}
     },
     "disk": ${DISK_JSON}
   },

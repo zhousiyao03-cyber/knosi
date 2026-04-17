@@ -16,7 +16,16 @@ test("parseOpsHostSnapshot returns typed host data for valid JSON", () => {
       host: {
         uptimeSeconds: 123,
         loadAverage: [0.1, 0.2, 0.3],
-        memory: { usedBytes: 10, totalBytes: 20 },
+        memory: {
+          usedBytes: 10,
+          totalBytes: 20,
+          freeBytes: 5,
+          availableBytes: 12,
+          buffCacheBytes: 7,
+          sharedBytes: 1,
+          swapUsedBytes: 3,
+          swapTotalBytes: 8,
+        },
         disk: { usedBytes: 30, totalBytes: 40, mount: "/" },
       },
       services: [{ name: "knosi", status: "healthy", detail: "Up 3m" }],
@@ -28,4 +37,6 @@ test("parseOpsHostSnapshot returns typed host data for valid JSON", () => {
     throw new Error("expected available host snapshot");
   }
   assert.equal(result.snapshot.host.memory.totalBytes, 20);
+  assert.equal(result.snapshot.host.memory.availableBytes, 12);
+  assert.equal(result.snapshot.host.memory.swapTotalBytes, 8);
 });

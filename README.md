@@ -222,6 +222,7 @@ OPS_OWNER_EMAIL=you@example.com
 If you enable GitHub or Google login on a self-hosted deployment, set `AUTH_URL` to the public HTTPS origin served by your reverse proxy. OAuth providers validate the callback URL against that origin, so relying on the container's internal `HOSTNAME=0.0.0.0` will produce `redirect_uri_mismatch` errors.
 
 Set `OPS_OWNER_EMAIL` to the single account that should be allowed to open `/settings/ops`. The page is read-only and only renders for that owner; other authenticated users receive a `404`.
+The System card in `/settings/ops` reports memory using the same Linux semantics as `free -h`: `Memory` matches the host's `used` column, while `Available`, `Cache`, and `Swap` are shown separately so you can tell reclaimable cache from real headroom.
 
 Image uploads on self-hosted deployments use S3-compatible object storage:
 

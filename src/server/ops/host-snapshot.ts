@@ -9,6 +9,12 @@ const hostSnapshotSchema = z.object({
     memory: z.object({
       usedBytes: z.number(),
       totalBytes: z.number(),
+      freeBytes: z.number(),
+      availableBytes: z.number(),
+      buffCacheBytes: z.number(),
+      sharedBytes: z.number(),
+      swapUsedBytes: z.number(),
+      swapTotalBytes: z.number(),
     }),
     disk: z.object({
       usedBytes: z.number(),
