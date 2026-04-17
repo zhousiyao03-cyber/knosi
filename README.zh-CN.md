@@ -9,7 +9,7 @@
 把笔记、碎片信息和对话沉淀到同一个地方，再用 AI 做检索、问答和回顾，不再在文档、聊天记录和临时灵感之间来回切换。
 
 在线体验：
-- https://second-brain-self-alpha.vercel.app/
+- https://www.knosi.xyz/
 
 ## 为什么这个项目值得打开
 
@@ -43,7 +43,7 @@
   - 首页和笔记页一键打开今日日报；日报标题写成"日期 + 星期几"，默认带三块模板，并可继承最近日报的未完成计划
 - **Learning Notebook** — 以 topic 组织学习内容，支持主题卡片（可编辑/删除）、主题内笔记列表、标签筛选、AI draft 起草、知识大纲 / 盲点分析 / 复习题生成，以及基于主题笔记上下文的 Ask AI
 - **Open Source Projects** — 以项目维度沉淀开源代码阅读笔记，支持 repo 元信息、项目内笔记编辑、标签筛选、单篇项目笔记只读链接分享和长期分析归档
-- **Portfolio** — 投资组合追踪，支持持仓管理（股票/加密货币）、Yahoo Finance + CoinGecko 实时价格、AI 持仓分析、GPT 新闻聚合（Marketaux / Google News RSS）与 Vercel Cron 自动刷新
+- **Portfolio** — 投资组合追踪，支持持仓管理（股票/加密货币）、Yahoo Finance + CoinGecko 实时价格、AI 持仓分析、GPT 新闻聚合（Marketaux / Google News RSS）与服务器 cron 自动刷新
 - **搜索** — Cmd+K 全局搜索笔记，关键词高亮
 - **Ask AI** — 基于知识库的 chunk 级 hybrid RAG 问答，支持语义检索、关键词召回、邻近段落扩展和可点击引用来源
 - **Token Usage** — 自动读取本机里的 Codex / Claude Code 本地 session（含 Claude subagents，跨工作区聚合），用于展示真实 token 用量；也支持手动补录 OpenAI API / 其他来源，统一在 Dashboard 和独立页面聚合（线上环境默认禁用，本地开发可开启）
@@ -64,7 +64,7 @@
 - **Search**：用 `Cmd+K` 快速找回笔记
 
 如果你只是想先看效果，直接打开线上地址：
-- https://second-brain-self-alpha.vercel.app/
+- https://www.knosi.xyz/
 
 如果你会在 iPhone 上把站点"添加到主屏幕"当作 App 使用，建议在升级后删掉旧图标并从线上地址重新添加一次。iOS 的主屏 Web App 和 Safari 标签页使用独立的网站数据容器，重新安装后再登录一次更稳。
 
@@ -274,7 +274,7 @@ docs/
 ### V1 收敛（已完成）
 
 - [x] Pass 1–6: 产品收敛、Bookmark 抓取 + AI 摘要、Ask AI RAG、Search 增强、UX/UI 打磨 + 暗色模式、E2E 收尾
-- [x] Vercel 部署准备：Auth.js 认证 + Turso 数据库 + 数据隔离
+- [x] 自托管部署准备：Auth.js 认证 + Turso 数据库 + 数据隔离 + Hetzner Docker Compose 部署链路
 
 ### V1 后续迭代
 

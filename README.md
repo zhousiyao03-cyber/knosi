@@ -243,7 +243,7 @@ node --env-file=.env.local scripts/db/migrate-base64-images-to-blob.mjs --dry
 node --env-file=.env.local scripts/db/migrate-base64-images-to-blob.mjs
 ```
 
-The migration script now handles both inlined `data:image/...` content and legacy `*.vercel-storage.com` image URLs stored in `notes`, `learning_notes`, and `os_project_notes`.
+The migration script handles inlined `data:image/...` content and legacy remote image URLs stored in `notes`, `learning_notes`, and `os_project_notes`, rewriting them to your configured S3-compatible bucket.
 
 ### Feature Flags
 
@@ -285,7 +285,7 @@ CLAUDE_CODE_CHAT_MODEL=sonnet   # opus | sonnet | haiku | full model id
 Then run the daemon on your local machine:
 
 ```bash
-npx @knosi/cli --url https://your-second-brain.vercel.app
+npx @knosi/cli --url https://www.knosi.xyz
 ```
 
 Or during local development:
