@@ -24,6 +24,10 @@ export function spawnClaudeForChat({ prompt, systemPrompt, model, onText }) {
     const child = cpSpawn(claudeBin, args, {
       detached: true,
       stdio: ["ignore", "pipe", "pipe"],
+      // On Windows, `claude` resolves to `claude.cmd`, which Node spawns via cmd.exe.
+      // Without this flag, Windows creates a visible console window for cmd.exe that
+      // flashes briefly every time AskAI runs. `CREATE_NO_WINDOW` suppresses it.
+      windowsHide: true,
     });
 
     const stderrChunks = [];
@@ -92,6 +96,7 @@ export function spawnClaudeForStructured({ prompt, model }) {
     const child = cpSpawn(claudeBin, args, {
       detached: true,
       stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
     });
 
     const stderrChunks = [];

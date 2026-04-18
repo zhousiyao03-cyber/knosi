@@ -184,7 +184,7 @@ export async function runDaemon(args) {
       const child = cpSpawn(
         claudeBinArg,
         ["-p", "hello", "--output-format", "stream-json", "--verbose"],
-        { stdio: ["ignore", "pipe", "pipe"] }
+        { stdio: ["ignore", "pipe", "pipe"], windowsHide: true }
       );
       let outputText = "";
       child.stdout.on("data", (chunk) => {

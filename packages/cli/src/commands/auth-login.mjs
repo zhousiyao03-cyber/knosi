@@ -46,7 +46,7 @@ function escapeForCmd(value) {
 function openUrl(url) {
   const { command, args } = getOpenCommand(process.platform, url);
   try {
-    const child = spawn(command, args, { stdio: "ignore", detached: true });
+    const child = spawn(command, args, { stdio: "ignore", detached: true, windowsHide: true });
     // spawn emits ENOENT asynchronously via 'error' — without this listener it crashes the process.
     child.once("error", () => {
       console.log("Could not open browser automatically. Open this URL manually:");
