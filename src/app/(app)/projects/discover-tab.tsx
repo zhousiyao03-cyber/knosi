@@ -263,11 +263,11 @@ export function DiscoverTab() {
           ) : (
             <button
               type="button"
-              disabled={!isUrlValid || analysingKey === resolvedUrl}
+              disabled={!isUrlValid || (analysingKey !== null && analysingKey === resolvedUrl)}
               onClick={handleAnalyseUrl}
               className="inline-flex items-center gap-1.5 rounded-md bg-stone-900 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white"
             >
-              {analysingKey === resolvedUrl ? (
+              {analysingKey !== null && analysingKey === resolvedUrl ? (
                 <Loader2 size={12} className="animate-spin" />
               ) : null}
               Add &amp; Analyse
