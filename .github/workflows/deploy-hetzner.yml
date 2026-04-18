@@ -43,9 +43,10 @@ jobs:
 
       - name: Validate deployment files
         run: |
-          test -f docker-compose.prod.yml
+          test -f ops/hetzner/Caddyfile
           test -f ops/hetzner/deploy.sh
           test -f ops/hetzner/rsync-excludes.txt
+          test -f ops/k3s/20-knosi.yaml
 
       - name: Configure SSH
         env:
