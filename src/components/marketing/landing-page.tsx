@@ -19,6 +19,7 @@ import {
   ChevronRight,
   ArrowRight,
 } from "lucide-react";
+import { faqs, GITHUB_URL } from "./landing-data";
 
 /* ─── data ──────────────────────────────────────────────── */
 
@@ -103,9 +104,9 @@ const featureModules = [
   },
   {
     icon: Server,
-    title: "Self-hosted by default",
+    title: "Self-hostable",
     description:
-      "Run locally or deploy to Vercel. Your notes and workflows stay in your control.",
+      "Use the hosted version at knosi.xyz, or run your own instance with Docker, k3s, or any cloud VM. Your notes and workflows stay in your control.",
   },
   {
     icon: RotateCw,
@@ -139,33 +140,6 @@ const audienceGroups = [
     title: "Independent makers",
     description:
       "Preserve product thinking, strategy notes, and execution context instead of scattering them across chats and docs.",
-  },
-];
-
-const faqs = [
-  {
-    q: "What is Knosi?",
-    a: "Knosi is a self-hosted, AI-native second brain for developers. It helps you turn Claude and ChatGPT outputs into searchable, reusable knowledge.",
-  },
-  {
-    q: "Is Knosi just a note-taking app?",
-    a: "No. Knosi is designed around the AI workflow first. It combines note-taking, retrieval, and AI-powered querying so the output of your AI sessions becomes long-term knowledge.",
-  },
-  {
-    q: "Why not just use Notion or Obsidian?",
-    a: "Those tools are great, but they are not built around capturing and reusing AI output as a first-class workflow. Knosi is.",
-  },
-  {
-    q: "Do I need an API key?",
-    a: "Not always. Knosi can route AI features through your local Claude setup, which lets you reuse an existing Claude subscription for many workflows.",
-  },
-  {
-    q: "Can I self-host it?",
-    a: "Yes. Knosi is built for self-hosting and can also be deployed to Vercel.",
-  },
-  {
-    q: "Who is it for?",
-    a: "Developers, AI-heavy knowledge workers, independent builders, and anyone who wants AI outputs to become reusable knowledge instead of disposable chat history.",
   },
 ];
 
@@ -211,16 +185,22 @@ export function LandingPage() {
 
         <div className="flex items-center gap-3">
           <Link
-            href="https://github.com/nicholasgriffintn/second-brain"
+            href={GITHUB_URL}
             className="hidden rounded-lg border border-stone-700 px-3.5 py-1.5 text-sm font-medium text-stone-300 transition-colors hover:border-stone-500 hover:text-white sm:inline-flex"
           >
             GitHub
           </Link>
           <Link
             href="/login"
+            className="hidden rounded-lg border border-stone-700 px-3.5 py-1.5 text-sm font-medium text-stone-300 transition-colors hover:border-stone-500 hover:text-white sm:inline-flex"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/register"
             className="rounded-lg bg-white px-3.5 py-1.5 text-sm font-medium text-stone-900 transition-colors hover:bg-stone-200"
           >
-            View demo
+            Sign up
           </Link>
         </div>
       </nav>
@@ -228,7 +208,7 @@ export function LandingPage() {
       {/* ── Hero ────────────────────────────────────────── */}
       <section className="mx-auto max-w-3xl px-6 pt-24 pb-12 text-center">
         <p className="mb-4 text-sm font-medium tracking-wider text-cyan-400 uppercase">
-          Self-hosted &middot; AI-native &middot; Built for developers
+          AI-native &middot; Built for developers &middot; Self-hostable
         </p>
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
           Turn AI conversations into
@@ -250,19 +230,19 @@ export function LandingPage() {
             href="/register"
             className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-stone-900 transition-colors hover:bg-stone-200"
           >
-            Start self-hosting
+            Get started &mdash; free
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
-            href="/login"
+            href={GITHUB_URL}
             className="rounded-lg border border-stone-700 px-5 py-2.5 text-sm font-semibold text-stone-300 transition-colors hover:border-stone-500 hover:text-white"
           >
-            View demo
+            View on GitHub
           </Link>
         </div>
         <p className="mt-6 text-sm text-stone-500">
-          Use your existing Claude subscription instead of paying for every extra
-          AI query.
+          Free to use on knosi.xyz. Open source and self-hostable if you want to
+          run your own.
         </p>
       </section>
 
@@ -482,9 +462,13 @@ export function LandingPage() {
           Own your knowledge layer
         </h2>
         <div className="mt-8 space-y-4 text-center text-base leading-relaxed text-stone-400">
-          <p>Knosi is designed for people who care about control.</p>
           <p>
-            Run it locally. Self-host it. Deploy it to your own Vercel setup.
+            The hosted version at knosi.xyz is free for most use. If you want
+            full control, run your own instance.
+          </p>
+          <p>
+            Knosi runs anywhere Node.js and SQLite run &mdash; Docker, k3s, a
+            single VPS, or your laptop.
             <br />
             Keep your notes, data, and AI workflow in an environment you control.
           </p>
@@ -495,7 +479,7 @@ export function LandingPage() {
         </div>
         <div className="mt-8 text-center">
           <Link
-            href="https://github.com/zhousiyao03-cyber/knosi"
+            href={GITHUB_URL}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-cyan-400 transition-colors hover:text-cyan-300"
           >
             Read the setup docs
@@ -538,14 +522,14 @@ export function LandingPage() {
             href="/register"
             className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-stone-900 transition-colors hover:bg-stone-200"
           >
-            Start self-hosting
+            Get started &mdash; free
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
-            href="https://github.com/zhousiyao03-cyber/knosi"
+            href={GITHUB_URL}
             className="rounded-lg border border-stone-700 px-5 py-2.5 text-sm font-semibold text-stone-300 transition-colors hover:border-stone-500 hover:text-white"
           >
-            View GitHub
+            View on GitHub
           </Link>
         </div>
       </section>
@@ -568,7 +552,7 @@ export function LandingPage() {
           </div>
           <div className="flex items-center gap-5 text-xs text-stone-500">
             <Link
-              href="https://github.com/zhousiyao03-cyber/knosi"
+              href={GITHUB_URL}
               className="transition-colors hover:text-stone-300"
             >
               GitHub
