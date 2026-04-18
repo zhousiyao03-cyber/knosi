@@ -26,10 +26,27 @@ export function buildAuthorizationUrl({
   return url.toString();
 }
 
+export function getOpenCommand(platform, url) {
+  if (platform === "win32") {
+    // cmd's `start` builtin: first quoted arg is the window title, so pass "" then the URL.
+    return { command: "cmd", args: ["/c", "start", "", url] };
+  }
+  if (platform === "darwin") {
+    return { command: "open", args: [url] };
+  }
+  return { command: "xdg-open", args: [url] };
+}
+
 function openUrl(url) {
-  const command = process.platform === "darwin" ? "open" : "xdg-open";
+  const { command, args } = getOpenCommand(process.platform, url);
   try {
-    spawn(command, [url], { stdio: "ignore", detached: true }).unref();
+    const child = spawn(command, args, { stdio: "ignore", detached: true });
+    // spawn emits ENOENT asynchronously via 'error' — without this listener it crashes the process.
+    child.once("error", () => {
+      console.log("Could not open browser automatically. Open this URL manually:");
+      console.log(url);
+    });
+    child.unref();
     return true;
   } catch {
     return false;
