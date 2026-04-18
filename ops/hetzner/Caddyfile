@@ -24,3 +24,11 @@ k3s.knosi.xyz {
 		header_up Host {host}
 	}
 }
+
+plausible.knosi.xyz {
+	encode gzip zstd
+
+	reverse_proxy 172.17.0.1:30080 {
+		header_up Host {host}
+	}
+}
