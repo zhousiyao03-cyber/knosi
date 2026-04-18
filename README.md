@@ -20,7 +20,15 @@ Write notes with a Notion-level editor, index your knowledge with hybrid RAG, an
 
 ---
 
-<!-- screenshots -->
+<p align="center">
+  <img src="public/screenshots/home.png" alt="Knosi Home dashboard — Today's Focus, 30-day heatmap, and recent notes" width="100%" />
+</p>
+
+<p align="center">
+  <img src="public/screenshots/notes.png" alt="Knosi Notes — folders and list" width="32%" />
+  <img src="public/screenshots/focus.png" alt="Knosi Focus — 30-day focus heatmap, streak, daily totals" width="32%" />
+  <img src="public/screenshots/usage.png" alt="Knosi Usage — token usage by provider, daily trend, estimated cost" width="32%" />
+</p>
 
 ---
 
