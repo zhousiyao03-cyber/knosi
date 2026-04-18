@@ -14,6 +14,9 @@ export default auth((req) => {
     pathname === "/" ||
     pathname === "/login" ||
     pathname === "/register" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/oauth/authorize") ||
     pathname.startsWith("/share/") ||
     pathname.startsWith("/icon") ||
