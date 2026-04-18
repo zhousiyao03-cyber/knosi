@@ -44,7 +44,7 @@ spec:
               echo "redis ready"
       containers:
         - name: knosi
-          image: docker.io/library/knosi-knosi:latest
+          image: docker.io/library/knosi:latest
           imagePullPolicy: Never
           ports:
             - containerPort: 3000

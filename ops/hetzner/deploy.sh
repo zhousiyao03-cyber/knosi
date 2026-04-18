@@ -11,7 +11,7 @@ NEXT_DEPLOYMENT_ID="${NEXT_DEPLOYMENT_ID:-$(date -u +%Y%m%d%H%M%S)}"
 GIT_SHA="${GIT_SHA:-$(git rev-parse HEAD 2>/dev/null || true)}"
 DEPLOYED_AT="${DEPLOYED_AT:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}"
 
-IMAGE_NAME="knosi-knosi:latest"
+IMAGE_NAME="knosi:latest"
 K3S_NAMESPACE="knosi"
 K3S_DEPLOYMENT="knosi"
 KUBECONFIG_FILE="${KUBECONFIG_FILE:-/etc/rancher/k3s/k3s.yaml}"
@@ -28,11 +28,14 @@ fi
 export NEXT_DEPLOYMENT_ID GIT_SHA DEPLOYED_AT KUBECONFIG="$KUBECONFIG_FILE"
 echo "deploying with NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID GIT_SHA=${GIT_SHA:-unknown}"
 
-# 1. Build new image via docker (keeps existing Dockerfile + compose build cache flow)
+# 1. Validate remaining compose config (just caddy now) and build the app image
 docker compose -f "$COMPOSE_FILE" config >/dev/null
-docker compose -f "$COMPOSE_FILE" build --pull --build-arg NEXT_DEPLOYMENT_ID="$NEXT_DEPLOYMENT_ID" knosi
+docker build --pull \
+  --build-arg NEXT_DEPLOYMENT_ID="$NEXT_DEPLOYMENT_ID" \
+  -t "$IMAGE_NAME" \
+  .
 
-# 2. Import the image into k3s containerd
+# 2. Import the image into k3s containerd so the pods can pull it locally
 echo "importing image into k3s containerd"
 docker save "$IMAGE_NAME" | k3s ctr images import -
 
@@ -54,9 +57,7 @@ kubectl -n "$K3S_NAMESPACE" rollout restart deploy/"$K3S_DEPLOYMENT"
 kubectl -n "$K3S_NAMESPACE" rollout status deploy/"$K3S_DEPLOYMENT" --timeout=300s
 
 # 7. Keep Caddy up to date (Caddyfile + cert management still run in docker).
-#    --no-deps prevents compose from also starting the stopped knosi + redis
-#    containers that are intentionally left as a rollback safety net.
-docker compose -f "$COMPOSE_FILE" up -d --no-deps caddy
+docker compose -f "$COMPOSE_FILE" up -d caddy
 
 # 8. End-to-end health check through Caddy → Traefik → k3s pod
 attempt=1
