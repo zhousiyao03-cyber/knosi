@@ -14,11 +14,68 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = "https://knosi.xyz";
+const SITE_TITLE = "Knosi — a self-hostable second brain for your AI conversations";
+const SITE_DESCRIPTION =
+  "Capture high-signal Claude and ChatGPT answers, turn them into structured notes, and ask AI on top of your own knowledge. Open source and self-hostable.";
+
 export const metadata: Metadata = {
-  title: "Knosi",
-  description: "Turn your Claude tokens into a second brain you actually own.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: "%s · Knosi",
+  },
+  description: SITE_DESCRIPTION,
   applicationName: "Knosi",
   manifest: "/manifest.webmanifest",
+  keywords: [
+    "second brain",
+    "knowledge management",
+    "Claude",
+    "ChatGPT",
+    "AI notes",
+    "personal knowledge base",
+    "self-hosted",
+    "open source",
+    "RAG",
+    "Notion alternative",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-snippet": -1,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "Knosi",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    locale: "en_US",
+    images: [
+      {
+        url: "/knosi-logo.png",
+        width: 512,
+        height: 512,
+        alt: "Knosi",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/knosi-logo.png"],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -33,20 +90,17 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="zh"
+      lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="h-full bg-[var(--background)] text-[var(--foreground)]">
+        <Providers>{children}</Providers>
         <Script
           defer
-          data-domain="knosi.xyz"
-          src="https://plausible.knosi.xyz/js/script.file-downloads.hash.outbound-links.pageview-props.revenue.tagged-events.js"
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token": "77230078425f404aa623df2e0c39e471"}'
           strategy="afterInteractive"
         />
-        <Script id="plausible-init" strategy="afterInteractive">
-          {`window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }`}
-        </Script>
-        <Providers>{children}</Providers>
       </body>
     </html>
   );
