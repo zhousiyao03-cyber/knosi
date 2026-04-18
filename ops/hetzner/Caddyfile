@@ -1,8 +1,15 @@
-{$ROOT_DOMAIN} {
-	redir https://{$APP_DOMAIN}{uri} permanent
+# Knosi reverse proxy — runs as a systemd service on the host.
+# Terminates TLS for the public domains and forwards everything to Traefik
+# at 127.0.0.1:30080, which then routes into the k3s cluster via Ingress.
+#
+# Certificates are managed automatically by Caddy via Let's Encrypt.
+# Cert state lives under /var/lib/caddy/.local/share/caddy/.
+
+knosi.xyz {
+	redir https://www.knosi.xyz{uri} permanent
 }
 
-{$APP_DOMAIN} {
+www.knosi.xyz {
 	encode gzip zstd
 
 	header {
@@ -12,7 +19,7 @@
 		X-Frame-Options "SAMEORIGIN"
 	}
 
-	reverse_proxy 172.17.0.1:30080 {
+	reverse_proxy 127.0.0.1:30080 {
 		header_up Host {host}
 	}
 }
@@ -20,7 +27,7 @@
 k3s.knosi.xyz {
 	encode gzip zstd
 
-	reverse_proxy 172.17.0.1:30080 {
+	reverse_proxy 127.0.0.1:30080 {
 		header_up Host {host}
 	}
 }
@@ -28,7 +35,7 @@ k3s.knosi.xyz {
 plausible.knosi.xyz {
 	encode gzip zstd
 
-	reverse_proxy 172.17.0.1:30080 {
+	reverse_proxy 127.0.0.1:30080 {
 		header_up Host {host}
 	}
 }

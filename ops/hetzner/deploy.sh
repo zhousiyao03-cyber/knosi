@@ -2,8 +2,8 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/srv/knosi}"
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
-HEALTHCHECK_URL="${HEALTHCHECK_URL:-http://127.0.0.1:3000/login}"
+CADDYFILE_SRC="${CADDYFILE_SRC:-ops/hetzner/Caddyfile}"
+CADDYFILE_DEST="${CADDYFILE_DEST:-/etc/caddy/Caddyfile}"
 EXPECTED_STATUS="${EXPECTED_STATUS:-200}"
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-30}"
 SLEEP_SECONDS="${SLEEP_SECONDS:-2}"
@@ -28,38 +28,43 @@ fi
 export NEXT_DEPLOYMENT_ID GIT_SHA DEPLOYED_AT KUBECONFIG="$KUBECONFIG_FILE"
 echo "deploying with NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID GIT_SHA=${GIT_SHA:-unknown}"
 
-# 1. Validate remaining compose config (just caddy now) and build the app image
-docker compose -f "$COMPOSE_FILE" config >/dev/null
-docker build --pull \
+# 1. Build the app image directly into k3s' containerd via nerdctl+buildkit.
+#    nerdctl's default config (/etc/nerdctl/nerdctl.toml) points at
+#    /run/k3s/containerd/containerd.sock with namespace k8s.io, so the
+#    resulting image is immediately visible to the kubelet — no separate
+#    `docker save | ctr images import` step needed.
+nerdctl build --pull \
   --build-arg NEXT_DEPLOYMENT_ID="$NEXT_DEPLOYMENT_ID" \
   -t "$IMAGE_NAME" \
   .
 
-# 2. Import the image into k3s containerd so the pods can pull it locally
-echo "importing image into k3s containerd"
-docker save "$IMAGE_NAME" | k3s ctr images import -
-
-# 3. Ensure the namespace + base manifests exist (idempotent, safe on re-runs)
+# 2. Ensure namespace exists (idempotent)
 kubectl apply -f ops/k3s/00-namespace.yaml
 
-# 4. Refresh the secret from .env.production so env changes propagate to pods
+# 3. Refresh the Secret from .env.production so env changes propagate
 kubectl -n "$K3S_NAMESPACE" create secret generic knosi-env \
   --from-env-file=.env.production \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# 5. Apply the rest of the manifests (Deployments / Services / Ingress / PVCs)
+# 4. Apply Deployments / Services / Ingress / PVCs
 kubectl apply -f ops/k3s/10-redis.yaml
 kubectl apply -f ops/k3s/20-knosi.yaml
 kubectl apply -f ops/k3s/30-ingress.yaml
 
-# 6. Trigger a rolling restart so the new image + refreshed secret are picked up
+# 5. Roll the deployment so the freshly built image + secret are picked up
 kubectl -n "$K3S_NAMESPACE" rollout restart deploy/"$K3S_DEPLOYMENT"
 kubectl -n "$K3S_NAMESPACE" rollout status deploy/"$K3S_DEPLOYMENT" --timeout=300s
 
-# 7. Keep Caddy up to date (Caddyfile + cert management still run in docker).
-docker compose -f "$COMPOSE_FILE" up -d caddy
+# 6. Sync Caddyfile and graceful-reload systemd caddy (edge TLS + reverse proxy)
+if ! cmp -s "$CADDYFILE_SRC" "$CADDYFILE_DEST"; then
+  cp "$CADDYFILE_SRC" "$CADDYFILE_DEST"
+  systemctl reload caddy
+  echo "Caddyfile changed → caddy reloaded"
+else
+  echo "Caddyfile unchanged → caddy left alone"
+fi
 
-# 8. End-to-end health check through Caddy → Traefik → k3s pod
+# 7. End-to-end health check: public path through Caddy → Traefik → k3s pod
 attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
   status_code="$(curl -sS -o /dev/null -w '%{http_code}' -H "Host: $K3S_HEALTHCHECK_HOST" "$K3S_HEALTHCHECK_URL" || true)"
@@ -74,6 +79,6 @@ while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
 done
 
 kubectl -n "$K3S_NAMESPACE" logs deploy/"$K3S_DEPLOYMENT" --tail=100 >&2 || true
-docker compose -f "$COMPOSE_FILE" logs --tail=50 caddy >&2 || true
+journalctl -u caddy --since "2 minutes ago" --no-pager | tail -30 >&2 || true
 echo "deployment failed: $K3S_HEALTHCHECK_URL did not return $EXPECTED_STATUS" >&2
 exit 1
