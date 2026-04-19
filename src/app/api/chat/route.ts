@@ -1,114 +1,18 @@
-import { and, eq, inArray } from "drizzle-orm";
-import { z } from "zod/v4";
-import { ASK_AI_SOURCE_SCOPES } from "@/lib/ask-ai";
-import { retrieveAgenticContext } from "@/server/ai/agentic-rag";
-import { retrieveContext } from "@/server/ai/rag";
 import {
   getAIErrorMessage,
   streamChatResponse,
 } from "@/server/ai/provider";
 import {
-  buildSystemPrompt,
-  getUserMessageText,
   normalizeMessages,
   sanitizeMessages,
-  type RetrievedKnowledgeItem,
 } from "@/server/ai/chat-system-prompt";
+import { buildChatContext, chatInputSchema } from "@/server/ai/chat-prepare";
 import { auth } from "@/lib/auth";
-import { db } from "@/server/db";
-import { bookmarks, notes } from "@/server/db/schema";
 import { checkAiRateLimit, recordAiUsage } from "@/server/ai-rate-limit";
 import { enqueueChatTask } from "@/server/ai/chat-enqueue";
 import { shouldUseDaemonForChat } from "@/server/ai/daemon-mode";
-import { observe, updateActiveObservation } from "@langfuse/tracing";
 
 export const maxDuration = 30;
-
-const pinnedSourceSchema = z.object({
-  id: z.string().min(1),
-  type: z.enum(["note", "bookmark"]),
-});
-
-const chatInputSchema = z.object({
-  id: z.string().optional(),
-  messages: z.array(z.unknown()),
-  sourceScope: z.enum(ASK_AI_SOURCE_SCOPES).optional(),
-  contextNoteText: z.string().max(32_000).optional(),
-  pinnedSources: z.array(pinnedSourceSchema).max(10).optional(),
-  preferStructuredBlocks: z.boolean().optional(),
-});
-
-/**
- * SECURITY: Always scoped by userId. AUTH_BYPASS path resolves to
- * userId="test-user" in the route handler below. Never trust the client's
- * title; we always refetch it from the db row.
- */
-async function resolvePinnedSources(
-  pins: Array<{ id: string; type: "note" | "bookmark" }>,
-  userId: string | null
-): Promise<RetrievedKnowledgeItem[]> {
-  if (pins.length === 0 || !userId) return [];
-
-  const noteIds = pins.filter((p) => p.type === "note").map((p) => p.id);
-  const bookmarkIds = pins
-    .filter((p) => p.type === "bookmark")
-    .map((p) => p.id);
-
-  const items: RetrievedKnowledgeItem[] = [];
-
-  if (noteIds.length > 0) {
-    const rows = await db
-      .select({
-        id: notes.id,
-        title: notes.title,
-        content: notes.plainText,
-      })
-      .from(notes)
-      .where(and(eq(notes.userId, userId), inArray(notes.id, noteIds)));
-    for (const row of rows) {
-      items.push({
-        id: row.id,
-        title: row.title ?? "Untitled note",
-        type: "note",
-        content: row.content ?? "",
-      });
-    }
-  }
-
-  if (bookmarkIds.length > 0) {
-    const rows = await db
-      .select({
-        id: bookmarks.id,
-        title: bookmarks.title,
-        content: bookmarks.content,
-        summary: bookmarks.summary,
-        url: bookmarks.url,
-      })
-      .from(bookmarks)
-      .where(
-        and(
-          eq(bookmarks.userId, userId),
-          inArray(bookmarks.id, bookmarkIds)
-        )
-      );
-    for (const row of rows) {
-      const body =
-        (row.content ?? "").trim() ||
-        (row.summary ?? "").trim() ||
-        (row.url ?? "");
-      items.push({
-        id: row.id,
-        title: row.title ?? row.url ?? "Untitled bookmark",
-        type: "bookmark",
-        content: body,
-      });
-    }
-  }
-
-  return items;
-}
-
-const SKIP_RAG_KEYWORDS = ["不用搜索", "直接回答", "不需要搜索", "不要搜索"];
 
 export async function POST(req: Request) {
   // Auth bypass for E2E testing
@@ -135,11 +39,6 @@ export async function POST(req: Request) {
   }
 
   try {
-    const messages = sanitizeMessages(
-      await normalizeMessages(parsed.data.messages)
-    );
-    const sourceScope = parsed.data.sourceScope ?? "all";
-
     // ─── Daemon branch ─────────────────────────────────────────────
     if (shouldUseDaemonForChat()) {
       if (!userId) {
@@ -151,6 +50,10 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      const messages = sanitizeMessages(
+        await normalizeMessages(parsed.data.messages)
+      );
+      const sourceScope = parsed.data.sourceScope ?? "all";
       // TODO(ask-ai M1/M2 follow-up): daemon mode currently ignores
       // contextNoteText and pinnedSources. Inline editor Ask AI uses stream
       // mode (sourceScope "direct"), so this is acceptable until the inline
@@ -163,85 +66,17 @@ export async function POST(req: Request) {
       if (process.env.AUTH_BYPASS !== "true") {
         void recordAiUsage(userId).catch(() => undefined);
       }
-      // Traces are emitted by the instrumentation bootstrap when enabled.
       return Response.json({ taskId, mode: "daemon" });
     }
     // ────────────────────────────────────────────────────────────────
 
-    const lastUserMessage = [...messages]
-      .reverse()
-      .find((message) => message.role === "user");
-    const userQuery = getUserMessageText(lastUserMessage);
-
-    const skipRag =
-      sourceScope === "direct" ||
-      SKIP_RAG_KEYWORDS.some((kw) => userQuery.includes(kw));
-    let context: RetrievedKnowledgeItem[] = [];
-
-    if (!skipRag) {
-      const tracedRetrieval = observe(async () => {
-        updateActiveObservation({ input: { query: userQuery, sourceScope } }, { asType: "retriever" });
-
-        const tracedAgenticRag = observe(
-          () => retrieveAgenticContext(userQuery, { scope: sourceScope, userId }),
-          { name: "agentic-rag", asType: "retriever" },
-        );
-        const agenticContext = await tracedAgenticRag();
-
-        if (agenticContext.length > 0) {
-          const results = agenticContext.map((item) => ({
-            chunkId: item.chunkId,
-            chunkIndex: item.chunkIndex,
-            content: item.content,
-            id: item.sourceId,
-            score: item.score,
-            sectionPath: item.sectionPath,
-            title: item.sourceTitle,
-            type: item.sourceType,
-          }));
-          updateActiveObservation({
-            output: results.map(({ content, ...meta }) => meta),
-            metadata: { method: "agentic", chunkCount: results.length },
-          }, { asType: "retriever" });
-          return results;
-        }
-
-        const tracedKeywordRag = observe(
-          () => retrieveContext(userQuery, { scope: sourceScope, userId }),
-          { name: "keyword-rag-fallback", asType: "retriever" },
-        );
-        const fallbackContext = await tracedKeywordRag();
-
-        const results = fallbackContext.map((item) => ({
-          content: item.content,
-          id: item.id,
-          title: item.title,
-          type: item.type,
-        }));
-        updateActiveObservation({
-          output: results.map(({ content, ...meta }) => meta),
-          metadata: { method: "keyword-fallback", chunkCount: results.length },
-        }, { asType: "retriever" });
-        return results;
-      }, { name: "rag-retrieval", asType: "retriever" });
-
-      context = await tracedRetrieval();
-    }
-
-    const pinnedSources = await resolvePinnedSources(
-      parsed.data.pinnedSources ?? [],
-      userId
-    );
+    const { system, messages } = await buildChatContext(parsed.data, userId);
 
     const response = await streamChatResponse({
       messages,
       sessionId: parsed.data.id,
       signal: req.signal,
-      system: buildSystemPrompt(context, sourceScope, {
-        contextNoteText: parsed.data.contextNoteText,
-        pinnedSources,
-        preferStructuredBlocks: parsed.data.preferStructuredBlocks,
-      }),
+      system,
     });
 
     // Record usage (fire-and-forget, don't block the response)
