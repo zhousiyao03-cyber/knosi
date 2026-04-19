@@ -5,7 +5,7 @@ const databaseUrl = getDatabaseUrl();
 const isTurso = isTursoDatabaseUrl(databaseUrl);
 
 export default defineConfig({
-  schema: "./src/server/db/schema.ts",
+  schema: "./src/server/db/schema/*.ts",
   out: "./drizzle",
   dialect: "sqlite",
   ...(isTurso
