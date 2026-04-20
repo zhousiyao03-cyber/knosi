@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { getEntitlements } from "@/server/billing/entitlements";
 import { callKnosiMcpTool, KNOSI_MCP_TOOLS } from "@/server/integrations/mcp-tools";
 import { OAUTH_SCOPES } from "@/server/integrations/oauth-clients";
 import { validateBearerAccessToken } from "@/server/integrations/oauth";
@@ -130,6 +131,17 @@ export async function POST(request: NextRequest) {
       authorization: request.headers.get("authorization"),
       requiredScopes,
     });
+
+    if (toolName === "save_to_knosi") {
+      const ent = await getEntitlements(auth.userId);
+      if (!ent.features.claudeCapture) {
+        return jsonRpcError(
+          body.id ?? null,
+          -32000,
+          "PRO_REQUIRED: Claude Capture requires a Pro plan."
+        );
+      }
+    }
 
     const structured = await callKnosiMcpTool({
       userId: auth.userId,
