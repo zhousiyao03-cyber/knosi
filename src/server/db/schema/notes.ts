@@ -115,6 +115,32 @@ export const bookmarks = sqliteTable(
   ]
 );
 
+/**
+ * Per-upload accounting for note images written to object storage.
+ * Only purpose is to let `assertQuota(... "storageMB" ...)` compute current
+ * usage without a `HEAD`/`LIST` against S3 for every upload attempt.
+ * The image bytes themselves live in the bucket; we only keep metadata.
+ */
+export const noteImages = sqliteTable(
+  "note_images",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    contentType: text("content_type"),
+    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
+      () => new Date()
+    ),
+  },
+  (table) => [
+    // equality-first (user_id); used by the quota sum query.
+    index("note_images_user_idx").on(table.userId),
+  ]
+);
+
 export const todos = sqliteTable(
   "todos",
   {

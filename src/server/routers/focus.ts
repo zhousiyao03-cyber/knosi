@@ -9,7 +9,7 @@ import {
   focusDevicePairings,
   focusDevices,
 } from "../db/schema";
-import { protectedProcedure, router } from "../trpc";
+import { proProcedure, protectedProcedure, router } from "../trpc";
 import {
   addDaysToDateString,
   buildDailyStats,
@@ -36,7 +36,7 @@ const focusDateInput = z.object({
 });
 
 export const focusRouter = router({
-  createPairingCode: protectedProcedure.mutation(async ({ ctx }) => {
+  createPairingCode: proProcedure.mutation(async ({ ctx }) => {
     const rateLimit = await enforceFocusRateLimit({
       scope: "pairing:create",
       key: ctx.userId,
@@ -102,7 +102,7 @@ export const focusRouter = router({
     return devices;
   }),
 
-  registerDevice: protectedProcedure
+  registerDevice: proProcedure
     .input(
       z.object({
         deviceId: z.string().trim().min(1),
@@ -159,7 +159,7 @@ export const focusRouter = router({
       };
     }),
 
-  revokeDevice: protectedProcedure
+  revokeDevice: proProcedure
     .input(z.object({ id: z.string().trim().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await db
@@ -384,7 +384,7 @@ export const focusRouter = router({
       });
     }),
 
-  classifySessions: protectedProcedure
+  classifySessions: proProcedure
     .input(focusDateInput)
     .mutation(async ({ ctx, input }) => {
       const { start, end } = getLocalDayRange(input);
@@ -439,7 +439,7 @@ export const focusRouter = router({
       return { classified: classifications.length };
     }),
 
-  generateSummary: protectedProcedure
+  generateSummary: proProcedure
     .input(focusDateInput)
     .mutation(async ({ ctx, input }) => {
       const { start, end } = getLocalDayRange(input);

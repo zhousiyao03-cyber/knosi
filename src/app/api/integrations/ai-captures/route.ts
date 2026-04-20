@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getEntitlements } from "@/server/billing/entitlements";
 import { captureAiNote } from "@/server/integrations/ai-capture";
 import { validateBearerAccessToken } from "@/server/integrations/oauth";
 import { OAUTH_SCOPES } from "@/server/integrations/oauth-clients";
@@ -9,6 +10,17 @@ export async function POST(request: NextRequest) {
       authorization: request.headers.get("authorization"),
       requiredScopes: [OAUTH_SCOPES.knowledgeWriteInbox],
     });
+
+    const ent = await getEntitlements(auth.userId);
+    if (!ent.features.claudeCapture) {
+      return NextResponse.json(
+        {
+          error: "pro_required",
+          error_description: "Claude Capture requires a Pro plan.",
+        },
+        { status: 403 }
+      );
+    }
 
     const body = (await request.json().catch(() => null)) as
       | {
