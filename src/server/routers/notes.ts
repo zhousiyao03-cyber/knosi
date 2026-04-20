@@ -302,7 +302,15 @@ export const notesRouter = router({
       const [note] = await db.select({ shareToken: notes.shareToken }).from(notes)
         .where(and(eq(notes.id, input.id), eq(notes.userId, ctx.userId)));
       if (!note) throw new Error("Note not found");
+      // Enabling share on an already-shared note is idempotent and must not
+      // consume extra quota — only newly enabling a share counts.
       if (note.shareToken) return { shareToken: note.shareToken };
+
+      const [{ cnt }] = await db
+        .select({ cnt: count() })
+        .from(notes)
+        .where(and(eq(notes.userId, ctx.userId), isNotNull(notes.shareToken)));
+      assertQuota(ctx.entitlements, "shareLinks", cnt ?? 0, 1);
 
       const shareToken = crypto.randomUUID();
       await db.update(notes)
