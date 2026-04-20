@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "event_name": "subscription_cancelled",
+    "event_id": "evt-cancelled-1",
+    "custom_data": { "user_id": "user-abc" }
+  },
+  "data": {
+    "id": "ls-sub-1",
+    "attributes": {
+      "store_id": 1,
+      "customer_id": 42,
+      "variant_id": 100,
+      "status": "cancelled",
+      "trial_ends_at": null,
+      "renews_at": null,
+      "ends_at": "2026-05-27T00:00:00Z",
+      "urls": { "update_payment_method": "https://lemonsqueezy.com/u/xyz" }
+    }
+  }
+}

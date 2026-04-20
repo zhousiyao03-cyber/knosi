@@ -10,5 +10,11 @@ export default defineConfig({
     exclude: ["e2e/**", "node_modules/**", ".next/**", "src/server/ops/**"],
     environment: "node",
     globals: false,
+    // Use an in-memory libsql DB for unit tests so integration-style tests
+    // (e.g. webhook handlers) can create a fresh schema per run without
+    // touching the local dev DB. Must be set before `@/server/db` loads.
+    env: {
+      TURSO_DATABASE_URL: "file::memory:?cache=shared",
+    },
   },
 });
