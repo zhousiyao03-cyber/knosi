@@ -1,4 +1,4 @@
-import { router, protectedProcedure } from "../trpc";
+import { router, protectedProcedure, proProcedure } from "../trpc";
 import { db } from "../db";
 import { portfolioHoldings, portfolioNews } from "../db/schema";
 import { and, eq, desc } from "drizzle-orm";
@@ -172,7 +172,7 @@ export const portfolioRouter = router({
       .orderBy(desc(portfolioHoldings.createdAt));
   }),
 
-  addHolding: protectedProcedure
+  addHolding: proProcedure
     .input(
       z.object({
         symbol: z.string().min(1).max(20).transform((s) => s.toUpperCase()),
@@ -192,7 +192,7 @@ export const portfolioRouter = router({
       return { id };
     }),
 
-  updateHolding: protectedProcedure
+  updateHolding: proProcedure
     .input(
       z.object({
         id: z.string(),
@@ -217,7 +217,7 @@ export const portfolioRouter = router({
       return { id };
     }),
 
-  deleteHolding: protectedProcedure
+  deleteHolding: proProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       await db
@@ -240,14 +240,14 @@ export const portfolioRouter = router({
       .orderBy(desc(portfolioNews.generatedAt));
   }),
 
-  refreshNews: protectedProcedure
+  refreshNews: proProcedure
     .input(z.object({ symbol: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const result = await generatePortfolioNews(ctx.userId, input.symbol);
       return { success: true, skipped: false, ...result };
     }),
 
-  analyze: protectedProcedure
+  analyze: proProcedure
     .input(portfolioAnalysisInputSchema)
     .query(async ({ input }) => {
       const fallback = buildPortfolioAnalysisFallback(input);
