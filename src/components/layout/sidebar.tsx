@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
+  Lock,
   LogOut,
   Moon,
   PanelLeftClose,
@@ -13,8 +14,21 @@ import {
   Sun,
 } from "lucide-react";
 import { logout } from "@/app/(app)/actions";
+import { useEntitlements } from "@/hooks/use-entitlements";
 import { AppBrand } from "./app-brand";
 import { navigationGroups } from "./navigation";
+
+/**
+ * Maps Pro-only sidebar routes to their entitlement feature flags so we can
+ * show a subtle lock icon next to the label when the user cannot write to the
+ * module. Free users with existing data can still read, but the sidebar
+ * lock makes the Pro status visible at a glance.
+ */
+const LOCK_BY_HREF: Record<string, "portfolio" | "focusTracker" | "ossProjects"> = {
+  "/portfolio": "portfolio",
+  "/focus": "focusTracker",
+  "/projects": "ossProjects",
+};
 
 const COLLAPSED_COOKIE = "sb_collapsed";
 
@@ -25,6 +39,7 @@ export function Sidebar({
   initialCollapsed?: boolean;
 }) {
   const pathname = usePathname();
+  const ent = useEntitlements();
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
     const saved = localStorage.getItem("theme");
@@ -106,12 +121,15 @@ export function Sidebar({
                       ? pathname === "/dashboard"
                       : pathname.startsWith(item.href);
                   const Icon = item.icon;
+                  const lockFeature = LOCK_BY_HREF[item.href];
+                  const locked =
+                    lockFeature && ent ? !ent.features[lockFeature] : false;
 
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      aria-label={item.label}
+                      aria-label={locked ? `${item.label} (Pro)` : item.label}
                       title={collapsed ? item.label : undefined}
                       className={cn(
                         "relative flex items-center rounded-lg text-[13px] font-medium transition-colors",
@@ -131,7 +149,17 @@ export function Sidebar({
                         )}
                         strokeWidth={isActive ? 2.2 : 1.8}
                       />
-                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {!collapsed && (
+                        <>
+                          <span className="truncate">{item.label}</span>
+                          {locked && (
+                            <Lock
+                              className="ml-auto h-3 w-3 shrink-0 opacity-60"
+                              aria-label="Pro"
+                            />
+                          )}
+                        </>
+                      )}
                     </Link>
                   );
                 })}
