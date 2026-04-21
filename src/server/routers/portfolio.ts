@@ -1,7 +1,7 @@
 import { router, protectedProcedure, proProcedure } from "../trpc";
 import { db } from "../db";
 import { portfolioHoldings, portfolioNews } from "../db/schema";
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { generateStructuredData } from "../ai/provider";
 import { fetchRecentPortfolioNewsArticles } from "../portfolio-news";
@@ -173,6 +173,19 @@ export const portfolioRouter = router({
       .from(portfolioHoldings)
       .where(eq(portfolioHoldings.userId, ctx.userId))
       .orderBy(desc(portfolioHoldings.createdAt));
+  }),
+
+  /**
+   * Returns whether the user has any existing portfolio holdings. Used by the
+   * <ProOnly> gate so downgraded users still see their data in read-only mode
+   * instead of the upgrade splash (spec §8.2).
+   */
+  hasAny: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(portfolioHoldings)
+      .where(eq(portfolioHoldings.userId, ctx.userId));
+    return { hasAny: Number(row?.count ?? 0) > 0 };
   }),
 
   addHolding: proProcedure
