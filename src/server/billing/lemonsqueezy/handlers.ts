@@ -2,6 +2,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { subscriptions } from "@/server/db/schema/billing";
+import { recordBillingEvent } from "@/server/metrics";
 import { invalidateEntitlements } from "../entitlements";
 import type { LsWebhookBody } from "./webhook";
 
@@ -31,7 +32,7 @@ export async function dispatchLsEvent(body: LsWebhookBody): Promise<void> {
   switch (body.meta.event_name) {
     case "subscription_created":
     case "subscription_updated":
-      return upsertSubscription(body);
+      return upsertSubscription(body, body.meta.event_name === "subscription_created");
     case "subscription_cancelled":
       return markCancelled(body);
     case "subscription_expired":
@@ -51,7 +52,7 @@ export async function dispatchLsEvent(body: LsWebhookBody): Promise<void> {
   }
 }
 
-async function upsertSubscription(body: LsWebhookBody) {
+async function upsertSubscription(body: LsWebhookBody, isCreated: boolean) {
   const userId = userIdFrom(body);
   const lsSubId = body.data.id;
   const attrs = body.data.attributes as unknown as SubAttrs;
@@ -84,6 +85,11 @@ async function upsertSubscription(body: LsWebhookBody) {
       },
     });
   await invalidateEntitlements(userId);
+  if (isCreated) {
+    recordBillingEvent("billing.checkout.completed", {
+      variant: String(attrs.variant_id),
+    });
+  }
 }
 
 async function markCancelled(body: LsWebhookBody) {

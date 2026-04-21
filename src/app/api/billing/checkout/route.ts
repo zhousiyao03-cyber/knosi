@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { isHostedMode } from "@/server/billing/mode";
 import { createCheckoutUrl } from "@/server/billing/lemonsqueezy/checkout";
+import { recordBillingEvent } from "@/server/metrics";
 
 export async function POST(req: Request) {
   // Self-hosted users must never reach the hosted Lemon Squeezy flow.
@@ -26,6 +27,8 @@ export async function POST(req: Request) {
   if (body.variant !== "monthly" && body.variant !== "annual") {
     return NextResponse.json({ error: "Invalid variant" }, { status: 400 });
   }
+
+  recordBillingEvent("billing.checkout.started", { variant: body.variant });
 
   try {
     const url = await createCheckoutUrl(session.user.id, body.variant);

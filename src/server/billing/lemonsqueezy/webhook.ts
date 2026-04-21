@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { db } from "@/server/db";
 import { webhookEvents } from "@/server/db/schema/billing";
 import { logger } from "@/server/logger";
+import { recordBillingEvent } from "@/server/metrics";
 
 /**
  * Verify the HMAC-SHA256 signature Lemon Squeezy sends in the `X-Signature`
@@ -39,6 +40,9 @@ export async function persistWebhookEvent(
   const eventId =
     body.meta.event_id ??
     `generated-${crypto.createHash("sha256").update(raw).digest("hex")}`;
+  recordBillingEvent("billing.webhook.received", {
+    event_name: body.meta.event_name,
+  });
   try {
     await db.insert(webhookEvents).values({
       id: eventId,

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema/auth";
 import { getRedis } from "@/server/redis";
+import { recordBillingEvent } from "@/server/metrics";
 import { isHostedMode } from "./mode";
 import { getSubscriptionByUserId } from "./subscriptions";
 
@@ -183,11 +184,20 @@ export async function getEntitlements(userId: string): Promise<Entitlements> {
     const cached = await redis.get(cacheKey(userId));
     if (cached) {
       try {
-        return JSON.parse(cached) as Entitlements;
+        const parsed = JSON.parse(cached) as Entitlements;
+        recordBillingEvent("billing.entitlement.cache", { result: "hit" });
+        return parsed;
       } catch {
         // Fall through and rebuild on parse error.
+        recordBillingEvent("billing.entitlement.cache", {
+          result: "parse_error",
+        });
       }
+    } else {
+      recordBillingEvent("billing.entitlement.cache", { result: "miss" });
     }
+  } else {
+    recordBillingEvent("billing.entitlement.cache", { result: "miss" });
   }
 
   const [user] = await db

@@ -1,5 +1,6 @@
 import { parsePool, pickAccountForUser } from "./account-pool";
 import { logger } from "@/server/logger";
+import { recordBillingEvent } from "@/server/metrics";
 
 export type HostedAiResult<T> =
   | { ok: true; value: T; account: string }
@@ -33,6 +34,9 @@ export async function runWithHostedAi<T>(
         { account: account.name, event: "billing.ai.hosted.success" },
         "hosted AI call succeeded",
       );
+      recordBillingEvent("billing.ai.upstream_success", {
+        account: account.name,
+      });
       return { ok: true, value, account: account.name };
     } catch (err) {
       const status = (err as { status?: number })?.status;
@@ -40,6 +44,10 @@ export async function runWithHostedAi<T>(
         { account: account.name, status, err, event: "billing.ai.hosted.error" },
         "hosted AI pool account failed",
       );
+      recordBillingEvent("billing.ai.upstream_error", {
+        account: account.name,
+        status: status ?? "unknown",
+      });
       if (status !== 429 && status !== 403) throw err;
       // fall through to next account
     }
