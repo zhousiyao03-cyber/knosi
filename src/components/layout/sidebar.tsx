@@ -17,6 +17,7 @@ import { logout } from "@/app/(app)/actions";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { AppBrand } from "./app-brand";
 import { navigationGroups } from "./navigation";
+import { PlanCard } from "./plan-card";
 
 /**
  * Maps Pro-only sidebar routes to their entitlement feature flags so we can
@@ -168,10 +169,13 @@ export function Sidebar({
           ))}
       </nav>
 
-      {/* Bottom: icon-only utility row */}
+      {/* Bottom: plan card + icon-only utility row */}
+      <div className={cn("mt-2 px-2 pt-3", collapsed && "px-0")}>
+        <PlanCard collapsed={collapsed} />
+      </div>
       <div
         className={cn(
-          "mt-2 flex gap-1 px-3 pt-3 pb-4",
+          "flex gap-1 px-3 pb-4",
           collapsed ? "flex-col items-center" : "items-center justify-start"
         )}
       >

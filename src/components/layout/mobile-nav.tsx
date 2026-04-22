@@ -8,6 +8,7 @@ import { logout } from "@/app/(app)/actions";
 import { cn } from "@/lib/utils";
 import { AppBrand } from "./app-brand";
 import { navigationItems } from "./navigation";
+import { PlanCard } from "./plan-card";
 
 function useDarkModeState() {
   return useState(() => {
@@ -131,6 +132,9 @@ export function MobileNav({
             </nav>
 
             <div className="mt-4 space-y-2 border-t border-stone-200 pt-4 dark:border-stone-800">
+              <div onClick={() => setOpen(false)}>
+                <PlanCard />
+              </div>
               <Link
                 href="/settings"
                 onClick={() => setOpen(false)}
