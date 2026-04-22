@@ -87,8 +87,10 @@ Paid Pro tier on hosted knosi.xyz (self-hosted unaffected, AGPL unchanged). One 
 
 - `pnpm build` — green throughout
 - `pnpm test:unit` — **37 passed** (entitlements matrix + grandfather window + quota + account pool + webhook integration + hosted AI)
-- Production Turso schema **NOT yet applied** (4 migrations pending)
-- E2E `billing.spec.ts` **not yet run green** — verification is part of the rollout
+- **Production Turso schema applied 2026-04-22** — all 4 migrations landed on prod DB; verified via `scripts/billing/check-prod-schema.mjs` (3 new tables + 2 new columns present). 12 pre-existing users left with `created_at=NULL` (treated as "ancient" by entitlements, eligible for 30-day grandfather if `KNOSI_BILLING_LAUNCH_DATE` is ever set).
+- **Production deploy 2026-04-22** — new image rolled out to K3s (`knosi-55f668445b-8gxcc`). `KNOSI_HOSTED_MODE=true` plus 5 LS vars live in `knosi-env` secret. `/pricing` serves 200 publicly, showing the full pricing table. Node briefly hit DiskPressure during nerdctl build — recovered by pruning buildkit cache (7 GB freed).
+- **Production webhook end-to-end verified 2026-04-22** — LS webhook URL switched to `https://www.knosi.xyz/api/webhooks/lemon-squeezy`. A signed `subscription_created` payload targeting an existing prod user returned 200, persisted to `webhook_events` with `error=null`, upserted `subscriptions` with `status=active`, and was cleaned up without leaving test rows. Bad signatures correctly rejected 401.
+- E2E `billing.spec.ts` **not yet run green** — structural spec but selectors un-verified against the live server.
 
 ## Remaining risks
 
@@ -96,47 +98,27 @@ Paid Pro tier on hosted knosi.xyz (self-hosted unaffected, AGPL unchanged). One 
 2. **LS test-mode fixture drift** — skeleton fixtures in `__fixtures__/` need replacement with real captures per `docs/billing/test-mode-checklist.md`.
 3. **E2E selectors not CI-verified** — Task 35 spec is structurally sound but selectors (e.g., "New note" button) may need tweaks once run against a live dev server.
 
-## Next steps (human-executable)
+## Live on production since 2026-04-22
 
-### 1. Production Turso schema rollout
+`https://www.knosi.xyz/pricing` is public, checkout buttons hit the real LS API in test mode, and the webhook pipeline is wired end-to-end. Helper scripts used during the rollout live under `scripts/billing/`:
 
-Before flipping `KNOSI_HOSTED_MODE=true`, apply all 4 migrations to prod Turso. Use credentials from `.env.turso-prod.local`:
+- `apply-prod-migrations.mjs` — applies `0034`-`0037` directly via libsql client (no turso CLI needed). Pass `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` inline.
+- `check-prod-schema.mjs` — verifies the 3 new tables and 2 new `users` columns exist.
+- `update-ls-webhook.mjs` — lists LS webhooks on the store and updates the callback URL.
+- `test-webhook-prod.mjs` — signs + fires a `subscription_created` payload at prod, verifies persistence, cleans up after itself.
 
-```bash
-for f in drizzle/0034_dazzling_exiles.sql drizzle/0035_ancient_jack_flag.sql drizzle/0036_worthless_stranger.sql drizzle/0037_third_changeling.sql; do
-  turso db shell <prod-db-name> < "$f"
-done
-```
+## Remaining cut-over tasks (before real money flows)
 
-Verify:
-```bash
-turso db shell <prod-db-name> "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('subscriptions', 'webhook_events', 'note_images')"
-turso db shell <prod-db-name> "PRAGMA table_info(users)"  # expect created_at + ai_provider_preference
-```
+1. **LS merchant application approval** — `Your application has been received and will be reviewed` on the LS dashboard. Until this clears, LS will reject real payments; checkout buttons fall back to test mode. External dependency, no local work.
+2. **Rotate API key and webhook secret.** Both values leaked into this session's chat transcript. Generate a new pair in the LS dashboard, overwrite the prod secret with `kubectl -n knosi create secret ... --dry-run=client -o yaml | kubectl apply -f -` (the deploy.sh flow), roll the deployment.
+3. **Set `KNOSI_BILLING_LAUNCH_DATE`** on the day you send the migration email. Opens the 30-day grandfather window for pre-launch users (the 12 users with `created_at=NULL` qualify via the entitlements zero-path).
+4. **Configure `KNOSI_CODEX_ACCOUNT_POOL`** before the first Pro user exists, otherwise Ask AI on Pro falls straight to the fallback chain's last step (error toast).
+5. **LS test-mode checklist run-through** (`docs/billing/test-mode-checklist.md`) — capture real webhook payloads to replace the skeletons under `src/server/billing/lemonsqueezy/__fixtures__/`.
+6. **Send `docs/billing/migration.md` email** to the 12 existing users once steps 1-3 are done.
+7. **Monitor** the conversion funnel, webhook error rate, and AI cost daily for the first 2 weeks (dashboards per `docs/billing/alerts.md`).
 
-### 2. LS test-mode run-through
+## Risks still open
 
-Follow `docs/billing/test-mode-checklist.md` — run every row against a test store, capture real webhook payloads, replace skeleton fixtures, re-run `pnpm test:unit`.
-
-### 3. Staging rollout (Task 38)
-
-Set on staging:
-```bash
-KNOSI_HOSTED_MODE=true
-LEMONSQUEEZY_API_KEY=<test-key>
-LEMONSQUEEZY_STORE_ID=<test-store>
-LEMONSQUEEZY_WEBHOOK_SECRET=<test-secret>
-LEMONSQUEEZY_VARIANT_MONTHLY=<test-variant-id>
-LEMONSQUEEZY_VARIANT_ANNUAL=<test-variant-id>
-KNOSI_CODEX_ACCOUNT_POOL=<pool-csv>
-```
-
-Deploy with existing `ops/hetzner/deploy.sh`. Observe `webhook_events` and metrics for ≥ 48 hours.
-
-### 4. Production cut-over
-
-- Switch LS keys to production mode.
-- Set `KNOSI_BILLING_LAUNCH_DATE` to the cut-over date (enables 30-day grandfather window).
-- Send migration email using `docs/billing/migration.md` as the body.
-- Make `/pricing` public-facing (already static; add nav link if desired).
-- Monitor conversion funnel, webhook errors, and AI cost estimates daily for 2 weeks.
+1. **Codex multi-tenant ToS** (owner-accepted) — account pool + upstream error monitoring in place; a ban still takes all Pro users down at once.
+2. **E2E `billing.spec.ts`** never run against the live server — selectors may need tweaks.
+3. **Webhook retry storm** — LS retries 500s indefinitely. If the handler ever throws on real payloads, the DB accumulates duplicates (harmless due to idempotency key) but noise grows. Monitor `billing.webhook.processed status=error`.
