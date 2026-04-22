@@ -1,4 +1,5 @@
 import dynamic from "next/dynamic";
+import { FocusGate } from "./_gate";
 
 const FocusPageClient = dynamic(() =>
   import("@/components/focus/focus-page-client").then(
@@ -7,5 +8,9 @@ const FocusPageClient = dynamic(() =>
 );
 
 export default function FocusPage() {
-  return <FocusPageClient />;
+  return (
+    <FocusGate>
+      <FocusPageClient />
+    </FocusGate>
+  );
 }

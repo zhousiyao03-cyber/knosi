@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lt, max, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt, max, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 import { generateDailySummary, classifyActivitySessions, generateDailyInsight } from "../ai/focus";
@@ -82,6 +82,19 @@ export const focusRouter = router({
       code,
       expiresAt: expiresAt.toISOString(),
     };
+  }),
+
+  /**
+   * Returns whether the user has any existing focus activity sessions. Used by
+   * the <ProOnly> gate so downgraded users still see their data in read-only
+   * mode instead of the upgrade splash (spec §8.2).
+   */
+  hasAny: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(activitySessions)
+      .where(eq(activitySessions.userId, ctx.userId));
+    return { hasAny: Number(row?.count ?? 0) > 0 };
   }),
 
   listDevices: protectedProcedure.query(async ({ ctx }) => {
@@ -419,7 +432,8 @@ export const focusRouter = router({
           displayLabel: null,
           tags: session.tags,
           durationSecs: session.durationSecs,
-        }))
+        })),
+        { userId: ctx.userId },
       );
 
       // 批量 UPDATE：用事务包裹，减少单独的写操作开销
@@ -464,14 +478,17 @@ export const focusRouter = router({
         return { summary: null };
       }
 
-      const summary = await generateDailySummary({
-        sessions: daily.displaySessions,
-        totalSecs: daily.totalSecs,
-        tagBreakdown: daily.tagBreakdown,
-        longestStreakSecs: daily.longestStreakSecs,
-        appSwitches: daily.appSwitches,
-        date: input.date,
-      });
+      const summary = await generateDailySummary(
+        {
+          sessions: daily.displaySessions,
+          totalSecs: daily.totalSecs,
+          tagBreakdown: daily.tagBreakdown,
+          longestStreakSecs: daily.longestStreakSecs,
+          appSwitches: daily.appSwitches,
+          date: input.date,
+        },
+        { userId: ctx.userId },
+      );
 
       const [existing] = await db
         .select({ id: focusDailySummaries.id })
@@ -625,13 +642,16 @@ export const focusRouter = router({
       const firstSession = sessions[0];
       const lastSession = sessions[sessions.length - 1];
 
-      return generateDailyInsight({
-        date: input.date,
-        totalSecs,
-        sessions,
-        topApps,
-        firstSessionAt: firstSession.startedAt,
-        lastSessionAt: lastSession.endedAt,
-      });
+      return generateDailyInsight(
+        {
+          date: input.date,
+          totalSecs,
+          sessions,
+          topApps,
+          firstSessionAt: firstSession.startedAt,
+          lastSessionAt: lastSession.endedAt,
+        },
+        { userId: ctx.userId },
+      );
     }),
 });

@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { FloatingAskAiDock } from "@/components/ask/floating-ask-ai-dock";
+import { TrialBanner } from "@/components/billing/trial-banner";
+import { UpgradeBadge } from "@/components/billing/upgrade-badge";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Sidebar } from "@/components/layout/sidebar";
 import { WorkspaceIdentityProvider } from "@/components/layout/workspace-identity-provider";
@@ -46,6 +48,8 @@ export default async function AppLayout({
           />
           <div className="min-w-0 flex-1 overflow-auto bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.88),rgba(251,251,250,1)_32%)] dark:bg-[radial-gradient(circle_at_top,rgba(38,38,38,0.96),rgba(25,25,25,1)_36%)] dark:text-stone-100">
             <MobileNav workspaceLabel={workspaceLabel} />
+            <TrialBanner />
+            <UpgradeBadge />
             <main className="px-4 py-5 md:px-6 md:py-6">
               <Suspense>{children}</Suspense>
             </main>

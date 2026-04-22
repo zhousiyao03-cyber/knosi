@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `ai_provider_preference` text;

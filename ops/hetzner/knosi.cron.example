@@ -9,3 +9,7 @@ JOBS_TICK_TOKEN=replace-with-random-hex
 */5 * * * * curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" "http://127.0.0.1:3000/api/cron/cleanup-stale-chat-tasks" >/dev/null
 # Optional if the portfolio module is enabled:
 # 0 * * * * curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" "http://127.0.0.1:3000/api/cron/portfolio-news" >/dev/null
+# Billing subscription gauge — emits one metric line per status to stdout
+# for ingestion by a log-based collector (Promtail / vector). Reads Turso
+# creds from the same .env the app pod uses.
+*/15 * * * * cd /srv/knosi && set -a && . ./.env.production && set +a && node scripts/billing/emit-subscription-gauge.mjs >> /var/log/knosi/billing-gauge.log 2>&1

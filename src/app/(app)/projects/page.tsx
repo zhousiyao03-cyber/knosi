@@ -4,12 +4,30 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, FolderGit2, Loader2, Plus, Search } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { ProOnly } from "@/components/billing/pro-only";
 import { DiscoverTab } from "./discover-tab";
 
 type Tab = "projects" | "discover";
 const PAGE_SIZE = 20;
 
 export default function ProjectsPage() {
+  const { data: hasAny } = trpc.ossProjects.hasAny.useQuery(undefined, {
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  return (
+    <ProOnly
+      feature="ossProjects"
+      title="Open Source Projects"
+      description="Per-project note collections with GitHub metadata and AI analysis."
+      hasData={hasAny?.hasAny}
+    >
+      <ProjectsContent />
+    </ProOnly>
+  );
+}
+
+function ProjectsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const utils = trpc.useUtils();

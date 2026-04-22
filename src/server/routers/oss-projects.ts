@@ -90,6 +90,19 @@ async function collectProjectMetaBatch(
 }
 
 export const ossProjectsRouter = router({
+  /**
+   * Returns whether the user has any existing tracked projects. Used by the
+   * <ProOnly> gate so downgraded users still see their data in read-only mode
+   * instead of the upgrade splash (spec §8.2).
+   */
+  hasAny: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(osProjects)
+      .where(eq(osProjects.userId, ctx.userId));
+    return { hasAny: Number(row?.count ?? 0) > 0 };
+  }),
+
   listProjects: protectedProcedure.query(async ({ ctx }) => {
     const projects = await db
       .select()

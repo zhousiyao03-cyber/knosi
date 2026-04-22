@@ -260,6 +260,13 @@
       "when": 1776695803297,
       "tag": "0036_worthless_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1776772267557,
+      "tag": "0037_third_changeling",
+      "breakpoints": true
     }
   ]
 }

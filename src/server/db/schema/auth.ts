@@ -10,6 +10,9 @@ export const users = sqliteTable("users", {
   email: text("email").unique(),
   emailVerified: integer("email_verified", { mode: "timestamp" }),
   image: text("image"),
+  aiProviderPreference: text("ai_provider_preference", {
+    enum: ["knosi-hosted", "claude-code-daemon", "openai", "local"],
+  }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 

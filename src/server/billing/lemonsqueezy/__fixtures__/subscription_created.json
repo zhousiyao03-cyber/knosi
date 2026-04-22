@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "event_name": "subscription_created",
+    "event_id": "evt-created-1",
+    "custom_data": { "user_id": "user-abc" }
+  },
+  "data": {
+    "id": "ls-sub-1",
+    "attributes": {
+      "store_id": 1,
+      "customer_id": 42,
+      "variant_id": 100,
+      "status": "on_trial",
+      "trial_ends_at": "2026-04-27T00:00:00Z",
+      "renews_at": "2026-05-27T00:00:00Z",
+      "ends_at": null,
+      "urls": { "update_payment_method": "https://lemonsqueezy.com/u/xyz" }
+    }
+  }
+}

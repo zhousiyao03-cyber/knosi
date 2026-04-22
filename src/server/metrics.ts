@@ -88,6 +88,7 @@ export function snapshotMetrics() {
     procedures: entries,
     caches: snapshotCacheMetrics(),
     operational: snapshotOperationalMetrics(),
+    billing: snapshotBillingMetrics(),
   };
 }
 
@@ -169,9 +170,94 @@ export function snapshotOperationalMetrics(windowMs = 15 * 60 * 1000) {
   };
 }
 
+// ── Billing metrics ────────────────────────────────────────────────
+// Counter-style labeled events for the billing subsystem (Task 34 / §9.1 of
+// the billing spec). Stored per (kind, sorted labels) composite key so the
+// same metric name can be queried across label permutations when we later
+// bolt on a real collector (Prometheus / OTel).
+//
+// Kept intentionally minimal: everything is an additive counter. A gauge is
+// expressed as "the last written value for kind+labels" — see
+// `billing.subscription.state` which is emitted once per cron tick with the
+// current count. For that case callers should use `setBillingGauge` instead
+// of `recordBillingEvent` so repeated ticks don't double-count.
+
+export type BillingMetricKind =
+  | "billing.webhook.received"
+  | "billing.webhook.processed"
+  | "billing.checkout.started"
+  | "billing.checkout.completed"
+  | "billing.quota_exceeded"
+  | "billing.ai.upstream_error"
+  | "billing.ai.upstream_success"
+  | "billing.entitlement.cache"
+  | "billing.subscription.state";
+
+type BillingLabelValue = string | number;
+type BillingLabels = Record<string, BillingLabelValue>;
+
+type BillingCounter = {
+  kind: BillingMetricKind;
+  labels: BillingLabels;
+  value: number;
+  lastAt: number;
+};
+
+const billingStore = new Map<string, BillingCounter>();
+
+function billingKey(kind: BillingMetricKind, labels: BillingLabels): string {
+  const pairs = Object.entries(labels)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => [k, String(v)] as const)
+    .sort(([a], [b]) => a.localeCompare(b));
+  const labelStr = pairs.map(([k, v]) => `${k}=${v}`).join(",");
+  return `${kind}|${labelStr}`;
+}
+
+/** Increment a counter-style billing metric. */
+export function recordBillingEvent(
+  kind: BillingMetricKind,
+  labels: BillingLabels = {},
+  delta = 1,
+) {
+  const key = billingKey(kind, labels);
+  const existing = billingStore.get(key);
+  if (existing) {
+    existing.value += delta;
+    existing.lastAt = Date.now();
+  } else {
+    billingStore.set(key, { kind, labels, value: delta, lastAt: Date.now() });
+  }
+}
+
+/** Set a gauge-style billing metric (overwrites prior value for same labels). */
+export function setBillingGauge(
+  kind: BillingMetricKind,
+  labels: BillingLabels,
+  value: number,
+) {
+  const key = billingKey(kind, labels);
+  billingStore.set(key, { kind, labels, value, lastAt: Date.now() });
+}
+
+export function snapshotBillingMetrics() {
+  const entries = Array.from(billingStore.values()).map((entry) => ({
+    kind: entry.kind,
+    labels: entry.labels,
+    value: entry.value,
+    lastAt: new Date(entry.lastAt).toISOString(),
+  }));
+  entries.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind.localeCompare(b.kind);
+    return b.value - a.value;
+  });
+  return entries;
+}
+
 /** 仅测试用 */
 export function _resetMetrics() {
   store.clear();
   cacheStore.clear();
   operationalEvents.length = 0;
+  billingStore.clear();
 }
