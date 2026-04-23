@@ -57,6 +57,7 @@ pnpm test:e2e
 - 确保只提交项目文件，不要提交 `data/*.db`、`.next/`、`node_modules/` 等
 - commit 前先 `git status` 确认待提交文件列表合理
 - **任务完成且验证通过后，直接 `git push` 到远程，不需要询问用户确认**
+- **push 到 `main` 会自动触发生产部署**：GitHub Actions workflow `.github/workflows/deploy-hetzner.yml` 会 lint + rsync 仓库到 Hetzner（`ssh knosi`），然后在服务器上跑 `ops/hetzner/deploy.sh`（重建镜像、滚动 k3s deployment、健康检查）。所以 `git push` = 发布，push 前务必确认代码可部署（build 通过、无破坏性 schema 未同步等）。不要再手动告诉用户去 SSH 上 pull/deploy。
 
 ### 6. 自动清理 — 禁止垃圾文件
 
