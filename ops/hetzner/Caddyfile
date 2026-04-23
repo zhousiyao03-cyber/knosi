@@ -4,12 +4,13 @@
 #
 # Certificates are managed automatically by Caddy via Let's Encrypt.
 # Cert state lives under /var/lib/caddy/.local/share/caddy/.
+#
+# Note: both apex and www are served directly (no redirect). Earlier an
+# apex→www 301 redirect broke the MCP streamable transport, because MCP
+# clients do not re-POST on 301/302. Keeping both hosts proxied avoids the
+# whole redirect class of issues.
 
-knosi.xyz {
-	redir https://www.knosi.xyz{uri} permanent
-}
-
-www.knosi.xyz {
+knosi.xyz, www.knosi.xyz {
 	encode gzip zstd
 
 	header {
