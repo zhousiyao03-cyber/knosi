@@ -97,12 +97,19 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
+type ChartTooltipPayloadItem = {
+  dataKey?: string;
+  name?: string;
+  value?: unknown;
+  color?: string;
+  payload?: Record<string, unknown>;
+};
+
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
   {
     active?: boolean;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    payload?: any[];
+    payload?: ChartTooltipPayloadItem[];
     label?: string | number;
     hideLabel?: boolean;
     hideIndicator?: boolean;
@@ -143,7 +150,7 @@ const ChartTooltipContent = React.forwardRef<
           <div className="font-medium">{label}</div>
         )}
         <div className="grid gap-1.5">
-          {payload.map((item: { dataKey?: string; name?: string; value?: unknown; color?: string; payload?: Record<string, unknown> }, index: number) => {
+          {payload.map((item, index) => {
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
             const itemConfig = config[key];
             const indicatorColor = item.payload?.fill as string || item.color;
@@ -203,11 +210,16 @@ ChartTooltipContent.displayName = "ChartTooltip";
 
 const ChartLegend = RechartsPrimitive.Legend;
 
+type ChartLegendPayloadItem = {
+  value?: string;
+  dataKey?: string;
+  color?: string;
+};
+
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    payload?: any[];
+    payload?: ChartLegendPayloadItem[];
     verticalAlign?: "top" | "bottom";
     hideIcon?: boolean;
     nameKey?: string;
@@ -230,7 +242,7 @@ const ChartLegendContent = React.forwardRef<
           className
         )}
       >
-        {payload.map((item: { value?: string; dataKey?: string; color?: string }) => {
+        {payload.map((item) => {
           const key = `${nameKey || item.dataKey || "value"}`;
           const itemConfig = config[key];
 

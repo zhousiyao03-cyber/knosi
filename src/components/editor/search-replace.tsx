@@ -234,8 +234,8 @@ export const SearchReplace = Extension.create<SearchReplaceOptions>({
 /* ---------- Read search storage from the editor ---------- */
 
 function getSearchStorage(editor: Editor): SearchStorage | undefined {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const storage = (editor.extensionStorage as any)?.searchReplace;
+  const storage = (editor.extensionStorage as unknown as Record<string, unknown>)
+    ?.searchReplace;
   return storage as SearchStorage | undefined;
 }
 

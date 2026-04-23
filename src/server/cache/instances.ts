@@ -24,8 +24,7 @@ import { RedisCache } from "./redis-cache";
  * 使用 `any` 作为存储类型，让 `getOrLoad<T>(key, loader)` 从 loader
  * 的返回类型推断出 T，调用方无需手动标注。
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const dashboardStatsCache = new RedisCache<any>({
+export const dashboardStatsCache = new RedisCache<unknown>({
   name: "dashboard.stats",
   ttlSeconds: 30,
 });
@@ -47,8 +46,7 @@ export function invalidateDashboardForUser(userId: string) {
  * key = `${userId}:${folderId ?? "*"}:${limit}:${offset}`
  * TTL = 60 秒(notes 列表变化频率低于 dashboard,允许更长 TTL)
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const notesListCache = new RedisCache<any>({
+export const notesListCache = new RedisCache<unknown>({
   name: "notes.list",
   ttlSeconds: 60,
 });

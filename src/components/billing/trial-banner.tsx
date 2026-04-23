@@ -1,10 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useEntitlements } from "@/hooks/use-entitlements";
 
 const DISMISS_KEY = "billing.trial.dismissed";
+
+function readDismissed() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(DISMISS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Last-3-days hosted-trial countdown banner.
@@ -18,17 +27,16 @@ const DISMISS_KEY = "billing.trial.dismissed";
  */
 export function TrialBanner() {
   const ent = useEntitlements();
-  const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    setDismissed(localStorage.getItem(DISMISS_KEY) === "1");
-  }, []);
+  const [dismissed, setDismissed] = useState(readDismissed);
+  // Capture render-time "now" via lazy state initializer so the component
+  // stays pure under React 19's purity rule.
+  const [now] = useState(() => Date.now());
 
   if (!ent || ent.source !== "hosted-trial") return null;
 
   const daysLeft = Math.max(
     0,
-    Math.ceil(((ent.trialEndsAt ?? 0) - Date.now()) / 86_400_000),
+    Math.ceil(((ent.trialEndsAt ?? 0) - now) / 86_400_000),
   );
   if (daysLeft > 3) return null;
 

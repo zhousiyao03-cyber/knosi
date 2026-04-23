@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { ArrowUpRight, Clock, Sparkles } from "lucide-react";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,9 @@ import { cn } from "@/lib/utils";
  */
 export function PlanCard({ collapsed = false }: { collapsed?: boolean }) {
   const ent = useEntitlements();
+  // Capture render-time "now" via lazy state initializer so the component
+  // stays pure under React 19's purity rule.
+  const [now] = useState(() => Date.now());
   if (!ent) return null;
   if (ent.source === "self-hosted") return null;
   if (ent.plan === "pro" && ent.source !== "hosted-trial") return null;
@@ -26,7 +30,7 @@ export function PlanCard({ collapsed = false }: { collapsed?: boolean }) {
   const daysLeft = isTrial
     ? Math.max(
         0,
-        Math.ceil(((ent.trialEndsAt ?? 0) - Date.now()) / 86_400_000),
+        Math.ceil(((ent.trialEndsAt ?? 0) - now) / 86_400_000),
       )
     : 0;
 
