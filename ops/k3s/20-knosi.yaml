@@ -60,6 +60,13 @@ spec:
               value: "3000"
             - name: REDIS_URL
               value: "redis://redis.knosi.svc.cluster.local:6379"
+            # Turso is in aws-us-east-1; round-trip from Hetzner (nbg1) is
+            # ~100ms so indexed point-lookups routinely trip the 100ms default.
+            # Raise to 300ms so the slow-query log flags real regressions, not
+            # the geo-latency floor. Lower this again if we move to embedded
+            # replicas or an eu-west Turso region.
+            - name: SLOW_QUERY_MS
+              value: "300"
           volumeMounts:
             - name: data
               mountPath: /app/data
