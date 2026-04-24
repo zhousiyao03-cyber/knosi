@@ -644,18 +644,39 @@ export function LandingPage() {
               The knowledge layer for your AI workflow.
             </span>
           </div>
-          <div className="flex items-center gap-5 text-xs text-stone-500">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-stone-500">
             <Link
               href={GITHUB_URL}
               className="transition-colors hover:text-stone-300"
             >
               GitHub
             </Link>
+            <Link href="/pricing" className="transition-colors hover:text-stone-300">
+              Pricing
+            </Link>
             <Link href="#features" className="transition-colors hover:text-stone-300">
               Product
             </Link>
             <Link href="#selfhost" className="transition-colors hover:text-stone-300">
               Self-host
+            </Link>
+            <Link
+              href="/legal/terms"
+              className="transition-colors hover:text-stone-300"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/legal/privacy"
+              className="transition-colors hover:text-stone-300"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/legal/refund"
+              className="transition-colors hover:text-stone-300"
+            >
+              Refunds
             </Link>
           </div>
         </div>
