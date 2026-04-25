@@ -443,59 +443,93 @@ export function TiptapEditor({
     []
   );
 
-  const handleSurfaceMouseMove = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      const surface = editorSurfaceRef.current;
-      const previous = hoveredBlockRef.current;
-      const targetElement =
-        event.target instanceof HTMLElement ? event.target : null;
+  // Coalesce mousemove handling into a single frame. Without this, scrolling
+  // a long doc fires mousemove constantly (because content moves under the
+  // cursor), and each call did getBoundingClientRect/posAtDOM + setState,
+  // forcing layout and a TiptapEditor re-render every event.
+  const mouseMoveRafRef = useRef<number | null>(null);
+  const lastMouseSampleRef = useRef<{
+    target: EventTarget | null;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
 
-      if (surface && previous && targetElement) {
-        const surfaceRect = surface.getBoundingClientRect();
-        const relativeX = event.clientX - surfaceRect.left;
-        const relativeY = event.clientY - surfaceRect.top;
-        const withinSameBand =
-          relativeY >= previous.top - 6 && relativeY <= previous.bottom + 6;
-        const withinGutter =
-          relativeX >= -BLOCK_CONTROL_GUTTER_WIDTH &&
-          relativeX <= previous.contentLeft + BLOCK_CONTROL_GUTTER_RIGHT_PADDING;
-        const withinTrackedBlock = Boolean(targetElement.closest(BLOCK_SELECTOR));
-
-        if (
-          !withinTrackedBlock &&
-          !targetElement.closest("[data-editor-insert-controls='true']") &&
-          withinSameBand &&
-          withinGutter
-        ) {
-          return;
-        }
+  useEffect(() => {
+    return () => {
+      if (mouseMoveRafRef.current !== null) {
+        cancelAnimationFrame(mouseMoveRafRef.current);
+        mouseMoveRafRef.current = null;
       }
+    };
+  }, []);
 
-      updateHoveredBlock(event.target);
+  const processMouseMoveSample = useCallback(() => {
+    mouseMoveRafRef.current = null;
+    const sample = lastMouseSampleRef.current;
+    if (!sample) return;
+
+    const surface = editorSurfaceRef.current;
+    const previous = hoveredBlockRef.current;
+    const targetElement =
+      sample.target instanceof HTMLElement ? sample.target : null;
+
+    if (surface && previous && targetElement) {
+      const surfaceRect = surface.getBoundingClientRect();
+      const relativeX = sample.clientX - surfaceRect.left;
+      const relativeY = sample.clientY - surfaceRect.top;
+      const withinSameBand =
+        relativeY >= previous.top - 6 && relativeY <= previous.bottom + 6;
+      const withinGutter =
+        relativeX >= -BLOCK_CONTROL_GUTTER_WIDTH &&
+        relativeX <= previous.contentLeft + BLOCK_CONTROL_GUTTER_RIGHT_PADDING;
+      const withinTrackedBlock = Boolean(targetElement.closest(BLOCK_SELECTOR));
 
       if (
-        surface &&
-        previous &&
-        targetElement &&
-        !targetElement.closest(BLOCK_SELECTOR) &&
-        !targetElement.closest("[data-editor-insert-controls='true']")
+        !withinTrackedBlock &&
+        !targetElement.closest("[data-editor-insert-controls='true']") &&
+        withinSameBand &&
+        withinGutter
       ) {
-        const surfaceRect = surface.getBoundingClientRect();
-        const relativeY = event.clientY - surfaceRect.top;
-        const relativeX = event.clientX - surfaceRect.left;
-        const withinSameBand =
-          relativeY >= previous.top - 6 && relativeY <= previous.bottom + 6;
-        const withinGutter =
-          relativeX >= -BLOCK_CONTROL_GUTTER_WIDTH &&
-          relativeX <= previous.contentLeft + BLOCK_CONTROL_GUTTER_RIGHT_PADDING;
-
-        if (!withinSameBand || !withinGutter) {
-          hoveredBlockRef.current = null;
-          setHoveredBlock(null);
-        }
+        return;
       }
+    }
+
+    updateHoveredBlock(sample.target);
+
+    if (
+      surface &&
+      previous &&
+      targetElement &&
+      !targetElement.closest(BLOCK_SELECTOR) &&
+      !targetElement.closest("[data-editor-insert-controls='true']")
+    ) {
+      const surfaceRect = surface.getBoundingClientRect();
+      const relativeY = sample.clientY - surfaceRect.top;
+      const relativeX = sample.clientX - surfaceRect.left;
+      const withinSameBand =
+        relativeY >= previous.top - 6 && relativeY <= previous.bottom + 6;
+      const withinGutter =
+        relativeX >= -BLOCK_CONTROL_GUTTER_WIDTH &&
+        relativeX <= previous.contentLeft + BLOCK_CONTROL_GUTTER_RIGHT_PADDING;
+
+      if (!withinSameBand || !withinGutter) {
+        hoveredBlockRef.current = null;
+        setHoveredBlock(null);
+      }
+    }
+  }, [updateHoveredBlock]);
+
+  const handleSurfaceMouseMove = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      lastMouseSampleRef.current = {
+        target: event.target,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      };
+      if (mouseMoveRafRef.current !== null) return;
+      mouseMoveRafRef.current = requestAnimationFrame(processMouseMoveSample);
     },
-    [updateHoveredBlock]
+    [processMouseMoveSample]
   );
 
   const handleSurfaceMouseLeave = useCallback(() => {
@@ -923,13 +957,9 @@ export function TiptapEditor({
       )}
       {editable && <BubbleToolbar editor={editor} />}
       {editable && <TableToolbar editor={editor} />}
-      {editable && editor && (
+      {editable && editor && inlineAskAnchor && (
         <InlineAskAiPopover
-          key={
-            inlineAskAnchor
-              ? `inline-ask-${inlineAskOpenId}`
-              : "inline-ask-closed"
-          }
+          key={`inline-ask-${inlineAskOpenId}`}
           editor={editor}
           anchor={inlineAskAnchor}
           noteText={editor.getText()}

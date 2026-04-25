@@ -134,7 +134,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
     <div
       ref={toolbarRef}
       className={cn(
-        "fixed z-50 flex items-center gap-0.5 rounded-xl border border-stone-800/80 bg-stone-950/95 px-1.5 py-1 shadow-xl backdrop-blur transition-opacity duration-150",
+        "fixed z-50 flex items-center gap-0.5 rounded-xl border border-stone-800/80 bg-stone-950 px-1.5 py-1 shadow-xl transition-opacity duration-150",
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
       style={{ top: position.top, left: position.left }}
