@@ -104,3 +104,35 @@ export async function pollAuthSession(serverUrl, sessionId) {
   if (!res.ok) throw new Error(`Poll failed: ${res.status}`);
   return res.json();
 }
+
+/**
+ * Read the persisted CLI session id for a given workerKey, or null.
+ * Used by the daemon when spawning a ChatWorker to decide whether to
+ * pass `--resume <id>`.
+ */
+export async function getDaemonConversation(workerKey) {
+  const url = new URL(`${serverUrl}/api/daemon/conversations`);
+  url.searchParams.set("workerKey", workerKey);
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: authHeaders(),
+  });
+  if (res.status === 401) throw new Error("AUTH_FAILED");
+  if (!res.ok) throw new Error(`getDaemonConversation: HTTP ${res.status}`);
+  const json = await res.json();
+  return { cliSessionId: json.cliSessionId ?? null };
+}
+
+/**
+ * Upsert the CLI session id for a given workerKey (or pass null to clear it,
+ * e.g. after a stale-session resume miss).
+ */
+export async function setDaemonConversation(workerKey, cliSessionId) {
+  const res = await fetch(`${serverUrl}/api/daemon/conversations`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ workerKey, cliSessionId }),
+  });
+  if (res.status === 401) throw new Error("AUTH_FAILED");
+  if (!res.ok) throw new Error(`setDaemonConversation: HTTP ${res.status}`);
+}
