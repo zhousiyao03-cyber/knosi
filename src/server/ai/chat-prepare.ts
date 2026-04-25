@@ -8,12 +8,14 @@ import { bookmarks, notes } from "@/server/db/schema";
 import { retrieveAgenticContext } from "@/server/ai/agentic-rag";
 import { retrieveContext } from "@/server/ai/rag";
 import {
-  buildSystemPrompt,
+  buildSystemPromptStable,
+  buildUserPreamble,
   getUserMessageText,
   normalizeMessages,
   sanitizeMessages,
   type RetrievedKnowledgeItem,
 } from "@/server/ai/chat-system-prompt";
+import { injectPreambleIntoLatestUser } from "@/server/ai/inject-preamble";
 
 export const pinnedSourceSchema = z.object({
   id: z.string().min(1),
@@ -187,11 +189,16 @@ export async function buildChatContext(
     userId
   );
 
-  const system = buildSystemPrompt(context, sourceScope, {
-    contextNoteText: input.contextNoteText,
-    pinnedSources,
+  const system = buildSystemPromptStable(sourceScope, {
     preferStructuredBlocks: input.preferStructuredBlocks,
   });
+  const preamble = buildUserPreamble({
+    retrieved: context,
+    sourceScope,
+    pinnedSources,
+    contextNoteText: input.contextNoteText,
+  });
+  const augmentedMessages = injectPreambleIntoLatestUser(messages, preamble);
 
-  return { system, messages, sourceScope };
+  return { system, messages: augmentedMessages, sourceScope };
 }

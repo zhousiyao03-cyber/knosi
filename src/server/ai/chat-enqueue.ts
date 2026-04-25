@@ -5,10 +5,12 @@ import { retrieveAgenticContext } from "@/server/ai/agentic-rag";
 import { retrieveContext } from "@/server/ai/rag";
 import { publishDaemonTaskNotification } from "@/server/ai/daemon-task-notifications";
 import {
-  buildSystemPrompt,
+  buildSystemPromptStable,
+  buildUserPreamble,
   getUserMessageText,
   type RetrievedKnowledgeItem,
 } from "@/server/ai/chat-system-prompt";
+import { injectPreambleIntoLatestUser } from "@/server/ai/inject-preamble";
 import type { AskAiSourceScope } from "@/lib/ask-ai";
 import { observe, updateActiveObservation } from "@langfuse/tracing";
 
@@ -86,7 +88,15 @@ export async function enqueueChatTask({
     context = await tracedRetrieval();
   }
 
-  const systemPrompt = buildSystemPrompt(context, sourceScope);
+  const systemPrompt = buildSystemPromptStable(sourceScope, {
+    preferStructuredBlocks: false,
+  });
+  const preamble = buildUserPreamble({
+    retrieved: context,
+    sourceScope,
+    pinnedSources: [],
+  });
+  const augmentedMessages = injectPreambleIntoLatestUser(messages, preamble);
   const model = process.env.CLAUDE_CODE_CHAT_MODEL?.trim() || "opus";
 
   const taskId = crypto.randomUUID();
@@ -96,7 +106,7 @@ export async function enqueueChatTask({
     status: "queued",
     taskType: "chat",
     sourceScope,
-    messages: JSON.stringify(messages),
+    messages: JSON.stringify(augmentedMessages),
     systemPrompt,
     model,
   });

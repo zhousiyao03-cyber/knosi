@@ -188,6 +188,125 @@ function finalizePrompt(base: string, options?: BuildSystemPromptOptions) {
   );
 }
 
+/**
+ * Stable per-conversation system prompt — does NOT depend on per-question
+ * RAG retrieval, the user's currently-open note, or pinned @-sources. Those
+ * volatile pieces ride along with the user message via {@link buildUserPreamble}.
+ *
+ * Stability matters for `claude --resume <sessionId>`: a resumed session
+ * locks its system prompt to whatever was set when it was first created.
+ * If we keep RAG context here, every question's freshly-retrieved chunks
+ * would force a different system prompt and break session reuse.
+ */
+export interface StableSystemPromptOptions {
+  preferStructuredBlocks?: boolean;
+}
+
+export function buildSystemPromptStable(
+  sourceScope: AskAiSourceScope,
+  options?: StableSystemPromptOptions
+): string {
+  const identityLine = getChatAssistantIdentity();
+
+  const baseRules = sourceScope === "direct"
+    ? `${identityLine} 当前请求选择了直接回答模式，不要引用知识库，直接用中文回答用户的问题，简洁准确。`
+    : `${identityLine} 你帮助用户管理和理解他们的知识库。用中文回答问题，简洁准确。
+
+回答规则：
+1. 优先基于用户消息中提供的知识库内容回答；如果不足以回答，可以补充你自己的知识，但要说明哪些是来自知识库、哪些是补充。
+2. 如果你使用了用户提供的知识库内容，必须在回复的最末尾追加一个隐藏标记，格式为：
+<!-- sources:[{"id":"来源ID","type":"note或bookmark","title":"来源标题"}] -->
+只包含你实际引用的来源，不要包含未使用的来源。
+3. 隐藏标记必须是回复的最后一行，前面有一个空行。`;
+
+  return withStructuredBlocksInstructions(baseRules, {
+    preferStructuredBlocks: options?.preferStructuredBlocks,
+  });
+}
+
+/**
+ * Per-question preamble carrying RAG-retrieved knowledge, the current note
+ * the user is editing, and any @-pinned sources. Returned as a plain string
+ * meant to be prepended onto the latest user message via
+ * {@link injectPreambleIntoLatestUser}.
+ *
+ * Returns "" when there is nothing to add, in which case the caller should
+ * leave the user message untouched.
+ */
+export interface BuildUserPreambleInput {
+  retrieved: RetrievedKnowledgeItem[];
+  sourceScope: AskAiSourceScope;
+  pinnedSources: RetrievedKnowledgeItem[];
+  contextNoteText?: string;
+}
+
+export function buildUserPreamble(input: BuildUserPreambleInput): string {
+  const parts: string[] = [];
+
+  if (input.retrieved.length > 0) {
+    const scopeHint =
+      input.sourceScope === "notes"
+        ? "当前只检索了笔记。"
+        : input.sourceScope === "bookmarks"
+          ? "当前只检索了收藏。"
+          : "当前检索了笔记和收藏。";
+
+    const knowledgeBlock = input.retrieved
+      .map((item) => {
+        const extraAttributes = [
+          item.chunkId ? `chunk_id="${item.chunkId}"` : null,
+          typeof item.chunkIndex === "number"
+            ? `chunk_index="${item.chunkIndex}"`
+            : null,
+          item.sectionPath?.length
+            ? `section="${item.sectionPath.join(" > ")}"`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return `<source id="${item.id}" type="${item.type}" title="${item.title}"${
+          extraAttributes ? ` ${extraAttributes}` : ""
+        }>\n${item.content}\n</source>`;
+      })
+      .join("\n\n");
+
+    parts.push(`${scopeHint}
+
+以下是从我的知识库中检索到的相关内容：
+
+<knowledge_base>
+${knowledgeBlock}
+</knowledge_base>`);
+  }
+
+  const noteCtx = input.contextNoteText?.trim();
+  if (noteCtx) {
+    parts.push(`我当前正在编辑一个笔记。以下是笔记的当前内容（当我说"这篇笔记"、"上面这段"、"本页"时，指的就是这段内容；除非我要求，否则不要原样复述）：
+
+<current_note>
+${noteCtx.slice(0, 8000)}
+</current_note>`);
+  }
+
+  if (input.pinnedSources.length > 0) {
+    const block = input.pinnedSources
+      .map((item) => {
+        const content = (item.content ?? "").slice(0, 6000);
+        return `<pinned_source id="${item.id}" type="${item.type}" title="${item.title}">\n${content}\n</pinned_source>`;
+      })
+      .join("\n\n");
+    parts.push(`我通过 @ 钉了以下来源作为这次提问的**权威上下文**。请优先基于它们回答；如果不足以回答，再说明哪些是补充：
+
+<pinned_sources>
+${block}
+</pinned_sources>`);
+  }
+
+  if (parts.length === 0) return "";
+
+  return parts.join("\n\n---\n\n") + "\n\n---\n\n";
+}
+
 export function buildSystemPrompt(
   context: RetrievedKnowledgeItem[],
   sourceScope: AskAiSourceScope,
