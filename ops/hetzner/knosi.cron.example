@@ -5,10 +5,14 @@ CRON_SECRET=replace-with-random-hex
 JOBS_TICK_TOKEN=replace-with-random-hex
 
 * * * * * APP_DIR=/srv/knosi /srv/knosi/ops/hetzner/collect-ops-snapshot.sh >/dev/null 2>&1
-* * * * * curl -fsS -H "Authorization: Bearer ${JOBS_TICK_TOKEN}" "http://127.0.0.1:3000/api/jobs/tick?max=10" >/dev/null
-*/5 * * * * curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" "http://127.0.0.1:3000/api/cron/cleanup-stale-chat-tasks" >/dev/null
+# The app pod's ClusterIP service binds to 3000 inside the cluster, but the
+# host only exposes Traefik on NodePort 30080. Reach the app via Traefik with
+# the Host header set so its IngressRoute matches. (Hitting 127.0.0.1:3000
+# from the host fails — the service isn't bound there.)
+* * * * * curl -fsS -H "Authorization: Bearer ${JOBS_TICK_TOKEN}" -H "Host: www.knosi.xyz" "http://127.0.0.1:30080/api/jobs/tick?max=10" >/dev/null
+*/5 * * * * curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" -H "Host: www.knosi.xyz" "http://127.0.0.1:30080/api/cron/cleanup-stale-chat-tasks" >/dev/null
 # Optional if the portfolio module is enabled:
-# 0 * * * * curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" "http://127.0.0.1:3000/api/cron/portfolio-news" >/dev/null
+# 0 * * * * curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" -H "Host: www.knosi.xyz" "http://127.0.0.1:30080/api/cron/portfolio-news" >/dev/null
 # Billing subscription gauge — emits one metric line per status to stdout
 # for ingestion by a log-based collector (Promtail / vector). Reads Turso
 # creds from the same .env the app pod uses.

@@ -49,6 +49,8 @@ export class ChatWorker {
     this._dead = false;
     this._resumeMissed = false;
     this._idleTimer = null;
+    this._deltaCount = 0;
+    this._eventCounts = {};
     this._spawn();
   }
 
@@ -111,6 +113,11 @@ export class ChatWorker {
       return;
     }
 
+    const tag = event.type === "stream_event"
+      ? `stream_event/${event.event?.type ?? "?"}/${event.event?.delta?.type ?? "-"}`
+      : `${event.type}${event.subtype ? "/" + event.subtype : ""}`;
+    this._eventCounts[tag] = (this._eventCounts[tag] ?? 0) + 1;
+
     if (
       event.type === "system" &&
       event.subtype === "init" &&
@@ -131,6 +138,7 @@ export class ChatWorker {
     ) {
       const delta = event.event.delta.text;
       this._currentText += delta;
+      this._deltaCount++;
       try {
         this._current?.onText(delta);
       } catch {}
@@ -150,11 +158,32 @@ export class ChatWorker {
       const totalText =
         typeof event.result === "string" ? event.result : this._currentText;
       const cur = this._current;
+      const eventCountsSummary = Object.entries(this._eventCounts)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(" ");
+      const accumulatedLen = this._currentText.length;
+      const resultFieldLen =
+        typeof event.result === "string" ? event.result.length : -1;
       this._current = null;
       this._currentText = "";
+      this._deltaCount = 0;
+      this._eventCounts = {};
+      if (!this._spawnFn) {
+        console.log(
+          `[chat-worker] result key=${this.workerKey} is_error=${!!event.is_error} ` +
+            `result_field_len=${resultFieldLen} accumulated_len=${accumulatedLen} ` +
+            `final_len=${totalText.length} events=[${eventCountsSummary}]`
+        );
+      }
       if (cur) {
         if (event.is_error) {
           cur.reject(new Error(errorText || "claude returned is_error"));
+        } else if (!totalText) {
+          cur.reject(
+            new Error(
+              `claude returned empty response (events=[${eventCountsSummary}])`
+            )
+          );
         } else {
           cur.resolve({ totalText, sessionId: this.cliSessionId });
         }
