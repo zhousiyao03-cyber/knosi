@@ -38,7 +38,17 @@ export class ChatWorkerPool {
       structuredFlag,
     });
     const existing = this._workers.get(key);
-    if (existing && !existing.isDead()) return existing;
+    if (existing && !existing.isDead()) {
+      if (!this._spawnFn) {
+        console.log(`[chat-worker-pool] reuse worker key=${key}`);
+      }
+      return existing;
+    }
+    if (!this._spawnFn) {
+      console.log(
+        `[chat-worker-pool] miss — creating worker key=${key} resume=${cliSessionId ? "yes" : "no"}`
+      );
+    }
     const worker = new ChatWorker({
       workerKey: key,
       systemPrompt,

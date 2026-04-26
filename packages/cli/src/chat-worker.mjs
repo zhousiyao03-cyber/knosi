@@ -83,6 +83,14 @@ export class ChatWorker {
           windowsHide: true,
         });
     this._proc = proc;
+    if (!this._spawnFn) {
+      // Diagnostic: surface every worker spawn so it's obvious in the daemon
+      // log whether process reuse is working. If you see a spawn line on
+      // every chat task, the pool is not reusing workers.
+      console.log(
+        `[chat-worker] spawn pid=${proc.pid} key=${this.workerKey} resume=${this.cliSessionId ? "yes" : "no"} bin=${claudeBin}`
+      );
+    }
 
     if (proc.stdout) {
       const rl = createInterface({ input: proc.stdout });
@@ -159,6 +167,11 @@ export class ChatWorker {
   _handleExit(code) {
     if (this._dead) return;
     this._dead = true;
+    if (!this._spawnFn) {
+      console.log(
+        `[chat-worker] exit code=${code} key=${this.workerKey} resumeMissed=${this._resumeMissed}`
+      );
+    }
     if (this._idleTimer) {
       clearTimeout(this._idleTimer);
       this._idleTimer = null;
