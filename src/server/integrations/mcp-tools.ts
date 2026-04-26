@@ -42,7 +42,10 @@ export const KNOSI_MCP_TOOLS = [
   },
   {
     name: "save_to_knosi",
-    description: "Save an explicit AI conversation excerpt into the user's AI Inbox.",
+    description:
+      "Save an explicit AI conversation excerpt into the user's Knosi knowledge base. " +
+      "Defaults to the AI Inbox folder. Pass `folder` to route the note into a named " +
+      "top-level folder (created on first use).",
     inputSchema: {
       type: "object",
       properties: {
@@ -50,6 +53,12 @@ export const KNOSI_MCP_TOOLS = [
         sourceApp: { type: "string" },
         capturedAtLabel: { type: "string" },
         sourceMeta: { type: "object" },
+        folder: {
+          type: "string",
+          description:
+            "Optional top-level folder name. When non-empty, the note is filed there " +
+            "(folder is created if missing). Empty/omitted = AI Inbox.",
+        },
         messages: {
           type: "array",
           items: {
@@ -67,21 +76,44 @@ export const KNOSI_MCP_TOOLS = [
   },
 ] as const;
 
-export async function callKnosiMcpTool(input: {
-  userId: string;
-  name: (typeof KNOSI_MCP_TOOLS)[number]["name"];
-  arguments: Record<string, unknown>;
-}) {
+export interface KnosiMcpDeps {
+  searchKnowledge: typeof searchKnowledge;
+  listRecentKnowledge: typeof listRecentKnowledge;
+  getKnowledgeItem: typeof getKnowledgeItem;
+  captureAiNote: typeof captureAiNote;
+}
+
+const defaultDeps: KnosiMcpDeps = {
+  searchKnowledge,
+  listRecentKnowledge,
+  getKnowledgeItem,
+  captureAiNote,
+};
+
+export async function callKnosiMcpTool(
+  input: {
+    userId: string;
+    name: (typeof KNOSI_MCP_TOOLS)[number]["name"];
+    arguments: Record<string, unknown>;
+  },
+  deps: KnosiMcpDeps = defaultDeps
+): Promise<Record<string, unknown>> {
   switch (input.name) {
-    case "search_knowledge":
-      return searchKnowledge({
+    case "search_knowledge": {
+      // MCP spec requires `structuredContent` to be a JSON object (not array
+      // or null), and Claude Code's MCP client enforces this strictly. Wrap
+      // array/null readers here so individual reader functions can keep their
+      // natural return shapes for other callers.
+      const items = await deps.searchKnowledge({
         userId: input.userId,
         query: String(input.arguments.query ?? ""),
         limit:
           typeof input.arguments.limit === "number" ? input.arguments.limit : undefined,
       });
-    case "get_knowledge_item":
-      return getKnowledgeItem({
+      return { items };
+    }
+    case "get_knowledge_item": {
+      const item = await deps.getKnowledgeItem({
         userId: input.userId,
         id: String(input.arguments.id ?? ""),
         type:
@@ -89,14 +121,18 @@ export async function callKnosiMcpTool(input: {
             ? input.arguments.type
             : undefined,
       });
-    case "list_recent_knowledge":
-      return listRecentKnowledge({
+      return { item };
+    }
+    case "list_recent_knowledge": {
+      const items = await deps.listRecentKnowledge({
         userId: input.userId,
         limit:
           typeof input.arguments.limit === "number" ? input.arguments.limit : undefined,
       });
+      return { items };
+    }
     case "save_to_knosi":
-      return captureAiNote({
+      return deps.captureAiNote({
         userId: input.userId,
         title:
           typeof input.arguments.title === "string" ? input.arguments.title : undefined,
@@ -108,6 +144,10 @@ export async function callKnosiMcpTool(input: {
         sourceMeta:
           input.arguments.sourceMeta && typeof input.arguments.sourceMeta === "object"
             ? (input.arguments.sourceMeta as Record<string, unknown>)
+            : undefined,
+        folder:
+          typeof input.arguments.folder === "string"
+            ? input.arguments.folder
             : undefined,
         messages: Array.isArray(input.arguments.messages)
           ? input.arguments.messages
