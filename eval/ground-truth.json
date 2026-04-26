@@ -1,0 +1,24 @@
+{
+  "_doc": "RAG eval 标注集。每个 entry: id / query / relevant_chunk_ids / notes。run scripts/eval-rag.mjs --seed-template 列出每个 query 的 BM25 top-10 候选 chunkId 给你手填 relevant_chunk_ids。",
+  "_usage": "node --experimental-strip-types --env-file=.env.local scripts/eval-rag.mjs [--ef N] [--top-k N] [--out path] [--seed-template]",
+  "queries": [
+    {
+      "id": "q-001",
+      "query": "Tiptap 编辑器粘贴 Markdown 表格的实现",
+      "relevant_chunk_ids": [],
+      "notes": "用 --seed-template 看候选后手填"
+    },
+    {
+      "id": "q-002",
+      "query": "Hetzner k3s 部署流程",
+      "relevant_chunk_ids": [],
+      "notes": ""
+    },
+    {
+      "id": "q-003",
+      "query": "knosi cli daemon 启动时检测 claude 二进制",
+      "relevant_chunk_ids": [],
+      "notes": ""
+    }
+  ]
+}
