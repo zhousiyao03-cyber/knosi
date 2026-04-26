@@ -100,36 +100,93 @@ export function DashboardPageClient({
         </div>
       </section>
 
-      {/* AI → Knowledge */}
+      {/* Recent notes — primary content on the home page */}
+      <section data-testid="dashboard-recent-notes">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-50">
+            Recent Notes
+          </h2>
+          <Link
+            href="/notes"
+            className="text-[11px] text-stone-400 transition-colors hover:text-stone-900 dark:text-stone-500 dark:hover:text-stone-100"
+          >
+            View all →
+          </Link>
+        </div>
+        <div className="overflow-hidden rounded-md border border-stone-200 bg-white/60 dark:border-stone-800 dark:bg-stone-950/50">
+          {isLoading ? (
+            <div className="px-3 py-6 text-center text-xs text-stone-400">
+              Loading...
+            </div>
+          ) : !data?.recentNotes.length ? (
+            <div className="px-3 py-6 text-center text-xs text-stone-400">
+              No notes yet
+            </div>
+          ) : (
+            data.recentNotes.map((note, idx) => (
+              <Link
+                key={note.id}
+                href={`/notes/${note.id}`}
+                className={`flex items-center gap-2 px-3 py-2 transition-colors hover:bg-stone-50 dark:hover:bg-stone-900/60 ${
+                  idx !== 0
+                    ? "border-t border-stone-100 dark:border-stone-900"
+                    : ""
+                }`}
+              >
+                <span className="min-w-0 flex-1 truncate text-sm text-stone-800 dark:text-stone-200">
+                  {note.title || "Untitled"}
+                </span>
+                {note.folder ? (
+                  <span className="shrink-0 truncate rounded bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-500 dark:bg-stone-900 dark:text-stone-400">
+                    {note.folder}
+                  </span>
+                ) : null}
+                <span className="shrink-0 text-[11px] tabular-nums text-stone-400">
+                  {formatDate(note.updatedAt)}
+                </span>
+              </Link>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* AI → Knowledge — compact one-line metric strip */}
       {data?.tokenStats && (
-        <section className="rounded-md border border-stone-200 bg-white/70 p-4 dark:border-stone-800 dark:bg-stone-950/50">
+        <Link
+          href="/notes"
+          data-testid="dashboard-ai-knowledge"
+          className="flex items-center gap-3 rounded-md border border-stone-200 bg-white/70 px-4 py-2.5 transition-colors hover:border-stone-300 hover:bg-white dark:border-stone-800 dark:bg-stone-950/50 dark:hover:border-stone-700 dark:hover:bg-stone-950"
+        >
           <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">
             <Zap className="h-3 w-3" />
             AI → Knowledge
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-4">
-            <div>
-              <div className="text-xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+          <div className="flex flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[11px] text-stone-500 dark:text-stone-400">
+            <span>
+              <span className="font-semibold tabular-nums text-stone-900 dark:text-stone-50">
                 {data.tokenStats.capturedNotes}
-              </div>
-              <div className="mt-0.5 text-[11px] text-stone-400">notes captured</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+              </span>{" "}
+              captured
+            </span>
+            <span className="text-stone-300 dark:text-stone-700">·</span>
+            <span>
+              <span className="font-semibold tabular-nums text-stone-900 dark:text-stone-50">
                 {data.tokenStats.capturedTokens >= 1000
                   ? `${(data.tokenStats.capturedTokens / 1000).toFixed(1)}k`
                   : data.tokenStats.capturedTokens}
-              </div>
-              <div className="mt-0.5 text-[11px] text-stone-400">≈ tokens saved</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold tabular-nums text-cyan-600 dark:text-cyan-400">
+              </span>{" "}
+              tokens
+            </span>
+            <span className="text-stone-300 dark:text-stone-700">·</span>
+            <span>
+              <span className="font-semibold tabular-nums text-cyan-600 dark:text-cyan-400">
                 {data.tokenStats.avgPerDay.toFixed(1)}
-              </div>
-              <div className="mt-0.5 text-[11px] text-stone-400">notes / day</div>
-            </div>
+              </span>{" "}
+              /day
+            </span>
           </div>
-        </section>
+          <ArrowRight className="h-3 w-3 shrink-0 text-stone-400" />
+        </Link>
       )}
 
       {/* Focus Tracking */}
@@ -184,51 +241,6 @@ export function DashboardPageClient({
 
       {/* Focus heatmap */}
       <DailyFocusHeatmap />
-
-      {/* Recent notes */}
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 dark:text-stone-500">
-            Recent Notes
-          </h2>
-          <Link
-            href="/notes"
-            className="text-[11px] text-stone-400 transition-colors hover:text-stone-900 dark:text-stone-500 dark:hover:text-stone-100"
-          >
-            View all →
-          </Link>
-        </div>
-        <div className="overflow-hidden rounded-md border border-stone-200 bg-white/60 dark:border-stone-800 dark:bg-stone-950/50">
-          {isLoading ? (
-            <div className="px-3 py-6 text-center text-xs text-stone-400">
-              Loading...
-            </div>
-          ) : !data?.recentNotes.length ? (
-            <div className="px-3 py-6 text-center text-xs text-stone-400">
-              No notes yet
-            </div>
-          ) : (
-            data.recentNotes.map((note, idx) => (
-              <Link
-                key={note.id}
-                href={`/notes/${note.id}`}
-                className={`flex items-center gap-2 px-3 py-2 transition-colors hover:bg-stone-50 dark:hover:bg-stone-900/60 ${
-                  idx !== 0
-                    ? "border-t border-stone-100 dark:border-stone-900"
-                    : ""
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate text-sm text-stone-800 dark:text-stone-200">
-                  {note.title || "Untitled"}
-                </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-stone-400">
-                  {formatDate(note.updatedAt)}
-                </span>
-              </Link>
-            ))
-          )}
-        </div>
-      </section>
     </div>
   );
 }

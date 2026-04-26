@@ -1,8 +1,8 @@
 import { z } from "zod/v4";
 import { router, protectedProcedure } from "../trpc";
 import { db } from "../db";
-import { notes, bookmarks, todos, osProjectNotes, osProjects, folders } from "../db/schema";
-import { and, count, desc, eq, gte, isNotNull, like, or, sql } from "drizzle-orm";
+import { notes, bookmarks, todos, folders } from "../db/schema";
+import { and, count, desc, eq, gte, like, or, sql } from "drizzle-orm";
 import { normalizeJournalTitlesForUser } from "../notes/journal-titles";
 import { dashboardStatsCache } from "../cache/instances";
 import { AI_INBOX_FOLDER_NAME } from "../integrations/ai-inbox";
@@ -13,14 +13,6 @@ async function computeDashboardStats(userId: string) {
   const [noteCount] = await db.select({ count: count() }).from(notes).where(eq(notes.userId, userId));
 
   const recentNotes = await db
-    .select({ id: notes.id, title: notes.title, updatedAt: notes.updatedAt })
-    .from(notes)
-    .where(eq(notes.userId, userId))
-    .orderBy(desc(notes.updatedAt))
-    .limit(5);
-
-  // Recent folder notes (learning notes now live in notes table with folder set)
-  const recentLearnNotes = await db
     .select({
       id: notes.id,
       title: notes.title,
@@ -28,24 +20,9 @@ async function computeDashboardStats(userId: string) {
       updatedAt: notes.updatedAt,
     })
     .from(notes)
-    .where(and(eq(notes.userId, userId), isNotNull(notes.folder)))
+    .where(eq(notes.userId, userId))
     .orderBy(desc(notes.updatedAt))
-    .limit(5);
-
-  // Recent project notes (across all projects)
-  const recentProjectNotes = await db
-    .select({
-      id: osProjectNotes.id,
-      title: osProjectNotes.title,
-      projectId: osProjectNotes.projectId,
-      projectName: osProjects.name,
-      updatedAt: osProjectNotes.updatedAt,
-    })
-    .from(osProjectNotes)
-    .innerJoin(osProjects, eq(osProjectNotes.projectId, osProjects.id))
-    .where(eq(osProjects.userId, userId))
-    .orderBy(desc(osProjectNotes.updatedAt))
-    .limit(5);
+    .limit(15);
 
   // AI → Knowledge stats: measure knowledge volume captured via AI (MCP save_to_knosi)
   const now = new Date();
@@ -102,8 +79,6 @@ async function computeDashboardStats(userId: string) {
       notes: noteCount.count,
     },
     recentNotes,
-    recentLearnNotes,
-    recentProjectNotes,
     tokenStats,
   };
 }
