@@ -1,4 +1,4 @@
-import { execSync, spawn as cpSpawn } from "node:child_process";
+import { spawnSync, spawn as cpSpawn } from "node:child_process";
 import {
   claimTask,
   configure,
@@ -24,16 +24,34 @@ function getArg(args, flag) {
 }
 
 function checkClaude(claudeBinArg) {
-  try {
-    const version = execSync(`${claudeBinArg} --version`, { encoding: "utf8" }).trim();
+  // Use spawnSync without a shell so we don't go through cmd.exe — on
+  // Chinese-codepage Windows, cmd.exe's GBK output mangles when Node tries
+  // to UTF-8 decode it, and the .cmd shim itself sometimes fails the round
+  // trip for reasons unrelated to whether Claude is actually installed.
+  // Reading stdout as a Buffer dodges the encoding question entirely; the
+  // version string is ASCII (e.g. "2.1.76 (Claude Code)") so any encoding
+  // would round-trip it.
+  const result = spawnSync(claudeBinArg, ["--version"], {
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+    // shell: true would re-introduce the cmd.exe path; explicitly false.
+    shell: false,
+  });
+  if (result.status === 0 && result.stdout) {
+    const version = result.stdout.toString("utf8").trim() ||
+      result.stdout.toString("latin1").trim() ||
+      "(unknown version)";
     console.log(`✓ Claude CLI: ${version}`);
     return true;
-  } catch {
-    console.error(`✗ Claude CLI not found at "${claudeBinArg}"`);
-    console.error("  Install: npm install -g @anthropic-ai/claude-code");
-    console.error("  Or specify: --claude-bin /path/to/claude");
-    return false;
   }
+  console.error(`✗ Claude CLI not found at "${claudeBinArg}"`);
+  if (result.error) {
+    console.error(`  ${result.error.code ?? ""} ${result.error.message ?? ""}`.trim());
+  }
+  console.error("  Install: npm install -g @anthropic-ai/claude-code");
+  console.error("  Or specify: --claude-bin /path/to/claude.exe");
+  console.error("  On Windows, prefer the native .exe over the .cmd shim.");
+  return false;
 }
 
 function ts() {
