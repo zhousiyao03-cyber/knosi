@@ -54,10 +54,13 @@ function vectorToBuffer(vector) {
 }
 
 async function getOrphanBatch(limit) {
+  // Prefer chunks whose source note was most recently updated — the user
+  // is likely asking about recent work, so semantic search should cover
+  // those first. Falls back to chunk created_at as a tiebreaker.
   const r = await client.execute({
     sql: `SELECT c.id, c.text FROM knowledge_chunks c
           WHERE NOT EXISTS (SELECT 1 FROM knowledge_chunk_embeddings e WHERE e.chunk_id = c.id)
-          ORDER BY c.created_at ASC
+          ORDER BY c.source_updated_at DESC, c.created_at DESC
           LIMIT ?`,
     args: [limit],
   });
@@ -132,13 +135,14 @@ async function main() {
         `[${new Date().toLocaleTimeString("en-GB", { hour12: false })}] ` +
         `batch failed (consec=${consecutiveErrors}): ${msg.slice(0, 150)}`
       );
-      if (consecutiveErrors >= 5) {
-        console.error("5 consecutive failures — aborting");
-        process.exit(1);
-      }
-      // Exponential-ish backoff on errors
-      const backoffMs = Math.min(60_000, SLEEP_MS * Math.pow(2, consecutiveErrors));
-      console.error(`  backing off ${backoffMs}ms`);
+      // Most failures are Gemini free-tier rate limits, which reset within
+      // minutes. Don't bail — backoff up to 5 minutes between attempts and
+      // keep going until everything is embedded.
+      const backoffMs = Math.min(
+        5 * 60_000,
+        SLEEP_MS * Math.pow(2, Math.min(consecutiveErrors, 6))
+      );
+      console.error(`  backing off ${Math.round(backoffMs/1000)}s`);
       await sleep(backoffMs);
       continue;
     }

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPublicOrigin } from "@/lib/public-origin";
 import { OAUTH_SCOPES } from "@/server/integrations/oauth-clients";
 
+// See oauth-protected-resource/route.ts for why this must be dynamic —
+// same cache-pinning hazard for the authorization server metadata.
+export const dynamic = "force-dynamic";
+
 export function GET(request: NextRequest) {
   const origin = getPublicOrigin(request);
 
