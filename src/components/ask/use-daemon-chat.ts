@@ -143,31 +143,28 @@ export function useDaemonChat({ api, sourceScope }: UseDaemonChatOptions) {
 
             if (!dataStr) continue;
 
+            let data: { type?: string; delta?: string; totalText?: string; error?: string };
             try {
-              const data = JSON.parse(dataStr);
+              data = JSON.parse(dataStr);
+            } catch {
+              continue;
+            }
 
-              if (eventType === "delta") {
-                if (data.type === "text_delta" && data.delta != null) {
-                  currentText += data.delta;
-                  updateAssistant(currentText);
-                }
-              } else if (eventType === "done") {
-                if (data.totalText && data.totalText !== currentText) {
-                  currentText = data.totalText;
-                  updateAssistant(currentText);
-                }
-                setStatus("idle");
-                abortRef.current = null;
-                return;
-              } else if (eventType === "error") {
-                throw new Error(data.error || "Daemon task failed");
+            if (eventType === "delta") {
+              if (data.type === "text_delta" && data.delta != null) {
+                currentText += data.delta;
+                updateAssistant(currentText);
               }
-            } catch (e) {
-              if (e instanceof Error && e.message !== "Daemon task failed") {
-                // JSON parse error — skip
-                continue;
+            } else if (eventType === "done") {
+              if (data.totalText && data.totalText !== currentText) {
+                currentText = data.totalText;
+                updateAssistant(currentText);
               }
-              throw e;
+              setStatus("idle");
+              abortRef.current = null;
+              return;
+            } else if (eventType === "error") {
+              throw new Error(data.error || "Daemon task failed");
             }
           }
         }
