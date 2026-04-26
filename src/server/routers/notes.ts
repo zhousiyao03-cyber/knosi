@@ -92,7 +92,6 @@ export const notesRouter = router({
     .query(async ({ input, ctx }) => {
       const limit = input?.limit ?? 30;
       const offset = input?.offset ?? 0;
-      await normalizeJournalTitlesForUser(ctx.userId);
 
       const cacheKey = `${ctx.userId}:${input?.folderId ?? "*"}:${limit}:${offset}`;
       return notesListCache.getOrLoad(
@@ -103,8 +102,22 @@ export const notesRouter = router({
             clauses.push(eq(notes.folderId, input.folderId));
           }
 
+          // Project only fields the list UI actually reads. Skipping `content`
+          // (Tiptap JSON, often >50KB per row) cuts the response payload by an
+          // order of magnitude on accounts with long notes.
           const items = await db
-            .select()
+            .select({
+              id: notes.id,
+              userId: notes.userId,
+              title: notes.title,
+              plainText: notes.plainText,
+              type: notes.type,
+              icon: notes.icon,
+              cover: notes.cover,
+              folderId: notes.folderId,
+              createdAt: notes.createdAt,
+              updatedAt: notes.updatedAt,
+            })
             .from(notes)
             .where(and(...clauses))
             .orderBy(desc(notes.updatedAt))
@@ -122,7 +135,6 @@ export const notesRouter = router({
   get: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input, ctx }) => {
-      await normalizeJournalTitlesForUser(ctx.userId);
       const result = await db.select().from(notes).where(and(eq(notes.id, input.id), eq(notes.userId, ctx.userId)));
       return result[0] ?? null;
     }),
