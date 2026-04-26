@@ -87,4 +87,48 @@ describe("callKnosiMcpTool structuredContent shape", () => {
     expect(isPlainObject(result)).toBe(true);
     expect(result).toEqual(expected);
   });
+
+  it("forwards save_to_knosi folder argument to captureAiNote", async () => {
+    let receivedFolder: string | null | undefined = "<unset>";
+    const result = await callKnosiMcpTool(
+      {
+        userId: "u1",
+        name: "save_to_knosi",
+        arguments: {
+          sourceApp: "bagu-skill",
+          folder: "八股文",
+          messages: [{ role: "assistant", content: "Card" }],
+        },
+      },
+      makeDeps({
+        captureAiNote: async (input) => {
+          receivedFolder = input.folder ?? null;
+          return { noteId: "n1", folderId: "folder-bagu", title: "T" };
+        },
+      })
+    );
+    expect(receivedFolder).toBe("八股文");
+    expect(result).toEqual({ noteId: "n1", folderId: "folder-bagu", title: "T" });
+  });
+
+  it("omits folder from captureAiNote when arg absent", async () => {
+    let receivedFolder: string | null | undefined = "<unset>";
+    await callKnosiMcpTool(
+      {
+        userId: "u1",
+        name: "save_to_knosi",
+        arguments: {
+          sourceApp: "claude-web",
+          messages: [{ role: "user", content: "Q?" }],
+        },
+      },
+      makeDeps({
+        captureAiNote: async (input) => {
+          receivedFolder = input.folder;
+          return { noteId: "n1", folderId: "f1", title: "T" };
+        },
+      })
+    );
+    expect(receivedFolder).toBeUndefined();
+  });
 });

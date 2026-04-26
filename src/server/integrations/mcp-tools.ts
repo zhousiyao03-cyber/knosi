@@ -42,7 +42,10 @@ export const KNOSI_MCP_TOOLS = [
   },
   {
     name: "save_to_knosi",
-    description: "Save an explicit AI conversation excerpt into the user's AI Inbox.",
+    description:
+      "Save an explicit AI conversation excerpt into the user's Knosi knowledge base. " +
+      "Defaults to the AI Inbox folder. Pass `folder` to route the note into a named " +
+      "top-level folder (created on first use).",
     inputSchema: {
       type: "object",
       properties: {
@@ -50,6 +53,13 @@ export const KNOSI_MCP_TOOLS = [
         sourceApp: { type: "string" },
         capturedAtLabel: { type: "string" },
         sourceMeta: { type: "object" },
+        folder: {
+          type: "string",
+          description:
+            "Optional top-level folder name. When non-empty after trim, the note is " +
+            "filed there (folder is created if missing). Empty, whitespace-only, or " +
+            "omitted = AI Inbox.",
+        },
         messages: {
           type: "array",
           items: {
@@ -135,6 +145,10 @@ export async function callKnosiMcpTool(
         sourceMeta:
           input.arguments.sourceMeta && typeof input.arguments.sourceMeta === "object"
             ? (input.arguments.sourceMeta as Record<string, unknown>)
+            : undefined,
+        folder:
+          typeof input.arguments.folder === "string"
+            ? input.arguments.folder
             : undefined,
         messages: Array.isArray(input.arguments.messages)
           ? input.arguments.messages
