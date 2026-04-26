@@ -5,6 +5,7 @@ import { notes } from "../db/schema";
 import {
   createAiInboxFolderRepository,
   resolveOrCreateAiInboxFolder as resolveOrCreateAiInboxFolderBase,
+  resolveOrCreateNamedFolder as resolveOrCreateNamedFolderBase,
   type AiInboxFolderRepository,
 } from "./ai-inbox";
 
@@ -21,6 +22,12 @@ export type AiCaptureInput = {
   sourceMeta?: Record<string, unknown>;
   capturedAt?: Date | string | number;
   capturedAtLabel?: string;
+  /**
+   * Optional top-level folder name. When provided (and non-empty after trim),
+   * the note is routed via `resolveOrCreateNamedFolder` instead of the
+   * default AI Inbox path.
+   */
+  folder?: string | null;
 };
 
 export type AiCaptureDependencies = {
@@ -32,6 +39,14 @@ export type AiCaptureDependencies = {
   invalidateDashboardForUser?: (userId: string) => void;
   resolveOrCreateAiInboxFolder?: (
     userId: string,
+    options?: {
+      repo?: AiInboxFolderRepository;
+      randomUUID?: () => string;
+    }
+  ) => Promise<string>;
+  resolveOrCreateNamedFolder?: (
+    userId: string,
+    name: string,
     options?: {
       repo?: AiInboxFolderRepository;
       randomUUID?: () => string;
@@ -195,12 +210,16 @@ export async function captureAiConversation(
   const randomUUID = dependencies.randomUUID ?? crypto.randomUUID;
   const markdownToTiptapImpl =
     dependencies.markdownToTiptap ?? markdownToTiptap;
-  const resolveFolderImpl =
+  const resolveInboxImpl =
     dependencies.resolveOrCreateAiInboxFolder ??
     resolveOrCreateAiInboxFolderBase;
+  const resolveNamedImpl =
+    dependencies.resolveOrCreateNamedFolder ??
+    resolveOrCreateNamedFolderBase;
   const repo =
     dependencies.inboxRepo ??
-    (dependencies.resolveOrCreateAiInboxFolder
+    (dependencies.resolveOrCreateAiInboxFolder ||
+    dependencies.resolveOrCreateNamedFolder
       ? undefined
       : await getDefaultAiInboxFolderRepository());
   const createNote =
@@ -228,10 +247,17 @@ export async function captureAiConversation(
     sourceMeta: input.sourceMeta,
   });
   const plainText = buildAiCapturePlainText(input.messages);
-  const folderId = await resolveFolderImpl(input.userId, {
-    repo,
-    randomUUID,
-  });
+  const trimmedFolder =
+    typeof input.folder === "string" ? input.folder.trim() : "";
+  const folderId = trimmedFolder
+    ? await resolveNamedImpl(input.userId, trimmedFolder, {
+        repo,
+        randomUUID,
+      })
+    : await resolveInboxImpl(input.userId, {
+        repo,
+        randomUUID,
+      });
   const noteId = randomUUID();
   const content = JSON.stringify(markdownToTiptapImpl(markdown));
 
