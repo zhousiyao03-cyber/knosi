@@ -104,6 +104,41 @@ async function deleteChunkRows(sourceType: KnowledgeSourceType, sourceId: string
     );
 }
 
+/**
+ * For chunks whose content is unchanged, ensure each one has a matching
+ * embedding row. Used to recover from prior transient failures that left
+ * chunks orphaned (e.g. Gemini rate limit during a previous attempt).
+ *
+ * Throws on embed-API failure so the caller's retry logic kicks in.
+ */
+async function fillMissingEmbeddingsForExistingChunks(
+  existing: ExistingChunkRow[]
+) {
+  if (existing.length === 0) return;
+
+  const existingIds = existing.map((chunk) => chunk.id);
+  const embeddedRows = await db
+    .select({ chunkId: knowledgeChunkEmbeddings.chunkId })
+    .from(knowledgeChunkEmbeddings)
+    .where(inArray(knowledgeChunkEmbeddings.chunkId, existingIds));
+
+  const embeddedSet = new Set(embeddedRows.map((row) => row.chunkId));
+  const missing = existing.filter((chunk) => !embeddedSet.has(chunk.id));
+  if (missing.length === 0) return;
+
+  const embedded = await embedTexts(missing.map((chunk) => chunk.text));
+  if (!embedded) return; // provider mode === "none" — intentionally skip
+
+  await db.insert(knowledgeChunkEmbeddings).values(
+    embedded.vectors.map((vector, index) => ({
+      chunkId: missing[index]!.id,
+      model: embedded.model,
+      dims: vector.length,
+      vector: vectorArrayToBuffer(vector),
+    }))
+  );
+}
+
 async function syncSourceIndex({
   content,
   plainText,
@@ -174,6 +209,16 @@ async function syncSourceIndex({
             eq(knowledgeChunks.sourceId, sourceId)
           )
         );
+
+      // Fill in any embeddings that are missing for these unchanged chunks.
+      // Without this, a transient embedding failure (e.g. Gemini free-tier
+      // rate limit) would leave chunks permanently orphaned: the next
+      // syncSourceIndex pass would see fingerprints match and skip embedding
+      // entirely. Now any pass — including the queue's automatic retry —
+      // converges on full coverage. embedTexts throws on transient failures,
+      // which propagates to the job's catch and triggers another retry.
+      await fillMissingEmbeddingsForExistingChunks(existing);
+
       if (jobId) await finishIndexJob(jobId, "done");
       return;
     }
@@ -197,14 +242,10 @@ async function syncSourceIndex({
 
     await db.insert(knowledgeChunks).values(insertedChunks);
 
-    const embedded = await embedTexts(nextChunks.map((chunk) => chunk.text)).catch(
-      (error) => {
-        console.warn(
-          `[indexer] embedding failed for ${sourceType}:${sourceId} — ${error instanceof Error ? error.message : String(error)}`
-        );
-        return null;
-      }
-    );
+    // Let exceptions propagate so the job is marked failed and the queue's
+    // retry kicks in. embedTexts returns null only when no provider is
+    // configured — that's intentional, not a failure.
+    const embedded = await embedTexts(nextChunks.map((chunk) => chunk.text));
 
     if (embedded) {
       await db.insert(knowledgeChunkEmbeddings).values(
