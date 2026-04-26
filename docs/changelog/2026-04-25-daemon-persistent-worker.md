@@ -92,23 +92,33 @@ worker pool keyed on `(userId, sourceScope, structuredFlag)`, so:
 | `pnpm test:unit` (vitest) | ⏸ Local skipped — vitest 4.x ESM/CJS conflict on Node 20.17 (env issue, unrelated to this change). CI runs Node 22 and exercises the vitest suites; the new `chat-system-prompt.test.ts` and `inject-preamble.test.ts` will run there. |
 | Manual two-message flow | ⏸ TODO — requires daemon restart + manual verification (see "Manual verification" below) |
 
-## Production rollout
+## Production rollout — completed 2026-04-26
 
-Schema change requires a production Turso rollout:
+Applied to production Turso via [`scripts/db/apply-2026-04-26-daemon-conversations-rollout.mjs`](../../scripts/db/apply-2026-04-26-daemon-conversations-rollout.mjs):
 
-```bash
-# 1. Inspect the generated migration
-cat drizzle/0038_jazzy_alice.sql
+```
+Production Turso rollout — daemon_conversations
+Target: libsql://database-bisque-ladder-vercel-icfg-...turso.io
 
-# 2. Apply to production Turso (credentials in .env.turso-prod.local per
-#    .claude/rules/production-turso.md)
-turso db shell <db-name> < drizzle/0038_jazzy_alice.sql
+Step 1: apply statement
+Step 2: apply statement
 
-# 3. Verify the table exists in production
-turso db shell <db-name> "SELECT name FROM sqlite_master WHERE type='table' AND name='daemon_conversations';"
+Verification:
+  OK — table daemon_conversations exists
+  OK — index daemon_conversations_user_worker_idx exists
+  OK — column id exists
+  OK — column user_id exists
+  OK — column worker_key exists
+  OK — column cli_session_id exists
+  OK — column last_used_at exists
+  OK — column created_at exists
+
+✅ Production rollout verified: daemon_conversations is ready.
 ```
 
-Then bump and publish the daemon CLI:
+The script is idempotent (`CREATE IF NOT EXISTS`), safe to re-run.
+
+After production schema is in place, bump and publish the daemon CLI:
 
 ```bash
 cd packages/cli
