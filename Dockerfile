@@ -21,13 +21,17 @@ ENV TURSO_DATABASE_URL=file:data/second-brain.db
 ENV AUTH_SECRET=change-me-in-production
 ENV NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID
 
-# Pre-download the embedding model so the first runtime request doesn't
-# hang for ~30s downloading 120MB. Cache lands in /app/.hf-cache and is
-# copied into the runner stage. HF_HOME makes the same path the lookup
-# location at runtime too.
+# Pre-download the embedding + reranker models so the first runtime
+# request doesn't hang for ~30s downloading. Cache lands in /app/.hf-cache
+# and is copied into the runner stage. HF_HOME makes the same path the
+# lookup location at runtime too.
 ENV HF_HOME=/app/.hf-cache
 RUN mkdir -p /app/.hf-cache && \
-    node -e "import('@huggingface/transformers').then(m => m.pipeline('feature-extraction', 'Xenova/multilingual-e5-small', { dtype: 'q8' })).then(() => console.log('model cached')).catch(e => { console.error(e); process.exit(1); })"
+    node -e "import('@huggingface/transformers').then(async m => { \
+      await m.pipeline('feature-extraction', 'Xenova/multilingual-e5-small', { dtype: 'q8' }); \
+      await m.pipeline('text-classification', 'Xenova/ms-marco-MiniLM-L-6-v2', { dtype: 'q8' }); \
+      console.log('models cached'); \
+    }).catch(e => { console.error(e); process.exit(1); })"
 
 RUN mkdir -p data && pnpm db:push && pnpm build
 

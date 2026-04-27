@@ -14,7 +14,25 @@
 //   - Different input shape (pairs of strings, not single strings)
 //   - Different lifecycle (only loaded if RAG_RERANKER_ENABLED=true)
 
-import type { TextClassificationPipeline } from "@huggingface/transformers";
+// We use the lower-level AutoTokenizer + AutoModelForSequenceClassification
+// instead of the high-level pipeline("text-classification", …) because the
+// pipeline's TS signature only accepts string / string[] inputs, but a
+// cross-encoder needs (query, passage) pairs. The tokenizer's `text_pair`
+// option is the supported way to feed pairs end-to-end.
+
+interface RerankerModel {
+  tokenizer: (
+    text: string[],
+    options: {
+      text_pair: string[];
+      padding: boolean;
+      truncation: boolean;
+    }
+  ) => Record<string, unknown>;
+  model: (input: Record<string, unknown>) => Promise<{
+    logits: { data: ArrayLike<number>; dims: number[] };
+  }>;
+}
 
 export interface RerankerCandidate {
   id: string;
@@ -46,22 +64,38 @@ export function isRerankerEnabled(): boolean {
   return true;
 }
 
-let pipelinePromise: Promise<TextClassificationPipeline> | null = null;
+let modelPromise: Promise<RerankerModel> | null = null;
 let testHook: ((pairs: Array<[string, string]>) => Promise<number[]>) | null =
   null;
 
-async function getPipeline() {
-  if (!pipelinePromise) {
-    pipelinePromise = (async () => {
+async function loadModel(): Promise<RerankerModel> {
+  if (!modelPromise) {
+    modelPromise = (async () => {
       // Dynamic import for the same reason as embeddings.ts: keep cold start
       // cost lazy so the rest of the server doesn't pay for it on boot.
-      const { pipeline } = await import("@huggingface/transformers");
-      return pipeline("text-classification", getModelId(), {
-        dtype: "q8",
-      });
+      const transformers = (await import("@huggingface/transformers")) as {
+        AutoTokenizer: { from_pretrained: (id: string) => Promise<unknown> };
+        AutoModelForSequenceClassification: {
+          from_pretrained: (
+            id: string,
+            options: { dtype: string }
+          ) => Promise<unknown>;
+        };
+      };
+      const id = getModelId();
+      const [tokenizer, model] = await Promise.all([
+        transformers.AutoTokenizer.from_pretrained(id),
+        transformers.AutoModelForSequenceClassification.from_pretrained(id, {
+          dtype: "q8",
+        }),
+      ]);
+      return {
+        tokenizer: tokenizer as RerankerModel["tokenizer"],
+        model: model as RerankerModel["model"],
+      };
     })();
   }
-  return pipelinePromise;
+  return modelPromise;
 }
 
 /**
@@ -92,32 +126,32 @@ export async function rerankCandidates(
     return candidates.map((c, i) => ({ id: c.id, score: scores[i] ?? 0 }));
   }
 
-  const pipe = await getPipeline();
+  const { tokenizer, model } = await loadModel();
 
-  // ms-marco-MiniLM was trained with [CLS] query [SEP] passage [SEP]. The
-  // Transformers.js text-classification pipeline accepts pairs as
-  // { text, text_pair } and applies the right tokenization.
-  const inputs = candidates.map((c) => ({
-    text: query,
-    text_pair: c.text,
-  }));
+  // Build one batch: query repeated to align with each candidate, candidates
+  // as text_pair. Tokenizer handles padding + truncation internally so all
+  // pairs end up the same length in the output tensor.
+  const queries = candidates.map(() => query);
+  const passages = candidates.map((c) => c.text);
 
-  // Cross-encoders are batchable; the pipeline handles internal batching.
-  // We pass everything in one call to maximize throughput.
-  const raw = (await pipe(inputs, { topk: 1 })) as Array<
-    { score: number } | Array<{ score: number }>
-  >;
-
-  // Pipeline output shape varies by topk: with topk=1 it's a flat array of
-  // { label, score }. Be defensive about array-of-array fallback.
-  const scores = raw.map((entry) => {
-    if (Array.isArray(entry)) {
-      return Number(entry[0]?.score ?? 0);
-    }
-    return Number(entry.score ?? 0);
+  const inputs = tokenizer(queries, {
+    text_pair: passages,
+    padding: true,
+    truncation: true,
   });
 
-  return candidates.map((c, i) => ({ id: c.id, score: scores[i] ?? 0 }));
+  // Single forward pass over the whole batch. logits shape: [batch_size, 1]
+  // for ms-marco-MiniLM (single-class regression head).
+  const { logits } = await model(inputs);
+  const data = Array.from(logits.data);
+  const numLabels = logits.dims[1] ?? 1;
+
+  return candidates.map((c, i) => ({
+    id: c.id,
+    // For multi-label heads grab the first logit; for single-label it IS the
+    // score. Either way, higher = more relevant.
+    score: Number(data[i * numLabels] ?? 0),
+  }));
 }
 
 // ─── Test seam ─────────────────────────────────────────────────────────
@@ -126,5 +160,5 @@ export function __setRerankerHookForTest(
   hook: ((pairs: Array<[string, string]>) => Promise<number[]>) | null
 ) {
   testHook = hook;
-  pipelinePromise = null;
+  modelPromise = null;
 }

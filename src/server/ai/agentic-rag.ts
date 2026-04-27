@@ -5,6 +5,7 @@ import { db } from "../db";
 import { knowledgeChunks } from "../db/schema";
 import { embedTexts } from "./embeddings";
 import { ensureKnowledgeBaseSeeded } from "./indexer";
+import { isRerankerEnabled, rerankCandidates } from "./reranker";
 import { tokenize, tokenizeForIndex } from "./tokenizer";
 import { getVectorStore } from "./vector-store";
 import { startAskTimer } from "./ask-timing";
@@ -67,8 +68,12 @@ interface QueryProfile {
   tokens: string[];
 }
 
-const KEYWORD_LIMIT = 18;
-const SEMANTIC_LIMIT = 18;
+const KEYWORD_LIMIT = 25;
+const SEMANTIC_LIMIT = 25;
+// Top-N from RRF fusion that we feed to the cross-encoder. Bigger pool
+// gives the reranker more headroom to find non-obvious matches; cost grows
+// linearly (~50ms total for 30 candidates on q8 ms-marco-MiniLM).
+const RERANK_POOL = 30;
 const SEED_LIMIT = 8;
 const FINAL_LIMIT = 16;
 const RECENT_QUERY_REGEX = /最近|最新|近期|刚刚|这几天|最近的/;
@@ -367,9 +372,12 @@ export async function retrieveAgenticContext(
     1.3
   );
 
-  const seedChunks = [...fusedScores.entries()]
+  // Pool of top RRF candidates that we hand to the cross-encoder. We then
+  // pick SEED_LIMIT from the rerank-sorted pool (or fall back to RRF order
+  // when reranker disabled / errored).
+  const rrfRanked = [...fusedScores.entries()]
     .sort((left, right) => right[1] - left[1])
-    .slice(0, SEED_LIMIT)
+    .slice(0, RERANK_POOL)
     .map(([id, score]) => ({
       chunk: scopedChunks.find((candidate) => candidate.id === id),
       score,
@@ -382,6 +390,48 @@ export async function retrieveAgenticContext(
         score: number;
       } => Boolean(result.chunk)
     );
+
+  let seedChunks = rrfRanked.slice(0, SEED_LIMIT);
+
+  if (isRerankerEnabled() && rrfRanked.length > 0) {
+    try {
+      const rerankInputs = rrfRanked.map((entry) => ({
+        id: entry.chunk.id,
+        // Concatenate title + section + body so the cross-encoder sees the
+        // same context the user would when judging relevance. ms-marco was
+        // trained on passage-level inputs (~200-400 tokens), so cap at
+        // 1200 chars to leave room for the query and special tokens.
+        text: [
+          entry.chunk.sourceTitle,
+          parseSectionPath(entry.chunk.sectionPath).join(" / "),
+          entry.chunk.text,
+        ]
+          .filter(Boolean)
+          .join("\n")
+          .slice(0, 1200),
+      }));
+
+      const rerankScored = await rerankCandidates(query, rerankInputs);
+      const scoreById = new Map(rerankScored.map((r) => [r.id, r.score]));
+
+      seedChunks = rrfRanked
+        .map((entry) => ({
+          chunk: entry.chunk,
+          // Score becomes the cross-encoder logit. RRF score is discarded —
+          // its only job was to limit the candidate pool to top RERANK_POOL.
+          score: scoreById.get(entry.chunk.id) ?? Number.NEGATIVE_INFINITY,
+        }))
+        .sort((left, right) => right.score - left.score)
+        .slice(0, SEED_LIMIT);
+    } catch (err) {
+      // Fall back to RRF order — better to ship a slightly worse ranking
+      // than to fail the whole query.
+      console.warn(
+        `[rag] reranker failed, 退到 RRF-only — ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+  timer.mark("rerank");
 
   if (seedChunks.length === 0) {
     timer.end({
