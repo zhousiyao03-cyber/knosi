@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { count, eq, max } from "drizzle-orm";
 import MiniSearch from "minisearch";
 import type { AskAiSourceScope } from "@/lib/ask-ai";
 import { db } from "../db";
@@ -8,6 +8,44 @@ import { ensureKnowledgeBaseSeeded } from "./indexer";
 import { tokenize, tokenizeForIndex } from "./tokenizer";
 import { getVectorStore } from "./vector-store";
 import { startAskTimer } from "./ask-timing";
+
+type ChunkRow = typeof knowledgeChunks.$inferSelect;
+type SearchDoc = { id: string; title: string; section: string; text: string };
+
+interface CachedIndex {
+  fingerprint: string;
+  scopedChunks: ChunkRow[];
+  miniSearch: MiniSearch<SearchDoc>;
+  chunkMap: Map<string, ChunkRow>;
+}
+
+// Per-(user,scope) MiniSearch index cache. Rebuilding the index used to
+// dominate wall time — a 3.5k-chunk user spent ~7.8s rebuilding it on every
+// ask even though the chunk set rarely changes. We keep up to
+// MAX_CACHED_INDEXES entries and evict in insertion order (Map preserves it;
+// re-inserting on hit makes that effectively LRU).
+const MAX_CACHED_INDEXES = 32;
+const indexCache = new Map<string, CachedIndex>();
+
+function makeIndexCacheKey(
+  userId: string,
+  scope: AskAiSourceScope | undefined
+) {
+  return `${userId}:${scope ?? "all"}`;
+}
+
+function touchCache(key: string, entry: CachedIndex) {
+  indexCache.delete(key);
+  indexCache.set(key, entry);
+}
+
+function evictCacheIfNeeded() {
+  while (indexCache.size > MAX_CACHED_INDEXES) {
+    const oldestKey = indexCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    indexCache.delete(oldestKey);
+  }
+}
 
 export interface AgenticRetrievalResult {
   blockType: string | null;
@@ -121,6 +159,88 @@ function toResult(
   };
 }
 
+/**
+ * Return an up-to-date MiniSearch index + chunk map for the (user, scope),
+ * rebuilding only when the underlying chunk set has changed.
+ *
+ * Cache invalidation is fingerprint-based: `count + max(updated_at)` over the
+ * user's chunks. Any insert / update / delete will move at least one of those
+ * (delete moves count, insert moves count + max, update moves max), so the
+ * fingerprint catches every relevant mutation. The fingerprint query itself
+ * is a tiny aggregate against `knowledge_chunks_user_id_idx` — much cheaper
+ * than the full SELECT it replaces on cache hits.
+ *
+ * Returns `cacheHit: true` when we reused an existing index, so callers can
+ * surface that to telemetry.
+ */
+async function getOrBuildIndex(
+  userId: string,
+  scope: AskAiSourceScope | undefined
+): Promise<{ entry: CachedIndex; cacheHit: boolean }> {
+  const cacheKey = makeIndexCacheKey(userId, scope);
+
+  const fingerprintRows = await db
+    .select({
+      total: count(),
+      maxUpdated: max(knowledgeChunks.updatedAt),
+    })
+    .from(knowledgeChunks)
+    .where(eq(knowledgeChunks.userId, userId));
+  const fpRow = fingerprintRows[0];
+  const total = Number(fpRow?.total ?? 0);
+  // drizzle returns max() as the column type; for a timestamp-mode integer
+  // column that's a Date | null. Coerce defensively because aggregates over
+  // empty sets return NULL.
+  const maxUpdatedAt =
+    fpRow?.maxUpdated instanceof Date ? fpRow.maxUpdated.getTime() : 0;
+  const fingerprint = `${total}:${maxUpdatedAt}`;
+
+  const existing = indexCache.get(cacheKey);
+  if (existing && existing.fingerprint === fingerprint) {
+    touchCache(cacheKey, existing);
+    return { entry: existing, cacheHit: true };
+  }
+
+  // Cold path: pull all chunks once, filter to scope, build the index.
+  const allChunks = await db
+    .select()
+    .from(knowledgeChunks)
+    .where(eq(knowledgeChunks.userId, userId));
+  const scopedChunks = allChunks.filter((chunk) =>
+    matchesScope(chunk.sourceType, scope)
+  );
+
+  const miniSearch = new MiniSearch<SearchDoc>({
+    fields: ["title", "section", "text"],
+    storeFields: [],
+    tokenize: tokenizeForIndex,
+    searchOptions: {
+      tokenize,
+      boost: { title: 3, section: 2, text: 1 },
+    },
+  });
+  const chunkMap = new Map(scopedChunks.map((chunk) => [chunk.id, chunk]));
+  miniSearch.addAll(
+    scopedChunks.map((chunk) => ({
+      id: chunk.id,
+      title: chunk.sourceTitle,
+      section: parseSectionPath(chunk.sectionPath).join(" "),
+      text: chunk.text,
+    }))
+  );
+
+  const entry: CachedIndex = {
+    fingerprint,
+    scopedChunks,
+    miniSearch,
+    chunkMap,
+  };
+  indexCache.set(cacheKey, entry);
+  evictCacheIfNeeded();
+
+  return { entry, cacheHit: false };
+}
+
 export async function retrieveAgenticContext(
   query: string,
   options: { scope?: AskAiSourceScope; userId?: string | null } = {}
@@ -136,47 +256,23 @@ export async function retrieveAgenticContext(
   timer.mark("ensureSeed");
 
   const profile = buildQueryProfile(query);
-  const allChunks = await db
-    .select()
-    .from(knowledgeChunks)
-    .where(eq(knowledgeChunks.userId, options.userId));
-  const scopedChunks = allChunks.filter((chunk) =>
-    matchesScope(chunk.sourceType, options.scope)
+
+  const { entry, cacheHit } = await getOrBuildIndex(
+    options.userId,
+    options.scope
   );
-  timer.mark("selectChunks");
+  const { scopedChunks, miniSearch, chunkMap } = entry;
+  timer.mark("loadIndex");
 
   if (scopedChunks.length === 0) {
-    timer.end({ chunks: 0, scoped: 0, scope: options.scope ?? "all" });
+    timer.end({
+      chunks: 0,
+      scoped: 0,
+      cache: cacheHit ? "hit" : "miss",
+      scope: options.scope ?? "all",
+    });
     return [] satisfies AgenticRetrievalResult[];
   }
-
-  // --- BM25 keyword retrieval via MiniSearch ---
-  const miniSearch = new MiniSearch<{
-    id: string;
-    title: string;
-    section: string;
-    text: string;
-  }>({
-    fields: ["title", "section", "text"],
-    storeFields: [],
-    tokenize: tokenizeForIndex,
-    searchOptions: {
-      tokenize,
-      boost: { title: 3, section: 2, text: 1 },
-    },
-  });
-
-  const chunkMap = new Map(scopedChunks.map((chunk) => [chunk.id, chunk]));
-
-  miniSearch.addAll(
-    scopedChunks.map((chunk) => ({
-      id: chunk.id,
-      title: chunk.sourceTitle,
-      section: parseSectionPath(chunk.sectionPath).join(" "),
-      text: chunk.text,
-    }))
-  );
-  timer.mark("buildIndex");
 
   const bm25Results = miniSearch.search(query, {
     tokenize,
@@ -289,8 +385,9 @@ export async function retrieveAgenticContext(
 
   if (seedChunks.length === 0) {
     timer.end({
-      chunks: allChunks.length,
+      chunks: scopedChunks.length,
       scoped: scopedChunks.length,
+      cache: cacheHit ? "hit" : "miss",
       bm25Hits: keywordMatches.length,
       semHits: semanticMatches.length,
       seeds: 0,
@@ -346,8 +443,9 @@ export async function retrieveAgenticContext(
 
   timer.mark("fuseExpand");
   timer.end({
-    chunks: allChunks.length,
+    chunks: scopedChunks.length,
     scoped: scopedChunks.length,
+    cache: cacheHit ? "hit" : "miss",
     bm25Hits: keywordMatches.length,
     semHits: semanticMatches.length,
     seeds: seedChunks.length,
