@@ -10,14 +10,20 @@ spec:
   replicas: 1
   # Production runs against remote Turso (TURSO_DATABASE_URL is set in
   # knosi-env), so the container is stateless and can roll without a PVC.
-  # maxUnavailable=0 keeps at least one pod serving traffic at all times,
-  # eliminating the deploy-time downtime window we used to get with the old
-  # Recreate strategy + RWO local-path PVC combo.
+  #
+  # maxSurge=0 / maxUnavailable=1: the host is a 4 GB CX23 and the pod's
+  # memory limit is 1.5 Gi (Next.js + in-process Transformers.js embedding
+  # + cross-encoder reranker). Allowing maxSurge=1 would briefly run two
+  # pods at ~3 Gi combined, which combined with Caddy + Traefik + system
+  # memory blew past host RAM and caused both pods to OOM during rollouts.
+  # The trade-off is a ~15s 503 window per deploy while the new pod boots,
+  # which is acceptable for a single-tenant app. Revisit if we move to a
+  # bigger node or split inference into a separate Deployment.
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: knosi
@@ -63,28 +69,33 @@ spec:
             # replicas or an eu-west Turso region.
             - name: SLOW_QUERY_MS
               value: "300"
+          # All three probes target /api/healthz, a static 200 with no DB
+          # or Redis call. Previously they hit /login, which triggered a
+          # React SSR + Turso lookup on every probe — under memory pressure
+          # the SSR itself slowed the probe enough to fail liveness, which
+          # then killed an otherwise-recoverable pod. The healthz route
+          # only reflects "Node process is up", which is what kubelet
+          # actually needs to decide whether to restart.
           startupProbe:
             httpGet:
-              path: /login
+              path: /api/healthz
               port: 3000
             failureThreshold: 30
             periodSeconds: 5
-            # Cold-start /login can hit a 300-500ms Turso lookup; the default
-            # 1s probe timeout was too tight and tripped during rollouts.
-            timeoutSeconds: 5
+            timeoutSeconds: 3
           readinessProbe:
             httpGet:
-              path: /login
+              path: /api/healthz
               port: 3000
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /login
+              path: /api/healthz
               port: 3000
             periodSeconds: 30
-            timeoutSeconds: 5
+            timeoutSeconds: 3
             failureThreshold: 3
           # When a pod enters Terminating, the endpoints controller removes
           # its IP from the Service, but Traefik takes a beat to observe the
@@ -99,10 +110,19 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              # Reflects the real working-set after Next.js boot + lazy
+              # Transformers.js model load. 256Mi was a guess from before
+              # the embedding/reranker moved in-process.
+              memory: 512Mi
             limits:
               cpu: 1000m
-              memory: 768Mi
+              # Headroom for: Next.js runtime (~300Mi), embedding model
+              # (~200Mi q8), cross-encoder reranker (~200Mi q8), Drizzle
+              # + libsql + Milvus + Langfuse SDKs (~150Mi), and request
+              # bursts. 768Mi was OOMing within minutes once both ML
+              # pipelines were active. Bump to 1.5Gi until inference is
+              # split into its own Deployment.
+              memory: 1536Mi
 ---
 apiVersion: v1
 kind: Service
