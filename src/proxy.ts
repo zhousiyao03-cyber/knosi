@@ -26,6 +26,12 @@ export default auth((req) => {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/oauth/") ||
     pathname === "/api/mcp" ||
+    // kubelet liveness/readiness/startup probes hit /api/healthz. Without
+    // this allow-list entry the middleware redirects them to /login,
+    // which produces a constant stream of "Probe terminated redirects"
+    // warnings and would silently fail probes the moment redirect-on-3xx
+    // semantics change.
+    pathname === "/api/healthz" ||
     pathname === "/api/integrations/ai-captures" ||
     pathname === "/.well-known/oauth-authorization-server" ||
     pathname === "/.well-known/oauth-protected-resource" ||
