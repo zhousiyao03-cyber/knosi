@@ -8,10 +8,11 @@ const STALE_RUNNING_MS = 10 * 60 * 1000; // 10 minutes
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
-  if (
-    process.env.CRON_SECRET &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
+  const cronSecret = process.env.CRON_SECRET;
+  // Fail closed: missing CRON_SECRET must NOT bypass auth (the previous
+  // `if (CRON_SECRET && header !== ...)` short-circuited to allow when the
+  // secret was unset, exposing this route to anonymous callers).
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

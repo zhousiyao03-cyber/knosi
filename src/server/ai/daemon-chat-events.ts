@@ -130,8 +130,17 @@ export async function subscribeToChatEvents(
   await client.subscribe(channel, (message) => {
     const event = parseChatEvent(message);
     if (!event) {
+      // Privacy: the raw `message` is the serialized chat payload, which on a
+      // valid producer can include streaming deltas / final assistant text.
+      // Only log structural metadata so a misbehaving producer can't dump
+      // full chat content into shared logs.
       logger.warn(
-        { event: "ask_ai.chat_event_parse_failed", taskId, message },
+        {
+          event: "ask_ai.chat_event_parse_failed",
+          taskId,
+          messageLength: message.length,
+          messageHead: message.slice(0, 64),
+        },
         "failed to parse daemon chat event"
       );
       return;

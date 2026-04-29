@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { CloudflareInsights } from "@/components/cloudflare-insights";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -95,12 +95,7 @@ export default function RootLayout({
     >
       <body className="h-full bg-[var(--background)] text-[var(--foreground)]">
         <Providers>{children}</Providers>
-        <Script
-          defer
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "77230078425f404aa623df2e0c39e471"}'
-          strategy="afterInteractive"
-        />
+        <CloudflareInsights />
       </body>
     </html>
   );

@@ -17,6 +17,19 @@ const DEFAULT_OPENAI_TASK_MODEL = "gpt-5.4";
 
 type AiSdkMode = Exclude<AIProviderMode, "codex" | "claude-code-daemon">;
 
+/**
+ * Vercel AI SDK's experimental_telemetry defaults `recordInputs` and
+ * `recordOutputs` to true — meaning when Langfuse is wired up the full prompt
+ * (including RAG-injected note bodies) and full LLM completion are exported as
+ * span attributes to cloud.langfuse.com.
+ *
+ * Privacy-by-default: only record content when the operator explicitly opts in
+ * via LANGFUSE_RECORD_CONTENT=true. Trace structure / latencies still flow.
+ */
+function shouldRecordTelemetryContent() {
+  return process.env.LANGFUSE_RECORD_CONTENT === "true";
+}
+
 function createAiSdkProvider(mode: AiSdkMode) {
   if (mode === "openai") {
     if (!process.env.OPENAI_API_KEY?.trim()) {
@@ -81,6 +94,7 @@ export function streamChatAiSdk({
   mode,
 }: StreamChatOptions & { mode: AiSdkMode }) {
   const provider = createAiSdkProvider(mode);
+  const recordContent = shouldRecordTelemetryContent();
   const result = streamText({
     abortSignal: signal,
     model: provider(resolveAiSdkModelId("chat", mode)),
@@ -88,6 +102,8 @@ export function streamChatAiSdk({
     system,
     experimental_telemetry: {
       isEnabled: true,
+      recordInputs: recordContent,
+      recordOutputs: recordContent,
       functionId: "chat",
       metadata: { mode },
     },
@@ -105,11 +121,19 @@ export async function generateStructuredDataAiSdk<TSchema extends z.ZodType>({
   mode,
 }: GenerateStructuredDataOptions<TSchema> & { mode: AiSdkMode }): Promise<z.infer<TSchema>> {
   const provider = createAiSdkProvider(mode);
+  const recordContent = shouldRecordTelemetryContent();
   const { output } = await generateText({
     model: provider(resolveAiSdkModelId("task", mode)),
     output: Output.object({ description, name, schema }),
     prompt,
     abortSignal: signal,
+    experimental_telemetry: {
+      isEnabled: true,
+      recordInputs: recordContent,
+      recordOutputs: recordContent,
+      functionId: "task",
+      metadata: { mode, name },
+    },
   });
 
   return output as z.infer<TSchema>;

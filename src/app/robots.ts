@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/share/"],
+        allow: ["/"],
         disallow: [
           "/api/",
           "/oauth/",
@@ -26,6 +26,10 @@ export default function robots(): MetadataRoute.Robots {
           "/workflows",
           "/usage",
           "/cli",
+          // /share/<token> are private capability URLs — never crawl. Each
+          // share page also returns <meta name="robots" content="noindex">
+          // for engines that ignore robots.txt for already-known URLs.
+          "/share/",
         ],
       },
     ],

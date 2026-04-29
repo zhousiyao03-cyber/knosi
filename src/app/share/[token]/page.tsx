@@ -1,5 +1,15 @@
+import type { Metadata } from "next";
 import { SharedNoteView } from "@/components/share/shared-note-view";
 import { getSharedNoteByToken } from "@/server/shares";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+    nocache: true,
+  },
+};
 
 export default async function SharePage({
   params,

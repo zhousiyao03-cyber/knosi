@@ -29,6 +29,39 @@ export const logger = pino({
   serializers: {
     err: pino.stdSerializers.err,
   },
+  /**
+   * Defense-in-depth PII redaction. Individual log sites should still avoid
+   * logging sensitive payloads in the first place — this only catches
+   * accidents (and field names that match conventions). Paths use pino's
+   * fast-redact syntax: dot path or wildcards.
+   */
+  redact: {
+    paths: [
+      "password",
+      "passwordHash",
+      "*.password",
+      "*.passwordHash",
+      "authorization",
+      "Authorization",
+      "cookie",
+      "Cookie",
+      "headers.authorization",
+      "headers.cookie",
+      "token",
+      "*.token",
+      "accessToken",
+      "refreshToken",
+      "clientSecret",
+      "client_secret",
+      "prompt",
+      "completion",
+      "delta",
+      "totalText",
+      "messages",
+      "*.email",
+    ],
+    censor: "[REDACTED]",
+  },
 });
 
 /**

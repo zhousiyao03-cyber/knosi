@@ -128,8 +128,11 @@ export async function buildChatContext(
   if (!skipRag) {
     const tracedRetrieval = observe(
       async () => {
+        // Privacy: do NOT include the raw user query in the retriever input —
+        // updateActiveObservation flows to Langfuse regardless of the AI SDK's
+        // recordInputs flag. Only ship structural metadata.
         updateActiveObservation(
-          { input: { query: userQuery, sourceScope } },
+          { input: { queryLength: userQuery.length, sourceScope } },
           { asType: "retriever" }
         );
 

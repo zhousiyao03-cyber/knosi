@@ -43,7 +43,8 @@ export async function enqueueChatTask({
 
   if (!skipRag) {
     const tracedRetrieval = observe(async () => {
-      updateActiveObservation({ input: { query: userQuery, sourceScope } }, { asType: "retriever" });
+      // Privacy: see chat-prepare.ts — do not ship raw query to Langfuse.
+      updateActiveObservation({ input: { queryLength: userQuery.length, sourceScope } }, { asType: "retriever" });
 
       const tracedAgenticRag = observe(
         () => retrieveAgenticContext(userQuery, { scope: sourceScope, userId }),
