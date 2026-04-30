@@ -74,11 +74,17 @@ async function shouldRouteHosted(userId: string | null | undefined): Promise<boo
   return false;
 }
 
+export type StreamChatResult = {
+  response: Response;
+  /** Resolved model id, or null when the path doesn't expose one (codex / daemon). Spec §6.2. */
+  modelId: string | null;
+};
+
 export async function streamChatResponse(
   options: StreamChatOptions,
   user: UserContext = {},
-) {
-  const mode = getProviderMode();
+): Promise<StreamChatResult> {
+  const mode = await getProviderMode({ userId: user.userId });
 
   if (mode === "claude-code-daemon") {
     throw new Error(
@@ -109,21 +115,25 @@ export async function streamChatResponse(
           : "All Knosi hosted AI accounts are currently unavailable. Please try again shortly.",
       );
     }
-    return result.value;
+    return { response: result.value, modelId: null };
   }
 
   if (mode === "codex") {
-    return streamChatCodex(optionsWithoutTools);
+    return { response: await streamChatCodex(optionsWithoutTools), modelId: null };
   }
 
-  return streamChatAiSdk({ ...options, mode });
+  const sdkResult = await streamChatAiSdk(
+    { ...options, mode },
+    { userId: user.userId },
+  );
+  return { response: sdkResult.response, modelId: sdkResult.modelId };
 }
 
 export async function generateStructuredData<TSchema extends z.ZodType>(
   options: GenerateStructuredDataOptions<TSchema>,
   user: UserContext = {},
 ): Promise<z.infer<TSchema>> {
-  const mode = getProviderMode();
+  const mode = await getProviderMode({ userId: user.userId });
 
   if (mode === "claude-code-daemon") {
     return generateStructuredDataDaemon(options);
@@ -147,7 +157,7 @@ export async function generateStructuredData<TSchema extends z.ZodType>(
     return generateStructuredDataCodex(options);
   }
 
-  return generateStructuredDataAiSdk({ ...options, mode });
+  return generateStructuredDataAiSdk({ ...options, mode }, { userId: user.userId });
 }
 
 export {

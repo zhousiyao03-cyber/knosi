@@ -13,6 +13,13 @@ export const users = sqliteTable("users", {
   aiProviderPreference: text("ai_provider_preference", {
     enum: ["knosi-hosted", "claude-code-daemon", "openai", "local"],
   }),
+  /**
+   * Free-text per-user override for the chat model id passed to the LLM
+   * provider. `null` = "use deployment default" (env / built-in fallback).
+   * Per-provider semantics differ — the Settings UI surfaces a curated
+   * preset list plus a custom-input box, but the schema does not constrain.
+   */
+  aiChatModel: text("ai_chat_model"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 

@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `ai_chat_model` text;

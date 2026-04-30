@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
 import { readJsonFile, resolveValue } from "./shared";
 import type { AIProviderMode, CodexAuthStore } from "./types";
 
@@ -86,7 +87,145 @@ function hasCodexAuthProfile() {
   return Boolean(store.authStore.profiles[resolveCodexProfileId()]);
 }
 
-export function getProviderMode(): AIProviderMode {
+// ─────────────────────────────────────────────────────────────────────────
+// Per-user provider-preference + chat-model cache (spec §3.3 / §3.4).
+//
+// Both pieces of user state live on the `users` row. We cache them together
+// keyed by userId — single DB hit per warm cache window covers both
+// `getProviderMode({ userId })` and `resolveAiSdkModelId("chat", mode, ...)`.
+//
+// TTL is 30s (short enough that the next request after a Settings save
+// reflects the change even on cache miss), and any explicit save MUST call
+// `invalidateProviderPrefCache(userId)` so the change is observed instantly.
+// ─────────────────────────────────────────────────────────────────────────
+
+const PROVIDER_PREF_CACHE_TTL_MS = 30_000;
+const MAX_CACHE = 1000;
+
+type AiProviderPreference =
+  | "knosi-hosted"
+  | "claude-code-daemon"
+  | "openai"
+  | "local"
+  | null;
+
+type UserAiPrefRow = {
+  pref: AiProviderPreference;
+  chatModel: string | null;
+};
+
+type CacheEntry = {
+  value: UserAiPrefRow;
+  expires: number;
+};
+
+const userAiPrefCache = new Map<string, CacheEntry>();
+
+async function loadUserAiPref(userId: string): Promise<UserAiPrefRow> {
+  // Lazy-imported to avoid a cycle: db schema imports drizzle, and drizzle's
+  // sqlite driver init must not run at the top of every provider module.
+  const { db } = await import("@/server/db");
+  const { users } = await import("@/server/db/schema/auth");
+  try {
+    const [row] = await db
+      .select({
+        pref: users.aiProviderPreference,
+        chatModel: users.aiChatModel,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return {
+      pref: (row?.pref ?? null) as AiProviderPreference,
+      chatModel: row?.chatModel ?? null,
+    };
+  } catch {
+    // DB blip should never break Ask AI — fall back to env-only resolution.
+    return { pref: null, chatModel: null };
+  }
+}
+
+async function getCachedUserAiPref(userId: string): Promise<UserAiPrefRow> {
+  const now = Date.now();
+  const cached = userAiPrefCache.get(userId);
+  if (cached && cached.expires > now) {
+    return cached.value;
+  }
+  const value = await loadUserAiPref(userId);
+  if (userAiPrefCache.size >= MAX_CACHE) {
+    // Evict the oldest entry (LRU-ish — Map preserves insertion order).
+    const oldest = userAiPrefCache.keys().next().value;
+    if (oldest) userAiPrefCache.delete(oldest);
+  }
+  userAiPrefCache.set(userId, {
+    value,
+    expires: now + PROVIDER_PREF_CACHE_TTL_MS,
+  });
+  return value;
+}
+
+/**
+ * Drop the cached per-user provider/chat-model entry. Call this from any
+ * mutation that updates `users.aiProviderPreference` / `users.aiChatModel`
+ * so the very next `getProviderMode` / `resolveAiSdkModelId` reflects the
+ * new value without waiting for the 30s TTL.
+ */
+export function invalidateProviderPrefCache(userId: string): void {
+  userAiPrefCache.delete(userId);
+}
+
+/**
+ * Internal accessor used by `resolveAiSdkModelId` (sibling module) so it
+ * can share the same single-row read with `getProviderMode`. Not exported
+ * to consumers — they should go through the model resolver.
+ */
+export async function getCachedUserChatModel(
+  userId: string,
+): Promise<string | null> {
+  const { chatModel } = await getCachedUserAiPref(userId);
+  return chatModel;
+}
+
+type ProviderModeContext = { userId?: string | null };
+
+/**
+ * Resolve the active AI provider mode.
+ *
+ * Resolution order (spec §3.3):
+ *   1. user preference on `users.aiProviderPreference` (cached 30s)
+ *   2. explicit `AI_PROVIDER` env var
+ *   3. auto-detect (codex auth profile → openai → local)
+ *
+ * Becoming async is intentional — without a DB round-trip we cannot honor
+ * a per-user setting. Identity-prompt code that has no userId context can
+ * still call the sync `getProviderModeSync()` to skip the user-pref branch.
+ */
+export async function getProviderMode(
+  ctx: ProviderModeContext = {},
+): Promise<AIProviderMode> {
+  if (ctx.userId) {
+    const { pref } = await getCachedUserAiPref(ctx.userId);
+    if (pref) {
+      // The "knosi-hosted" preference is a routing intent — the underlying
+      // backend is the codex pool. Map to "codex" so downstream provider
+      // dispatchers don't need to know about this UI-layer label.
+      // `claude-code-daemon` is intentionally honored here even though
+      // `shouldUseDaemonForChat()` (the daemon branch in route.ts) still
+      // gates on env — when daemon isn't actually set up, the existing
+      // banner / error UX informs the user.
+      if (pref === "knosi-hosted") return "codex";
+      return pref as AIProviderMode;
+    }
+  }
+  return getProviderModeSync();
+}
+
+/**
+ * Sync provider-mode resolution that ignores user preference. Used by
+ * `identity.ts` (system-prompt assembly) to avoid bubbling async up the
+ * chain — see spec §3.6 step 3 / §3.7.
+ */
+export function getProviderModeSync(): AIProviderMode {
   const explicitMode = process.env.AI_PROVIDER?.trim().toLowerCase();
   if (explicitMode === "claude-code-daemon") {
     return "claude-code-daemon";
@@ -110,4 +249,10 @@ export function getProviderMode(): AIProviderMode {
   }
 
   return "local";
+}
+
+// Test-only helper — not exported through any barrel — to flush cache
+// between unit-test cases without leaning on the 30s TTL.
+export function __resetProviderPrefCacheForTests(): void {
+  userAiPrefCache.clear();
 }

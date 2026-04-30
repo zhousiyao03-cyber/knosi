@@ -24,6 +24,29 @@ import { adaptTextStreamToUiMessageStream } from "@/server/ai/legacy-stream-adap
 
 export const maxDuration = 30;
 
+/**
+ * Re-emit a streaming Response with `X-Knosi-Mode` / `X-Knosi-Model`
+ * debug headers. Spec §6.2 — kept permanently, used by the per-user
+ * provider E2E to assert routing actually changed when Settings was
+ * updated. We pass `body` straight through so the SSE stream is not
+ * buffered.
+ */
+function withDebugHeaders(
+  source: Response,
+  meta: { mode: string; modelId: string | null },
+): Response {
+  const headers = new Headers(source.headers);
+  headers.set("X-Knosi-Mode", meta.mode);
+  if (meta.modelId) {
+    headers.set("X-Knosi-Model", meta.modelId);
+  }
+  return new Response(source.body, {
+    status: source.status,
+    statusText: source.statusText,
+    headers,
+  });
+}
+
 export async function POST(req: Request) {
   const timer = startAskTimer("/api/chat");
 
@@ -93,7 +116,7 @@ export async function POST(req: Request) {
     const { system, messages } = await buildChatContext(parsed.data, userId);
     timer.mark("buildContext");
 
-    const mode = getProviderMode();
+    const mode = await getProviderMode({ userId });
     // Tool-calling only on the AI SDK path. Codex / hosted-pool / daemon
     // continue running single-turn — we run them through the legacy
     // adapter so the front-end transport stays uniform. Spec §5.3.
@@ -126,7 +149,7 @@ export async function POST(req: Request) {
         `as soon as you can answer.`;
     }
 
-    const response = await streamChatResponse(
+    const { response: rawResponse, modelId } = await streamChatResponse(
       {
         messages,
         sessionId: parsed.data.id,
@@ -148,10 +171,14 @@ export async function POST(req: Request) {
     // The AI-SDK path (with or without tools) already returns a UI
     // message stream Response via toUIMessageStreamResponse(); only the
     // codex / hosted-pool / daemon legacy paths need the adapter.
-    if (!supportsTools) {
-      return adaptTextStreamToUiMessageStream(response);
-    }
-    return response;
+    const finalResponse = supportsTools
+      ? rawResponse
+      : adaptTextStreamToUiMessageStream(rawResponse);
+
+    // Spec §6.2: surface routing decisions as response headers for E2E
+    // assertions and for human debugging in dev tools. Cheap to keep on
+    // permanently — header bytes are negligible vs the SSE body.
+    return withDebugHeaders(finalResponse, { mode, modelId });
   } catch (error) {
     const isInvalidInput =
       error instanceof Error &&

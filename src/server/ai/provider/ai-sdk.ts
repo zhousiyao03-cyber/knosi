@@ -1,6 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, Output, stepCountIs, streamText } from "ai";
 import type { z } from "zod/v4";
+import { getCachedUserChatModel } from "./mode";
 import { resolveValue } from "./shared";
 import type {
   AIProviderMode,
@@ -8,6 +9,8 @@ import type {
   GenerationKind,
   StreamChatOptions,
 } from "./types";
+
+type AiSdkContext = { userId?: string | null };
 
 const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:11434/v1";
 const DEFAULT_LOCAL_CHAT_MODEL = "qwen2.5:14b";
@@ -57,7 +60,14 @@ function createAiSdkProvider(mode: AiSdkMode) {
   });
 }
 
-export function resolveAiSdkModelId(kind: GenerationKind, mode: AiSdkMode) {
+/**
+ * Sync env / built-in resolution shared by both the user-aware path and
+ * the identity-prompt path. Does NOT read per-user preference.
+ */
+export function resolveAiSdkModelIdSync(
+  kind: GenerationKind,
+  mode: AiSdkMode,
+): string {
   if (mode === "openai") {
     const fallbackModelId =
       kind === "chat" ? DEFAULT_OPENAI_CHAT_MODEL : DEFAULT_OPENAI_TASK_MODEL;
@@ -87,21 +97,58 @@ export function resolveAiSdkModelId(kind: GenerationKind, mode: AiSdkMode) {
   );
 }
 
-export function streamChatAiSdk({
-  messages,
-  signal,
-  system,
-  mode,
-  tools,
-  maxSteps,
-}: StreamChatOptions & { mode: AiSdkMode }) {
+/**
+ * Resolve the chat / task model id for the AI-SDK path.
+ *
+ * Precedence (spec §3.4):
+ *   1. user preference on `users.aiChatModel` — `kind === "chat"` only
+ *   2. provider-specific env var (OPENAI_CHAT_MODEL / AI_CHAT_MODEL / ...)
+ *   3. built-in default
+ *
+ * `kind === "task"` deliberately ignores user preference: structured-data
+ * generation is sensitive to schema-parsing reliability, so we always run
+ * it on the deployment-default model. Spec §3.4.
+ */
+export async function resolveAiSdkModelId(
+  kind: GenerationKind,
+  mode: AiSdkMode,
+  ctx: AiSdkContext = {},
+): Promise<string> {
+  if (kind === "chat" && ctx.userId) {
+    const userModel = await getCachedUserChatModel(ctx.userId);
+    if (userModel?.trim()) {
+      return userModel.trim();
+    }
+  }
+  return resolveAiSdkModelIdSync(kind, mode);
+}
+
+export type StreamChatAiSdkResult = {
+  /** Underlying UI-message-stream Response from `toUIMessageStreamResponse()`. */
+  response: Response;
+  /** Resolved model id actually passed to the LLM provider. Spec §6.2 / §6.3. */
+  modelId: string;
+};
+
+export async function streamChatAiSdk(
+  {
+    messages,
+    signal,
+    system,
+    mode,
+    tools,
+    maxSteps,
+  }: StreamChatOptions & { mode: AiSdkMode },
+  ctx: AiSdkContext = {},
+): Promise<StreamChatAiSdkResult> {
   const provider = createAiSdkProvider(mode);
   const recordContent = shouldRecordTelemetryContent();
   const hasTools = Boolean(tools && Object.keys(tools).length > 0);
+  const modelId = await resolveAiSdkModelId("chat", mode, ctx);
 
   const result = streamText({
     abortSignal: signal,
-    model: provider(resolveAiSdkModelId("chat", mode)),
+    model: provider(modelId),
     messages,
     system,
     // Tools are only meaningful with `stopWhen` — without it the SDK
@@ -124,6 +171,10 @@ export function streamChatAiSdk({
       functionId: hasTools ? "ask-ai-agent" : "chat",
       metadata: {
         mode,
+        // Spec §6.3 — surface the resolved model id so we can chart model
+        // distribution in Langfuse (per-user model selection means this
+        // can now vary across requests).
+        model: modelId,
         ...(hasTools ? { hasTools: true, maxSteps: maxSteps ?? 1 } : {}),
       },
     },
@@ -133,21 +184,28 @@ export function streamChatAiSdk({
   // that the front-end's <ChatMessageParts> component needs to render
   // step badges. Single-turn callers don't get tool parts so the
   // payload is functionally equivalent to a text stream.
-  return result.toUIMessageStreamResponse();
+  return { response: result.toUIMessageStreamResponse(), modelId };
 }
 
-export async function generateStructuredDataAiSdk<TSchema extends z.ZodType>({
-  description,
-  name,
-  prompt,
-  schema,
-  signal,
-  mode,
-}: GenerateStructuredDataOptions<TSchema> & { mode: AiSdkMode }): Promise<z.infer<TSchema>> {
+export async function generateStructuredDataAiSdk<TSchema extends z.ZodType>(
+  {
+    description,
+    name,
+    prompt,
+    schema,
+    signal,
+    mode,
+  }: GenerateStructuredDataOptions<TSchema> & { mode: AiSdkMode },
+  // `task` kind ignores user preference (spec §3.4) — the second arg is
+  // accepted for symmetry but currently unused.
+  _ctx: AiSdkContext = {},
+): Promise<z.infer<TSchema>> {
+  void _ctx;
   const provider = createAiSdkProvider(mode);
   const recordContent = shouldRecordTelemetryContent();
+  const modelId = await resolveAiSdkModelId("task", mode);
   const { output } = await generateText({
-    model: provider(resolveAiSdkModelId("task", mode)),
+    model: provider(modelId),
     output: Output.object({ description, name, schema }),
     prompt,
     abortSignal: signal,
@@ -156,7 +214,7 @@ export async function generateStructuredDataAiSdk<TSchema extends z.ZodType>({
       recordInputs: recordContent,
       recordOutputs: recordContent,
       functionId: "task",
-      metadata: { mode, name },
+      metadata: { mode, model: modelId, name },
     },
   });
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { ModelPicker } from "./model-picker";
 
 type ProviderOption = {
   value: "knosi-hosted" | "claude-code-daemon" | "openai" | "local";
@@ -68,45 +69,57 @@ export function AiProviderSection() {
       <div className="space-y-2">
         {OPTIONS.map((opt) => {
           const disabled = opt.proOnly && !isPro;
+          const radioId = `ai-provider-${opt.value}`;
           return (
-            <label
+            <div
               key={opt.value}
-              className={`flex items-start gap-3 rounded-2xl border border-stone-200 p-3 dark:border-stone-800 ${
-                disabled
-                  ? "opacity-50"
-                  : "cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-900"
+              className={`rounded-2xl border border-stone-200 p-3 dark:border-stone-800 ${
+                disabled ? "opacity-50" : ""
               }`}
             >
-              <input
-                type="radio"
-                name="ai-provider"
-                value={opt.value}
-                disabled={disabled}
-                checked={selected === opt.value}
-                onChange={() => {
-                  if (!disabled) void select(opt.value);
-                }}
-                className="mt-1"
-              />
-              <div>
-                <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
-                  {opt.label}
-                  {opt.proOnly ? (
-                    <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400">
-                      Pro
-                    </span>
+              <label
+                htmlFor={radioId}
+                className={`flex items-start gap-3 ${
+                  disabled
+                    ? ""
+                    : "cursor-pointer"
+                }`}
+              >
+                <input
+                  id={radioId}
+                  type="radio"
+                  name="ai-provider"
+                  value={opt.value}
+                  disabled={disabled}
+                  checked={selected === opt.value}
+                  onChange={() => {
+                    if (!disabled) void select(opt.value);
+                  }}
+                  className="mt-1"
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-stone-900 dark:text-stone-100">
+                    {opt.label}
+                    {opt.proOnly ? (
+                      <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400">
+                        Pro
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="text-sm text-stone-500 dark:text-stone-400">
+                    {opt.desc}
+                  </div>
+                  {saving === opt.value ? (
+                    <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                      Saving…
+                    </div>
                   ) : null}
                 </div>
-                <div className="text-sm text-stone-500 dark:text-stone-400">
-                  {opt.desc}
-                </div>
-                {saving === opt.value ? (
-                  <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-                    Saving…
-                  </div>
-                ) : null}
-              </div>
-            </label>
+              </label>
+              {selected === opt.value && !disabled ? (
+                <ModelPicker provider={opt.value} />
+              ) : null}
+            </div>
           );
         })}
       </div>

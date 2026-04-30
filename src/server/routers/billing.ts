@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod/v4";
+import { invalidateProviderPrefCache } from "@/server/ai/provider/mode";
 import { invalidateEntitlements } from "@/server/billing/entitlements";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema/auth";
@@ -41,6 +42,52 @@ export const billingRouter = router({
         .set({ aiProviderPreference: input.preference })
         .where(eq(users.id, userId));
       await invalidateEntitlements(userId);
+      // Spec §3.3 — drop the per-user provider/model cache so the very
+      // next /api/chat call routes against the new preference instead of
+      // waiting up to 30s for the TTL to expire.
+      invalidateProviderPrefCache(userId);
+      return { ok: true as const };
+    }),
+
+  /**
+   * Read the user's currently-saved chat model id. `null` means "use the
+   * deployment default". Spec §4.1 / §3.4.
+   */
+  getAiChatModel: protectedProcedure.query(async ({ ctx }) => {
+    const userId = (ctx as { userId?: string }).userId;
+    if (!userId) return null;
+    const [row] = await db
+      .select({ model: users.aiChatModel })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    return row?.model ?? null;
+  }),
+
+  /**
+   * Persist the user's chat model id override. `null` resets to the
+   * deployment default. Spec §4.1 — free text, capped at 200 chars; we
+   * deliberately do not validate against any provider's `/v1/models`
+   * (MVP trusts user input and lets the LLM API surface bad ids).
+   */
+  setAiChatModel: protectedProcedure
+    .input(
+      z.object({
+        model: z.string().trim().min(1).max(200).nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = (ctx as { userId?: string }).userId;
+      if (!userId) {
+        // Self-hosted / E2E bypass — no user row to update.
+        return { ok: true as const };
+      }
+      await db
+        .update(users)
+        .set({ aiChatModel: input.model })
+        .where(eq(users.id, userId));
+      // Drop cache so the next chat request reflects the change.
+      invalidateProviderPrefCache(userId);
       return { ok: true as const };
     }),
 });
