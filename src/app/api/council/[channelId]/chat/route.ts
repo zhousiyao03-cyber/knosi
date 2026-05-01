@@ -1,0 +1,132 @@
+import { type NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import { auth } from "@/lib/auth";
+import { isAuthBypassEnabled } from "@/server/auth/request-session";
+import { db } from "@/server/db";
+import {
+  councilChannels,
+  councilChannelPersonas,
+  councilPersonas,
+} from "@/server/db/schema/council";
+import { and, eq } from "drizzle-orm";
+import { runTurn } from "@/server/council/orchestrator";
+import type { SSEEvent } from "@/server/council/types";
+
+export const runtime = "nodejs"; // RAG path uses native deps
+
+const encoder = new TextEncoder();
+
+function encodeSseEvent(evt: SSEEvent): Uint8Array {
+  return encoder.encode(`data: ${JSON.stringify(evt)}\n\n`);
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ channelId: string }> },
+) {
+  // Auth (with E2E bypass parity to /api/chat)
+  let userId: string | null = null;
+  if (!isAuthBypassEnabled()) {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    userId = session.user.id;
+  } else {
+    // Mirror Ask AI: in dev with bypass, fall back to a sentinel id derived
+    // from the dev test account. We try auth() first (to keep real session
+    // working in dev), only falling back if it's missing.
+    const session = await auth();
+    userId = session?.user?.id ?? null;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  // Final safety check for TypeScript narrowing
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { channelId } = await params;
+
+  // Ownership check
+  const [channel] = await db
+    .select()
+    .from(councilChannels)
+    .where(
+      and(eq(councilChannels.id, channelId), eq(councilChannels.userId, userId)),
+    )
+    .limit(1);
+  if (!channel) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Load personas in this channel
+  const personaRows = await db
+    .select({ persona: councilPersonas })
+    .from(councilChannelPersonas)
+    .innerJoin(
+      councilPersonas,
+      eq(councilChannelPersonas.personaId, councilPersonas.id),
+    )
+    .where(eq(councilChannelPersonas.channelId, channelId));
+
+  if (personaRows.length === 0) {
+    return NextResponse.json(
+      { error: "No personas in channel" },
+      { status: 400 },
+    );
+  }
+
+  // Parse body
+  const body = (await req.json().catch(() => ({}))) as {
+    content?: string;
+    messageId?: string;
+  };
+  const content = body.content?.trim();
+  if (!content) {
+    return NextResponse.json({ error: "Empty content" }, { status: 400 });
+  }
+  const userMessageId = body.messageId ?? crypto.randomUUID();
+
+  // SSE stream
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for await (const evt of runTurn({
+          channel,
+          personas: personaRows.map((r) => r.persona),
+          userMessage: { id: userMessageId, content },
+          userId: userId!,
+          abortSignal: req.signal,
+        })) {
+          controller.enqueue(encodeSseEvent(evt));
+        }
+      } catch (err) {
+        if (!isAbortError(err)) {
+          controller.enqueue(
+            encodeSseEvent({
+              type: "error",
+              message: (err as Error).message ?? "unknown",
+            }),
+          );
+        }
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
