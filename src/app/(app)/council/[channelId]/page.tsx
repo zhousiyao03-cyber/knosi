@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getRequestSession } from "@/server/auth/request-session";
 import { db } from "@/server/db";
 import {
   councilChannels,
@@ -16,7 +16,7 @@ export default async function CouncilChannelPage({
 }: {
   params: Promise<{ channelId: string }>;
 }) {
-  const session = await auth();
+  const session = await getRequestSession();
   if (!session?.user?.id) redirect("/login");
   const { channelId } = await params;
 

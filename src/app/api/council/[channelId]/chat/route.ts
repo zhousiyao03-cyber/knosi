@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { z } from "zod/v4";
-import { auth } from "@/lib/auth";
-import { isAuthBypassEnabled } from "@/server/auth/request-session";
+import { getRequestSession } from "@/server/auth/request-session";
 import { db } from "@/server/db";
 import {
   councilChannels,
@@ -34,29 +33,12 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ channelId: string }> },
 ) {
-  // Auth (with E2E bypass parity to /api/chat)
-  let userId: string | null = null;
-  if (!isAuthBypassEnabled()) {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    userId = session.user.id;
-  } else {
-    // Mirror Ask AI: in dev with bypass, fall back to a sentinel id derived
-    // from the dev test account. We try auth() first (to keep real session
-    // working in dev), only falling back if it's missing.
-    const session = await auth();
-    userId = session?.user?.id ?? null;
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
-
-  // Final safety check for TypeScript narrowing
-  if (!userId) {
+  // Auth (with E2E bypass support via getRequestSession)
+  const session = await getRequestSession();
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
 
   const { channelId } = await params;
 
@@ -106,7 +88,7 @@ export async function POST(
           channel,
           personas: personaRows.map((r) => r.persona),
           userMessage: { id: userMessageId, content },
-          userId: userId!,
+          userId,
           abortSignal: req.signal,
         })) {
           controller.enqueue(encodeSseEvent(evt));

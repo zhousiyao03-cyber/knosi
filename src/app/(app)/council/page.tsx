@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getRequestSession } from "@/server/auth/request-session";
 import { ensureDefaultCouncilChannel } from "@/server/council/seeds";
 
 export default async function CouncilIndexPage() {
-  const session = await auth();
+  const session = await getRequestSession();
   if (!session?.user?.id) {
     redirect("/login");
   }

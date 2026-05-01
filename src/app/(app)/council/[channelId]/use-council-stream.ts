@@ -74,7 +74,30 @@ export function useCouncilStream(
           }
         }
       } catch (err) {
-        if ((err as Error).name !== "AbortError") {
+        if ((err as Error).name === "AbortError" || ctrl.signal.aborted) {
+          // Client-side abort: mark any streaming messages as interrupted and
+          // inject a user_interrupt system message so the UI reflects it.
+          setMessages((m) => {
+            const hasStreaming = m.some((msg) => msg.status === "streaming");
+            const updated = m.map((msg) =>
+              msg.status === "streaming"
+                ? { ...msg, status: "interrupted" as const }
+                : msg,
+            );
+            if (hasStreaming) {
+              return [
+                ...updated,
+                {
+                  id: crypto.randomUUID(),
+                  role: "system" as const,
+                  content: stoppedReasonToText("user_interrupt"),
+                  status: "complete" as const,
+                },
+              ];
+            }
+            return updated;
+          });
+        } else {
           console.warn("[council] stream error", err);
         }
       } finally {
