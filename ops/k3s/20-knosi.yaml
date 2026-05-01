@@ -120,9 +120,11 @@ spec:
               # (~200Mi q8), cross-encoder reranker (~200Mi q8), Drizzle
               # + libsql + Milvus + Langfuse SDKs (~150Mi), and request
               # bursts. 768Mi was OOMing within minutes once both ML
-              # pipelines were active. Bump to 1.5Gi until inference is
-              # split into its own Deployment.
-              memory: 1536Mi
+              # pipelines were active. 1.5Gi held until Cursor provider
+              # landed — first Ask AI call OOMed at 14:41 (2026-05-01),
+              # peak working-set crossed the line. Bump to 3Gi (host has
+              # 4GB total, single replica) until inference is split out.
+              memory: 3072Mi
 ---
 apiVersion: v1
 kind: Service
