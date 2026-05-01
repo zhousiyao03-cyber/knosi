@@ -52,7 +52,7 @@ export const councilRouter = router({
     }),
 
   listMessages: protectedProcedure
-    .input(z.object({ channelId: z.string(), limit: z.number().default(200) }))
+    .input(z.object({ channelId: z.string(), limit: z.number().int().positive().max(500).default(200) }))
     .query(async ({ ctx, input }) => {
       // ownership check
       const channel = await db
