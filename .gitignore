@@ -63,6 +63,9 @@ next-env.d.ts
 # handoff (cross-session temp file)
 HANDOFF.md
 
+# brainstorming visual companion
+.superpowers/
+
 # claude code local settings
 .claude/settings.local.json
 .claude/
