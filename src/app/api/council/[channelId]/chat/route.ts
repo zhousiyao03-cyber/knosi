@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { z } from "zod/v4";
 import { auth } from "@/lib/auth";
 import { isAuthBypassEnabled } from "@/server/auth/request-session";
 import { db } from "@/server/db";
@@ -15,6 +16,11 @@ import type { SSEEvent } from "@/server/council/types";
 export const runtime = "nodejs"; // RAG path uses native deps
 
 const encoder = new TextEncoder();
+
+const bodySchema = z.object({
+  content: z.string().trim().min(1).max(4000),
+  messageId: z.string().uuid().optional(),
+});
 
 function encodeSseEvent(evt: SSEEvent): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(evt)}\n\n`);
@@ -84,15 +90,13 @@ export async function POST(
   }
 
   // Parse body
-  const body = (await req.json().catch(() => ({}))) as {
-    content?: string;
-    messageId?: string;
-  };
-  const content = body.content?.trim();
-  if (!content) {
-    return NextResponse.json({ error: "Empty content" }, { status: 400 });
+  const rawBody = await req.json().catch(() => null);
+  const parsed = bodySchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
-  const userMessageId = body.messageId ?? crypto.randomUUID();
+  const { content } = parsed.data;
+  const userMessageId = parsed.data.messageId ?? crypto.randomUUID();
 
   // SSE stream
   const stream = new ReadableStream<Uint8Array>({
