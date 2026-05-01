@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { db } from "@/server/db";
 import { councilChannelMessages } from "@/server/db/schema/council";
 import { asc, eq } from "drizzle-orm";
-import type { Channel, Persona, SSEEvent } from "./types";
+import type { Channel, ClassifierDecision, Persona, SSEEvent } from "./types";
 import { classifyShouldSpeak, type HistoryEntry } from "./classifier";
 import { streamPersonaResponse } from "./persona-stream";
 
@@ -39,6 +39,10 @@ export async function* runTurn({
   yield { type: "turn_start", turnId };
 
   // 2) wall-clock guard
+  // NOTE: wallClockExpired is only checked between iterations, not
+  // mid-stream. A stalled streamPersonaResponse will not be killed
+  // by this guard alone — Phase 2 should wire the timer through an
+  // internal AbortController so the underlying stream gets cancelled.
   let wallClockExpired = false;
   const wallTimer = setTimeout(() => {
     wallClockExpired = true;
@@ -65,30 +69,47 @@ export async function* runTurn({
 
       const history = await loadRecentHistory(channel.id, personaIndex);
 
-      // CLASSIFY (parallel; isolate errors per persona)
-      const decisions = await Promise.all(
-        personas.map(async (p) => {
-          try {
-            const d = await classifyShouldSpeak({
-              persona: p,
-              history,
-              lastAgentMessage,
-              userId,
-              abortSignal,
-            });
-            return { persona: p, decision: d };
-          } catch {
-            return {
-              persona: p,
-              decision: {
-                shouldSpeak: false,
-                priority: 0,
-                reason: "classifier-error",
-              },
-            };
-          }
-        })
-      );
+      // CLASSIFY (parallel; isolate per-persona errors but propagate abort)
+      let decisions: Array<{ persona: Persona; decision: ClassifierDecision }>;
+      try {
+        decisions = await Promise.all(
+          personas.map(async (p) => {
+            try {
+              const d = await classifyShouldSpeak({
+                persona: p,
+                history,
+                lastAgentMessage,
+                userId,
+                abortSignal,
+              });
+              return { persona: p, decision: d };
+            } catch (err) {
+              // If abort happened, propagate up so the outer abort branch
+              // emits user_interrupt instead of consecutive_no.
+              if (abortSignal.aborted || isAbort(err)) throw err;
+              return {
+                persona: p,
+                decision: {
+                  shouldSpeak: false,
+                  priority: 0,
+                  reason: "classifier-error",
+                },
+              };
+            }
+          })
+        );
+      } catch (err) {
+        if (abortSignal.aborted || isAbort(err)) {
+          yield { type: "stopped", reason: "user_interrupt" };
+          return;
+        }
+        throw err;
+      }
+
+      if (abortSignal.aborted) {
+        yield { type: "stopped", reason: "user_interrupt" };
+        return;
+      }
 
       const queue = decisions
         .filter((d) => d.decision.shouldSpeak)
@@ -132,9 +153,12 @@ export async function* runTurn({
         if (isAbort(err)) {
           interrupted = true;
         } else {
-          // Single-agent error: log a system row, close placeholder, continue
+          // Single-agent error: persist a system row UNDER THE SAME messageId
+          // so the SSE agent_end and the DB row reference the same identifier.
+          // Skip without incrementing agentSpoken so other personas can still
+          // get a turn.
           await db.insert(councilChannelMessages).values({
-            id: crypto.randomUUID(),
+            id: messageId,
             channelId: channel.id,
             role: "system",
             personaId: speaker.persona.id,
@@ -147,7 +171,7 @@ export async function* runTurn({
           yield {
             type: "agent_end",
             messageId,
-            status: "complete",
+            status: "interrupted",
           };
           continue;
         }

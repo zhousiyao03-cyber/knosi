@@ -184,6 +184,42 @@ describe("runTurn", () => {
         abortSignal: new AbortController().signal,
       })
     );
-    expect(events.find((e) => e.type === "stopped")).toBeTruthy();
+    const stopped = events.find((e) => e.type === "stopped");
+    expect(stopped && "reason" in stopped && stopped.reason).toBe("consecutive_no");
+  });
+
+  it("isolates per-agent stream errors: emits system row + skips, turn continues", async () => {
+    // First call yields p1 with priority 0.5 (only one). Stream throws.
+    // Then on reclassify all return no → consecutive_no.
+    let pass = 0;
+    vi.mocked(classifyShouldSpeak).mockImplementation(async ({ persona }) => {
+      pass += 1;
+      if (pass <= 3) {
+        return {
+          shouldSpeak: persona.id === "p1",
+          priority: 0.5,
+          reason: "",
+        };
+      }
+      return { shouldSpeak: false, priority: 0, reason: "" };
+    });
+    vi.mocked(streamPersonaResponse).mockImplementation(async function* () {
+      throw new Error("model down");
+    });
+    const events = await collect(
+      runTurn({
+        channel,
+        personas,
+        userMessage: { content: "hi", id: "m1" },
+        userId: "u1",
+        abortSignal: new AbortController().signal,
+      })
+    );
+    // Should emit agent_end status="interrupted" for the failed persona,
+    // then proceed to next reclassify → consecutive_no
+    const end = events.find((e) => e.type === "agent_end");
+    expect(end && "status" in end && end.status).toBe("interrupted");
+    const stopped = events.find((e) => e.type === "stopped");
+    expect(stopped && "reason" in stopped && stopped.reason).toBe("consecutive_no");
   });
 });
