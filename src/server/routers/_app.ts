@@ -12,6 +12,7 @@ import { ossProjectsRouter } from "./oss-projects";
 import { billingRouter } from "./billing";
 import { learningNotebookRouter } from "./learning-notebook";
 import { councilRouter } from "./council";
+import { preferencesRouter } from "./preferences";
 
 export const appRouter = router({
   notes: notesRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   billing: billingRouter,
   learningNotebook: learningNotebookRouter,
   council: councilRouter,
+  preferences: preferencesRouter,
 });
 
 export type AppRouter = typeof appRouter;
