@@ -131,23 +131,40 @@ Wire the secret into the deployment env in `ops/hetzner/deploy.sh` or the k8s ma
 kubectl -n knosi exec deploy/knosi -- printenv | grep KNOSI_SECRET_KEY
 ```
 
-### 2. Turso schema rollout
+### 2. Turso schema rollout — DONE 2026-05-02
 
-The two migrations (`0045_rare_nightmare.sql` + `0046_far_madame_masque.sql`) must be applied to prod Turso. Per CLAUDE.md, this is NOT done by drizzle-kit push on prod — run them via `turso db shell`:
+Applied both migrations directly via the libsql HTTP API (no `turso` CLI on this machine). Pre-state had legacy `users.ai_provider_preference` + `users.ai_chat_model` and no new tables. Post-state verified:
 
-```bash
-# Credentials in .env.turso-prod.local
-turso db shell <prod-db> < drizzle/0045_rare_nightmare.sql
-turso db shell <prod-db> < drizzle/0046_far_madame_masque.sql
-
-# Verify both tables present:
-turso db shell <prod-db> "select sql from sqlite_master where name in ('ai_providers','ai_role_assignments')"
-
-# Verify legacy users columns are gone:
-turso db shell <prod-db> "pragma table_info(users)"
 ```
+=== post-rollout verification ===
 
-Paste the verification query output back into this changelog when complete.
+CREATE TABLE `ai_providers` (
+	`id` text PRIMARY KEY NOT NULL,
+	`user_id` text NOT NULL,
+	`kind` text NOT NULL,
+	`label` text NOT NULL,
+	`base_url` text,
+	`api_key_enc` text,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+)
+
+CREATE TABLE `ai_role_assignments` (
+	`user_id` text NOT NULL,
+	`role` text NOT NULL,
+	`provider_id` text NOT NULL,
+	`model_id` text NOT NULL,
+	`updated_at` integer NOT NULL,
+	PRIMARY KEY(`user_id`, `role`),
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`provider_id`) REFERENCES `ai_providers`(`id`) ON UPDATE no action ON DELETE restrict
+)
+
+users columns: id, name, email, email_verified, image, created_at
+  legacy ai_provider_preference: GONE ✓
+  legacy ai_chat_model: GONE ✓
+```
 
 ### 3. Deploy
 
