@@ -12,6 +12,11 @@ import { users } from "./auth";
  *
  * `label` is the user-facing name (e.g. "OpenAI", "DeepSeek", "Home Ollama").
  * Multiple rows of the same kind are allowed (e.g. a Personal + Work key).
+ *
+ * NOTE: SQLite does not enforce the kind/role enum at the SQL layer — every
+ * insert path MUST pipe through zod validation at the tRPC router boundary
+ * (Phase 6.1) before reaching `db.insert`. Bypassing zod risks invalid kind
+ * values that crash `resolveAiCall` at runtime.
  */
 export const aiProviders = sqliteTable(
   "ai_providers",
@@ -28,12 +33,12 @@ export const aiProviders = sqliteTable(
     label: text("label").notNull(),
     baseUrl: text("base_url"),
     apiKeyEnc: text("api_key_enc"),
-    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
-      () => new Date(),
-    ),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
-      () => new Date(),
-    ),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
   },
   (t) => ({
     userIdx: index("ai_providers_user_idx").on(t.userId),
@@ -49,6 +54,11 @@ export const aiProviders = sqliteTable(
  *
  * On delete restrict at the provider FK so deleting an in-use provider
  * forces the user to reassign the role first (UI surfaces a confirmation).
+ *
+ * NOTE: SQLite does not enforce the role enum at the SQL layer — every
+ * insert path MUST pipe through zod validation at the tRPC router boundary
+ * (Phase 6.1) before reaching `db.insert`. Bypassing zod risks invalid role
+ * values that crash `resolveAiCall` at runtime.
  */
 export const aiRoleAssignments = sqliteTable(
   "ai_role_assignments",
@@ -61,9 +71,9 @@ export const aiRoleAssignments = sqliteTable(
       .notNull()
       .references(() => aiProviders.id, { onDelete: "restrict" }),
     modelId: text("model_id").notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
-      () => new Date(),
-    ),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.userId, t.role] }),

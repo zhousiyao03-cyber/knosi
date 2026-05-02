@@ -5,8 +5,8 @@ CREATE TABLE `ai_providers` (
 	`label` text NOT NULL,
 	`base_url` text,
 	`api_key_enc` text,
-	`created_at` integer,
-	`updated_at` integer,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
@@ -16,7 +16,7 @@ CREATE TABLE `ai_role_assignments` (
 	`role` text NOT NULL,
 	`provider_id` text NOT NULL,
 	`model_id` text NOT NULL,
-	`updated_at` integer,
+	`updated_at` integer NOT NULL,
 	PRIMARY KEY(`user_id`, `role`),
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`provider_id`) REFERENCES `ai_providers`(`id`) ON UPDATE no action ON DELETE restrict
