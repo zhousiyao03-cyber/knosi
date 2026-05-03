@@ -9,6 +9,7 @@ import {
 import { decryptApiKey, encryptApiKey } from "@/server/ai/crypto";
 import { invalidateProviderCache } from "@/server/ai/provider/resolve";
 import { probeProvider } from "@/server/ai/provider/probe";
+import { ensureDefaultEmbeddingProvider } from "@/server/ai/provider/seed";
 import { protectedProcedure, router } from "@/server/trpc";
 
 const KIND = z.enum([
@@ -214,6 +215,9 @@ export const aiSettingsRouter = router({
 
   getRoleAssignments: protectedProcedure.query(async ({ ctx }) => {
     const userId = requireUser(ctx);
+    // Lazy-seed the embedding role with in-process Transformers.js so RAG
+    // works out of the box. No-op when the user has already chosen one.
+    await ensureDefaultEmbeddingProvider(userId);
     const rows = await db
       .select()
       .from(aiRoleAssignments)
