@@ -62,6 +62,7 @@ export default defineConfig({
         ENABLE_TOKEN_USAGE: "false",
         NEXT_PUBLIC_ENABLE_TOKEN_USAGE: "false",
         DRIFTER_E2E_MOCK: "1",
+        WORDS_E2E_MOCK: "1",
         KNOSI_SECRET_KEY: "0".repeat(64),
       },
       url: "http://localhost:3100/",
