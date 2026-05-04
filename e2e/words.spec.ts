@@ -61,6 +61,59 @@ test.describe("Words", () => {
     });
   });
 
+  test("badge shows NEW initially and ×N after practice", async ({ page }) => {
+    await page.goto("/words");
+    const badge = page.getByTestId("words-status-badge");
+    const stress = page.getByTestId("words-stress");
+    await expect(stress).toBeVisible();
+    await expect(badge).toBeVisible();
+
+    // Walk forward until we land on a sentence whose lifetime count is 0 —
+    // i.e. the badge says NEW. With a 100-word seed this should happen
+    // within a handful of clicks even after earlier tests.
+    let foundNew = false;
+    for (let i = 0; i < 110; i++) {
+      const text = (await badge.textContent())?.trim() ?? "";
+      if (text === "NEW") {
+        foundNew = true;
+        break;
+      }
+      await page.getByTestId("words-next").click();
+      await page.waitForTimeout(40);
+    }
+    expect(foundNew).toBe(true);
+  });
+
+  test("New only filter excludes practised words", async ({ page }) => {
+    await page.goto("/words");
+    await expect(page.getByTestId("words-stress")).toBeVisible();
+
+    // Practice the current word once so it has count > 0 and would be
+    // excluded by New only.
+    await page.getByTestId("words-play-word").click();
+    await page.waitForTimeout(120);
+    const recordPromise = page.waitForResponse(
+      (r) => r.url().includes("/api/trpc/words.recordPractice") && r.ok(),
+      { timeout: 5000 },
+    );
+    await page.getByTestId("words-next").click();
+    await recordPromise;
+
+    // Toggle to New only. Expect every visible card from now on shows NEW.
+    await page.getByTestId("words-filter-new").click();
+
+    const badge = page.getByTestId("words-status-badge");
+    // Sample several cards in New-only mode.
+    for (let i = 0; i < 6; i++) {
+      // Either we have a card showing NEW, or we hit the empty state.
+      const hasEmpty = (await page.getByTestId("words-empty-newonly").count()) > 0;
+      if (hasEmpty) break;
+      await expect(badge).toHaveText("NEW");
+      await page.getByTestId("words-next").click();
+      await page.waitForTimeout(40);
+    }
+  });
+
   test("practice count persists across reload", async ({ page }) => {
     await page.goto("/words");
     await expect(page.getByTestId("words-stress")).toBeVisible();

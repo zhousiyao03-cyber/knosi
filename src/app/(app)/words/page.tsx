@@ -52,18 +52,50 @@ export default function WordsPage() {
     ];
   }, [userAdded]);
 
+  type FilterMode = "all" | "new-only";
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [shuffleNonce, setShuffleNonce] = useState(0);
-  const order = useMemo<DeckEntry[]>(
-    () => (isClient ? shuffle(allWords) : allWords),
+
+  // Snapshot of counts taken at the moment we (re)shuffle. We deliberately do
+  // NOT rebuild `order` whenever counts change — otherwise practising the
+  // current "new" word would push count above 0 and immediately exclude it
+  // mid-card, causing the pointer to jump. Filter freshness is good enough
+  // at "every reshuffle / every filter toggle" boundary.
+  const filterSnapshotRef = useRef<Record<string, number>>({});
+
+  // Keep snapshot fresh on filter toggle so a user switching All → New only
+  // sees the latest counts. shuffleNonce-driven reshuffles also pick up
+  // fresh counts via the same path.
+  useEffect(() => {
+    filterSnapshotRef.current = countsQuery.data ?? {};
+    // Only re-snapshot at filter / nonce boundaries.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isClient, shuffleNonce, allWords],
-  );
+  }, [filterMode, shuffleNonce]);
+
+  const order = useMemo<DeckEntry[]>(() => {
+    if (!isClient) return allWords;
+    const snapshot = filterSnapshotRef.current;
+    const filtered =
+      filterMode === "new-only"
+        ? allWords.filter((w) => (snapshot[w.id] ?? 0) === 0)
+        : allWords;
+    return shuffle(filtered);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient, shuffleNonce, allWords, filterMode]);
+
   const [pointer, setPointer] = useState(0);
 
-  // Clamp pointer if order shrinks (defensive — v1 doesn't remove words).
+  // Clamp pointer when the deck shrinks (e.g. switching to New only with
+  // fewer entries) or when a reshuffle replaces the array.
   useEffect(() => {
     if (pointer >= order.length && order.length > 0) setPointer(0);
   }, [order.length, pointer]);
+
+  // Reset pointer to 0 when the user toggles filterMode so they always start
+  // at the top of the (potentially much smaller) New-only deck.
+  useEffect(() => {
+    setPointer(0);
+  }, [filterMode]);
 
   const localPlayCountRef = useRef(0);
   const current = order[pointer];
@@ -196,6 +228,26 @@ export default function WordsPage() {
     );
   }
   if (!current) {
+    // Two distinct empty states: deck filtered to nothing vs still loading.
+    if (filterMode === "new-only" && allWords.length > 0) {
+      return (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
+          <p
+            data-testid="words-empty-newonly"
+            className="text-sm text-stone-600 dark:text-stone-400"
+          >
+            You&apos;ve practiced every word at least once. Nothing left to mark as new.
+          </p>
+          <button
+            type="button"
+            onClick={() => setFilterMode("all")}
+            className="rounded-md border border-stone-300 px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
+          >
+            Show all
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-6">
         <p className="text-sm text-stone-500">Loading words…</p>
@@ -203,14 +255,29 @@ export default function WordsPage() {
     );
   }
 
+  const badgeText =
+    currentLifetimeCount === 0 ? "NEW" : `×${currentLifetimeCount}`;
+  const badgeClass =
+    currentLifetimeCount === 0
+      ? "border-emerald-300 text-emerald-700 dark:border-emerald-700/60 dark:text-emerald-400"
+      : "border-stone-300 text-stone-500 dark:border-stone-700 dark:text-stone-400";
+
   return (
     <div className="flex min-h-[80vh] flex-col items-center justify-center px-6">
-      <p
-        data-testid="words-stress"
-        className="text-balance text-center text-4xl font-medium tracking-tight text-stone-900 dark:text-stone-100"
-      >
-        {current.stressPattern}
-      </p>
+      <div className="flex items-center justify-center gap-3">
+        <p
+          data-testid="words-stress"
+          className="text-balance text-center text-4xl font-medium tracking-tight text-stone-900 dark:text-stone-100"
+        >
+          {current.stressPattern}
+        </p>
+        <span
+          data-testid="words-status-badge"
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-widest uppercase ${badgeClass}`}
+        >
+          {badgeText}
+        </span>
+      </div>
       <p
         data-testid="words-ipa"
         className="mt-4 text-center font-mono text-lg text-stone-600 dark:text-stone-400"
@@ -230,7 +297,39 @@ export default function WordsPage() {
         “{current.exampleEn}”
       </p>
 
-      <div className="mt-12 flex items-center gap-3">
+      <div
+        data-testid="words-filter"
+        className="mt-10 inline-flex rounded-full border border-stone-200 bg-stone-50/70 p-0.5 text-xs dark:border-stone-800 dark:bg-stone-900/60"
+      >
+        <button
+          type="button"
+          data-testid="words-filter-all"
+          onClick={() => setFilterMode("all")}
+          aria-pressed={filterMode === "all"}
+          className={`rounded-full px-3 py-1 transition ${
+            filterMode === "all"
+              ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900"
+              : "text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
+          }`}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          data-testid="words-filter-new"
+          onClick={() => setFilterMode("new-only")}
+          aria-pressed={filterMode === "new-only"}
+          className={`rounded-full px-3 py-1 transition ${
+            filterMode === "new-only"
+              ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900"
+              : "text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
+          }`}
+        >
+          New only
+        </button>
+      </div>
+
+      <div className="mt-6 flex items-center gap-3">
         <button
           type="button"
           data-testid="words-play-word"
