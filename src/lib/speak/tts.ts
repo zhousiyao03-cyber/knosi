@@ -14,15 +14,46 @@
 
 let cachedVoice: SpeechSynthesisVoice | null = null;
 
+// Voice quality keywords that platforms use to mark their better voices.
+// macOS / iOS: "Premium", "Enhanced", "Siri".
+// Windows / Edge: "Natural", "Neural", "Online".
+// Chrome: "Google" voices are usually network-backed and noticeably nicer than
+// the OS compact voices.
+const QUALITY_KEYWORDS = [
+  "premium",
+  "enhanced",
+  "siri",
+  "natural",
+  "neural",
+  "online",
+  "google",
+];
+
+function isQualityVoice(v: SpeechSynthesisVoice): boolean {
+  const name = v.name.toLowerCase();
+  return QUALITY_KEYWORDS.some((kw) => name.includes(kw));
+}
+
 function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
   if (voices.length === 0) return null;
-  const enUS = voices.find((v) => v.lang === "en-US");
-  if (enUS) return enUS;
-  const enGB = voices.find((v) => v.lang === "en-GB");
-  if (enGB) return enGB;
-  const anyEn = voices.find((v) => v.lang.startsWith("en"));
-  if (anyEn) return anyEn;
-  return voices[0] ?? null;
+
+  // Prefer "quality" en-US voice → quality en-GB → any quality en-* →
+  // any en-US → en-GB → any en-* → platform default. Quality wins over
+  // dialect: a Premium en-GB voice sounds better than a compact en-US one.
+  const enUS = voices.filter((v) => v.lang === "en-US");
+  const enGB = voices.filter((v) => v.lang === "en-GB");
+  const anyEn = voices.filter((v) => v.lang.startsWith("en"));
+
+  return (
+    enUS.find(isQualityVoice) ??
+    enGB.find(isQualityVoice) ??
+    anyEn.find(isQualityVoice) ??
+    enUS[0] ??
+    enGB[0] ??
+    anyEn[0] ??
+    voices[0] ??
+    null
+  );
 }
 
 async function getVoice(): Promise<SpeechSynthesisVoice | null> {
@@ -68,7 +99,9 @@ export async function speak(text: string): Promise<void> {
   const utt = new SpeechSynthesisUtterance(text);
   const voice = await getVoice();
   if (voice) utt.voice = voice;
-  utt.rate = 1.0;
+  // Slightly slower than default — natural shadow-drilling pace, and helps
+  // mask the choppy prosody of low-quality compact voices.
+  utt.rate = 0.95;
   utt.pitch = 1.0;
   utt.lang = voice?.lang ?? "en-US";
   await new Promise<void>((resolve) => {
