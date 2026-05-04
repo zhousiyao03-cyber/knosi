@@ -64,6 +64,7 @@ Write notes with a Notion-level editor, index your knowledge with hybrid RAG, an
 
 - **Portfolio Tracker** — Position management with Yahoo Finance and CoinGecko real-time prices, AI position analysis, and news aggregation via Marketaux or Google News RSS with server-side cron auto-refresh.
 - **Speak** — `/speak` shadow-drill module. One native English sentence at a time, browser TTS plays it, you shadow it, press Next. Per-sentence lifetime practice count synced across devices. Ships with 30 hand-picked working-professional sentences.
+- **Words** — `/words` per-word pronunciation drill. Each card shows stress visualization, IPA, brief Chinese meaning, and a native example sentence. 100 hand-picked seeds. Add your own words; AI enriches them on save. Browser TTS reused from `/speak`.
 - **Search** — `Cmd+K` global note search with keyword highlighting.
 - **Dark Mode** — Global toggle, full dark mode coverage.
 
