@@ -1,5 +1,6 @@
 import {
   Activity,
+  BookOpen,
   FileText,
   FolderGit2,
   GraduationCap,
@@ -40,6 +41,7 @@ export const navigationGroups: NavGroup[] = [
       { href: "/learn", label: "Learning", icon: GraduationCap },
       { href: "/projects", label: "Projects", icon: FolderGit2 },
       { href: "/speak", label: "Speak", icon: Mic },
+      { href: "/words", label: "Words", icon: BookOpen },
     ],
   },
   {
