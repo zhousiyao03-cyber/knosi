@@ -12,9 +12,17 @@ export default function SpeakPage() {
   const countsQuery = trpc.speak.getCounts.useQuery();
   const recordPractice = trpc.speak.recordPractice.useMutation();
 
+  // SSR-safe: render a stable placeholder server-side. Real shuffle and TTS
+  // checks happen only after mount.
+  const [mounted, setMounted] = useState(false);
   // Shuffled order of sentences for this session. Reshuffles when we run out.
-  const [order, setOrder] = useState<SeedSentence[]>(() => shuffle(SEED_SENTENCES));
+  const [order, setOrder] = useState<SeedSentence[]>(() => SEED_SENTENCES);
   const [pointer, setPointer] = useState(0);
+
+  useEffect(() => {
+    setMounted(true);
+    setOrder(shuffle(SEED_SENTENCES));
+  }, []);
 
   // How many times Play fired for the *current* sentence in this session.
   // Reset on Next.
@@ -122,6 +130,13 @@ export default function SpeakPage() {
     () => `${pointer + 1} / ${order.length}`,
     [pointer, order.length],
   );
+
+  if (!mounted) {
+    // Render a minimal, deterministic shell on the server to avoid a
+    // hydration mismatch when the client swaps in the shuffled order +
+    // platform-dependent TTS support check.
+    return <div className="min-h-[80vh]" />;
+  }
 
   if (!isTtsSupported()) {
     return (
