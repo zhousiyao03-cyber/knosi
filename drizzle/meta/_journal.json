@@ -344,6 +344,13 @@
       "when": 1777888432588,
       "tag": "0048_lame_miss_america",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1777899041854,
+      "tag": "0049_thankful_dexter_bennett",
+      "breakpoints": true
     }
   ]
 }
