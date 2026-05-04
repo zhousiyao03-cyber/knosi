@@ -38,16 +38,21 @@ test.describe("Speak", () => {
     await page.goto("/speak");
     await expect(page.getByTestId("speak-sentence")).toBeVisible();
 
-    // Play once on the current sentence, then Next — that should flush a
-    // recordPractice call for the *previous* sentence.
+    // Play once on the current sentence, then Next — that flushes a
+    // recordPractice mutation for the *previous* sentence and then waits
+    // for it to settle on the server.
     await page.getByTestId("speak-play").click();
     await page.waitForTimeout(150);
-    await page.getByTestId("speak-next").click();
 
-    // Give the recordPractice mutation time to settle on the server before
-    // we reload (otherwise the next page's getCounts query may race the
-    // in-flight upsert and miss the row).
-    await page.waitForTimeout(800);
+    // Wait for the recordPractice request to finish before navigating
+    // (instead of guessing with a timeout). This avoids a race against the
+    // upsert when the next page's getCounts query loads.
+    const recordPromise = page.waitForResponse(
+      (r) => r.url().includes("/api/trpc/speak.recordPractice") && r.ok(),
+      { timeout: 5000 },
+    );
+    await page.getByTestId("speak-next").click();
+    await recordPromise;
 
     // Reload and walk through the deck looking for any sentence with
     // "Practiced N times". With shuffle this is the previously-played

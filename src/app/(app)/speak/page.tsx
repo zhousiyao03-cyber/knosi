@@ -1,28 +1,46 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { trpc } from "@/lib/trpc";
 import { SEED_SENTENCES, type SeedSentence } from "@/lib/speak/seed";
 import { shuffle } from "@/lib/speak/shuffle";
 import { cancelSpeech, isTtsSupported, speak } from "@/lib/speak/tts";
 
+// useSyncExternalStore-based client-only flag. Returns false during SSR /
+// initial hydration and true once we're on the client. This avoids the
+// "setState inside useEffect" pattern that lints want us to avoid.
+const subscribeNoop = () => () => {};
+const getServerSnapshot = () => false;
+const getClientSnapshot = () => true;
+function useIsClient(): boolean {
+  return useSyncExternalStore(subscribeNoop, getClientSnapshot, getServerSnapshot);
+}
+
 export default function SpeakPage() {
   const utils = trpc.useUtils();
   const countsQuery = trpc.speak.getCounts.useQuery();
   const recordPractice = trpc.speak.recordPractice.useMutation();
 
-  // SSR-safe: render a stable placeholder server-side. Real shuffle and TTS
-  // checks happen only after mount.
-  const [mounted, setMounted] = useState(false);
-  // Shuffled order of sentences for this session. Reshuffles when we run out.
-  const [order, setOrder] = useState<SeedSentence[]>(() => SEED_SENTENCES);
-  const [pointer, setPointer] = useState(0);
+  const isClient = useIsClient();
 
-  useEffect(() => {
-    setMounted(true);
-    setOrder(shuffle(SEED_SENTENCES));
-  }, []);
+  // Reshuffle nonce — bumped to force a new order. Initial shuffle happens
+  // automatically on the first client render via useMemo below.
+  const [shuffleNonce, setShuffleNonce] = useState(0);
+  const order = useMemo<SeedSentence[]>(
+    () => (isClient ? shuffle(SEED_SENTENCES) : SEED_SENTENCES),
+    // shuffleNonce is what triggers re-shuffling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isClient, shuffleNonce],
+  );
+  const [pointer, setPointer] = useState(0);
 
   // How many times Play fired for the *current* sentence in this session.
   // Reset on Next.
@@ -71,7 +89,7 @@ export default function SpeakPage() {
     setPointer((p) => {
       const np = p + 1;
       if (np >= order.length) {
-        setOrder(shuffle(SEED_SENTENCES));
+        setShuffleNonce((n) => n + 1);
         return 0;
       }
       return np;
@@ -131,7 +149,7 @@ export default function SpeakPage() {
     [pointer, order.length],
   );
 
-  if (!mounted) {
+  if (!isClient) {
     // Render a minimal, deterministic shell on the server to avoid a
     // hydration mismatch when the client swaps in the shuffled order +
     // platform-dependent TTS support check.
