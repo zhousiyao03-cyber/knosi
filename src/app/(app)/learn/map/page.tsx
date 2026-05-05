@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/routers/_app";
 import { trpc } from "@/lib/trpc";
@@ -43,13 +43,50 @@ type Topic = Track["areas"][number]["topics"][number];
 
 export default function CurriculumMapPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const utils = trpc.useUtils();
   const curriculumQuery = trpc.curriculum.getCurriculum.useQuery();
 
   const [explicitTrackId, setExplicitTrackId] = useState<string | null>(null);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const deepLinkAppliedRef = useRef(false);
 
-  const tracks = curriculumQuery.data?.tracks ?? [];
+  const tracks = useMemo(
+    () => curriculumQuery.data?.tracks ?? [],
+    [curriculumQuery.data]
+  );
+
+  // ?topicId=... — locate the topic, switch to its track, open the side panel.
+  // Run only once per arrival to avoid fighting subsequent user navigation.
+  useEffect(() => {
+    if (deepLinkAppliedRef.current) return;
+    if (tracks.length === 0) return;
+
+    const targetTopicId = searchParams?.get("topicId");
+    if (!targetTopicId) return;
+
+    for (const track of tracks) {
+      for (const area of track.areas) {
+        if (area.topics.some((t) => t.id === targetTopicId)) {
+          setExplicitTrackId(track.id);
+          setSelectedTopicId(targetTopicId);
+          deepLinkAppliedRef.current = true;
+
+          // Defer scroll until after render commits the new track.
+          requestAnimationFrame(() => {
+            const el = document.querySelector(
+              `[data-topic-id="${targetTopicId}"]`
+            );
+            el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          });
+          return;
+        }
+      }
+    }
+    // If topicId doesn't match anything (stale link), still mark applied so we
+    // don't loop forever as user clicks around.
+    deepLinkAppliedRef.current = true;
+  }, [tracks, searchParams]);
 
   const activeTrack = useMemo(() => {
     if (tracks.length === 0) return undefined;
@@ -139,7 +176,10 @@ export default function CurriculumMapPage() {
           </div>
         </header>
 
-        <nav className="mb-6 flex items-center gap-2" data-testid="track-tabs">
+        <nav
+          className="mb-6 -mx-1 flex items-center gap-2 overflow-x-auto pb-1 px-1"
+          data-testid="track-tabs"
+        >
           {tracks.map((track) => (
             <button
               key={track.id}
@@ -186,17 +226,25 @@ export default function CurriculumMapPage() {
       </div>
 
       {selectedTopicId && (
-        <SidePanel
-          topicId={selectedTopicId}
-          onClose={() => setSelectedTopicId(null)}
-          onMasteryChange={(mastery) =>
-            setMastery.mutate({ topicId: selectedTopicId, mastery })
-          }
-          onJumpToNote={(noteId, learningTopicId) => {
-            setSelectedTopicId(null);
-            router.push(`/learn/${learningTopicId}/${noteId}`);
-          }}
-        />
+        <>
+          <button
+            type="button"
+            aria-label="Close panel"
+            className="fixed inset-0 z-20 bg-black/30 sm:hidden"
+            onClick={() => setSelectedTopicId(null)}
+          />
+          <SidePanel
+            topicId={selectedTopicId}
+            onClose={() => setSelectedTopicId(null)}
+            onMasteryChange={(mastery) =>
+              setMastery.mutate({ topicId: selectedTopicId, mastery })
+            }
+            onJumpToNote={(noteId, learningTopicId) => {
+              setSelectedTopicId(null);
+              router.push(`/learn/${learningTopicId}/${noteId}`);
+            }}
+          />
+        </>
       )}
     </div>
   );
@@ -277,7 +325,7 @@ function SidePanel({
 
   if (detailQuery.isLoading || !detailQuery.data) {
     return (
-      <aside className="fixed right-0 top-0 z-30 h-full w-[380px] border-l border-stone-200 bg-white p-6 dark:border-stone-800 dark:bg-stone-950">
+      <aside className="fixed right-0 top-0 z-30 h-full w-full sm:w-[380px] border-l border-stone-200 bg-white p-6 dark:border-stone-800 dark:bg-stone-950">
         <div className="text-stone-500 dark:text-stone-400">Loading…</div>
       </aside>
     );
@@ -287,7 +335,7 @@ function SidePanel({
 
   return (
     <aside
-      className="fixed right-0 top-0 z-30 h-full w-[380px] overflow-y-auto border-l border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-950"
+      className="fixed right-0 top-0 z-30 h-full w-full sm:w-[380px] overflow-y-auto border-l border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-950"
       data-testid="topic-side-panel"
     >
       <div className="mb-4 flex items-start justify-between gap-3">

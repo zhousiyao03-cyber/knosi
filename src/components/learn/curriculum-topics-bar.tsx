@@ -43,7 +43,10 @@ export function CurriculumTopicsBar({ noteId }: { noteId: string }) {
           )}
           title={`${topic.trackTitle} › ${topic.areaTitle}`}
         >
-          <Link href="/learn/map" className="truncate max-w-[200px]">
+          <Link
+            href={`/learn/map?topicId=${encodeURIComponent(topic.id)}`}
+            className="truncate max-w-[200px]"
+          >
             {topic.title}
           </Link>
           <button

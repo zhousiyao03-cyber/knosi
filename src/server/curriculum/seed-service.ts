@@ -192,6 +192,76 @@ export async function resetCurriculum(userId: string): Promise<void> {
   await seedDefaultCurriculum(userId);
 }
 
+// Auto-link a single note (used on createNote / updateNote). Idempotent.
+// Returns count of new links inserted.
+export async function autoLinkNote(
+  userId: string,
+  noteId: string,
+  noteTitle: string
+): Promise<number> {
+  if (!noteTitle?.trim()) return 0;
+
+  const topicRows = await db
+    .select({ id: curriculumTopics.id, title: curriculumTopics.title })
+    .from(curriculumTopics)
+    .innerJoin(curriculumAreas, eq(curriculumAreas.id, curriculumTopics.areaId))
+    .innerJoin(curriculumTracks, eq(curriculumTracks.id, curriculumAreas.trackId))
+    .where(eq(curriculumTracks.userId, userId));
+
+  if (topicRows.length === 0) return 0;
+
+  const titleToKeywords = new Map<string, string[]>();
+  for (const track of DEFAULT_CURRICULUM) {
+    for (const area of track.areas) {
+      for (const topic of area.topics) {
+        titleToKeywords.set(topic.title, topic.keywords ?? []);
+      }
+    }
+  }
+
+  const matches: TopicWithKeywords[] = [];
+  for (const t of topicRows) {
+    const candidate: TopicWithKeywords = {
+      id: t.id,
+      title: t.title,
+      keywords: titleToKeywords.get(t.title) ?? [],
+    };
+    if (topicMatchesNote(noteTitle, candidate)) matches.push(candidate);
+  }
+
+  if (matches.length === 0) return 0;
+
+  const before = await db
+    .select({ topicId: curriculumTopicNotes.topicId })
+    .from(curriculumTopicNotes)
+    .where(eq(curriculumTopicNotes.noteId, noteId));
+  const existing = new Set(before.map((r) => r.topicId));
+
+  const inserts = matches
+    .filter((m) => !existing.has(m.id))
+    .map((m) => ({ topicId: m.id, noteId }));
+
+  if (inserts.length === 0) return 0;
+
+  await db.insert(curriculumTopicNotes).values(inserts).onConflictDoNothing();
+
+  // Bootstrap mastery from blank → learning for any newly matched topic
+  await db
+    .update(curriculumTopics)
+    .set({ mastery: "learning" })
+    .where(
+      and(
+        inArray(
+          curriculumTopics.id,
+          inserts.map((i) => i.topicId)
+        ),
+        eq(curriculumTopics.mastery, "blank")
+      )
+    );
+
+  return inserts.length;
+}
+
 export async function rerunAutoLink(userId: string): Promise<number> {
   const topicRows = await db
     .select({ id: curriculumTopics.id, title: curriculumTopics.title })

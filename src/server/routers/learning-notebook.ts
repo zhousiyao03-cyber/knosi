@@ -9,6 +9,7 @@ import {
   learningTopics,
 } from "../db/schema";
 import { protectedProcedure, router } from "../trpc";
+import { autoLinkNote } from "../curriculum/seed-service";
 
 const createTopicSchema = z.object({
   title: z.string().trim().min(1),
@@ -301,12 +302,13 @@ export const learningNotebookRouter = router({
     .input(noteInputSchema)
     .mutation(async ({ input, ctx }) => {
       const id = crypto.randomUUID();
+      const title = input.title?.trim() || "";
       await db.transaction(async (tx) => {
         await tx.insert(learningNotes).values({
           id,
           topicId: input.topicId,
           userId: ctx.userId,
-          title: input.title?.trim() || "",
+          title,
           content: input.content,
           plainText: input.plainText,
           tags: input.tags,
@@ -324,6 +326,15 @@ export const learningNotebookRouter = router({
           );
       });
 
+      // Best-effort curriculum auto-link; never fail the create.
+      if (title) {
+        try {
+          await autoLinkNote(ctx.userId, id, title);
+        } catch (err) {
+          console.error("autoLinkNote (create) failed:", err);
+        }
+      }
+
       return { id };
     }),
 
@@ -331,6 +342,14 @@ export const learningNotebookRouter = router({
     .input(updateNoteSchema)
     .mutation(async ({ input, ctx }) => {
       const { id, topicId, ...data } = input;
+
+      const before = await db
+        .select({ title: learningNotes.title })
+        .from(learningNotes)
+        .where(and(eq(learningNotes.id, id), eq(learningNotes.userId, ctx.userId)))
+        .limit(1);
+      const oldTitle = before[0]?.title ?? "";
+
       await db.transaction(async (tx) => {
         await tx
           .update(learningNotes)
@@ -349,6 +368,16 @@ export const learningNotebookRouter = router({
             )
           );
       });
+
+      // Re-link only when title changed; skip pure content edits.
+      const newTitle = (data.title ?? oldTitle).trim();
+      if (newTitle && newTitle !== oldTitle.trim()) {
+        try {
+          await autoLinkNote(ctx.userId, id, newTitle);
+        } catch (err) {
+          console.error("autoLinkNote (update) failed:", err);
+        }
+      }
 
       return { id };
     }),
