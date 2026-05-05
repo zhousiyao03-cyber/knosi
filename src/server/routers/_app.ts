@@ -16,6 +16,7 @@ import { aiSettingsRouter } from "./ai-settings";
 import { preferencesRouter } from "./preferences";
 import { speakRouter } from "./speak";
 import { wordsRouter } from "./words";
+import { curriculumRouter } from "./curriculum";
 
 export const appRouter = router({
   notes: notesRouter,
@@ -35,6 +36,7 @@ export const appRouter = router({
   preferences: preferencesRouter,
   speak: speakRouter,
   words: wordsRouter,
+  curriculum: curriculumRouter,
 });
 
 export type AppRouter = typeof appRouter;
