@@ -17,6 +17,7 @@ import {
   extractTomorrowPlanItems,
 } from "@/lib/note-templates";
 import { normalizeJournalTitlesForUser } from "../notes/journal-titles";
+import { autoLinkNote } from "../curriculum/seed-service";
 import {
   invalidateDashboardForUser,
   invalidateNotesListForUser,
@@ -209,6 +210,11 @@ export const notesRouter = router({
       await db.insert(notes).values({ id, userId: ctx.userId, ...input });
       await enqueueNoteIndexJob(id, "note-create");
       void syncNoteLinks(id, input.content ?? null).catch(() => undefined);
+      if (input.title?.trim()) {
+        void autoLinkNote(ctx.userId, id, input.title, "general").catch((err) => {
+          console.error("autoLinkNote (general create) failed:", err);
+        });
+      }
       invalidateDashboardForUser(ctx.userId);
       invalidateNotesListForUser(ctx.userId);
       return { id };
@@ -229,6 +235,13 @@ export const notesRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
 
+      const before = await db
+        .select({ title: notes.title })
+        .from(notes)
+        .where(and(eq(notes.id, id), eq(notes.userId, ctx.userId)))
+        .limit(1);
+      const oldTitle = before[0]?.title ?? "";
+
       await db
         .update(notes)
         .set({
@@ -245,6 +258,13 @@ export const notesRouter = router({
         if (updatedNote) {
           void syncNoteLinks(id, updatedNote.content).catch(() => undefined);
         }
+      }
+
+      const newTitle = (input.title ?? oldTitle).trim();
+      if (newTitle && newTitle !== oldTitle.trim()) {
+        void autoLinkNote(ctx.userId, id, newTitle, "general").catch((err) => {
+          console.error("autoLinkNote (general update) failed:", err);
+        });
       }
 
       invalidateDashboardForUser(ctx.userId);

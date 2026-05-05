@@ -8,6 +8,7 @@ import { ArrowLeft, Check, Copy, FolderOpen, ImagePlus, Link, Share2, X } from "
 import dynamic from "next/dynamic";
 import type { Editor as TiptapEditorInstance } from "@tiptap/react";
 import { BacklinksPanel } from "./backlinks-panel";
+import { CurriculumTopicsBar } from "@/components/learn/curriculum-topics-bar";
 import { TocSidebar } from "@/components/editor/toc-sidebar";
 
 const TiptapEditor = dynamic(
@@ -653,6 +654,8 @@ function NoteEditor({ id, note }: { id: string; note: NoteData }) {
             }}
           />
         </div>
+
+        <CurriculumTopicsBar noteId={id} kind="general" />
 
         <div className="-mx-1 sm:mx-0 sm:px-1">
           <TiptapEditor

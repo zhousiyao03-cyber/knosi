@@ -2,6 +2,7 @@ import { sqliteTable, text, integer, index, primaryKey } from "drizzle-orm/sqlit
 import { type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { users } from "./auth";
 import { learningNotes } from "./learning";
+import { notes } from "./notes";
 
 export const curriculumTracks = sqliteTable(
   "curriculum_tracks",
@@ -72,6 +73,11 @@ export const curriculumTopicNotes = sqliteTable(
     noteId: text("note_id")
       .notNull()
       .references(() => learningNotes.id, { onDelete: "cascade" }),
+    source: text("source", {
+      enum: ["auto_substring", "auto_jaccard", "manual"],
+    })
+      .notNull()
+      .default("auto_substring"),
     createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   },
   (table) => [
@@ -80,5 +86,30 @@ export const curriculumTopicNotes = sqliteTable(
   ]
 );
 
+export const curriculumTopicGeneralNotes = sqliteTable(
+  "curriculum_topic_general_notes",
+  {
+    topicId: text("topic_id")
+      .notNull()
+      .references(() => curriculumTopics.id, { onDelete: "cascade" }),
+    noteId: text("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
+    source: text("source", {
+      enum: ["auto_substring", "auto_jaccard", "manual"],
+    })
+      .notNull()
+      .default("auto_substring"),
+    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  },
+  (table) => [
+    primaryKey({ columns: [table.topicId, table.noteId] }),
+    index("curriculum_topic_general_notes_note_idx").on(table.noteId),
+  ]
+);
+
 export const MASTERY_STATES = ["blank", "heard", "learning", "mastered"] as const;
 export type MasteryState = (typeof MASTERY_STATES)[number];
+
+export const LINK_SOURCES = ["auto_substring", "auto_jaccard", "manual"] as const;
+export type LinkSource = (typeof LINK_SOURCES)[number];

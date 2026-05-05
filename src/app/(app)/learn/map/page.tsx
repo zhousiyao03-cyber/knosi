@@ -239,9 +239,13 @@ export default function CurriculumMapPage() {
             onMasteryChange={(mastery) =>
               setMastery.mutate({ topicId: selectedTopicId, mastery })
             }
-            onJumpToNote={(noteId, learningTopicId) => {
+            onJumpToNote={(noteId, kind, parentId) => {
               setSelectedTopicId(null);
-              router.push(`/learn/${learningTopicId}/${noteId}`);
+              if (kind === "learning" && parentId) {
+                router.push(`/learn/${parentId}/${noteId}`);
+              } else {
+                router.push(`/notes/${noteId}`);
+              }
             }}
           />
         </>
@@ -294,6 +298,17 @@ function TopicCard({ topic, onClick }: { topic: Topic; onClick: () => void }) {
   );
 }
 
+const SOURCE_BADGE: Record<string, string> = {
+  manual: "Manual",
+  auto_substring: "Auto",
+  auto_jaccard: "Fuzzy",
+};
+const SOURCE_BADGE_COLOR: Record<string, string> = {
+  manual: "text-emerald-700 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/15",
+  auto_substring: "text-stone-600 bg-stone-100 dark:text-stone-400 dark:bg-stone-800",
+  auto_jaccard: "text-amber-700 bg-amber-100 dark:text-amber-300 dark:bg-amber-500/15",
+};
+
 function SidePanel({
   topicId,
   onClose,
@@ -303,23 +318,31 @@ function SidePanel({
   topicId: string;
   onClose: () => void;
   onMasteryChange: (mastery: "blank" | "heard" | "learning" | "mastered") => void;
-  onJumpToNote: (noteId: string, learningTopicId: string) => void;
+  onJumpToNote: (noteId: string, kind: "learning" | "general", parentId: string | null) => void;
 }) {
   const utils = trpc.useUtils();
   const detailQuery = trpc.curriculum.getTopicDetail.useQuery({ topicId });
   const [showLinkPicker, setShowLinkPicker] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const unlink = trpc.curriculum.unlinkNote.useMutation({
+  const invalidateAll = () => {
+    utils.curriculum.getTopicDetail.invalidate({ topicId });
+    utils.curriculum.getCurriculum.invalidate();
+  };
+
+  const unlink = trpc.curriculum.unlinkNote.useMutation({ onSuccess: invalidateAll });
+  const bulkUnlink = trpc.curriculum.bulkUnlink.useMutation({
     onSuccess: () => {
-      utils.curriculum.getTopicDetail.invalidate({ topicId });
-      utils.curriculum.getCurriculum.invalidate();
+      invalidateAll();
+      setSelected(new Set());
+      setBulkMode(false);
     },
   });
   const createNote = trpc.curriculum.createNoteForTopic.useMutation({
     onSuccess: ({ noteId, learningTopicId }) => {
-      utils.curriculum.getTopicDetail.invalidate({ topicId });
-      utils.curriculum.getCurriculum.invalidate();
-      onJumpToNote(noteId, learningTopicId);
+      invalidateAll();
+      onJumpToNote(noteId, "learning", learningTopicId);
     },
   });
 
@@ -332,6 +355,14 @@ function SidePanel({
   }
 
   const { topic, linkedNotes } = detailQuery.data;
+  const toggleSelected = (key: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   return (
     <aside
@@ -386,35 +417,102 @@ function SidePanel({
       )}
 
       <section className="mb-4">
-        <div className="mb-2 text-[11px] uppercase tracking-wide text-stone-500">
-          Linked notes ({linkedNotes.length})
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-[11px] uppercase tracking-wide text-stone-500">
+            Linked notes ({linkedNotes.length})
+          </div>
+          {linkedNotes.length > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                setBulkMode((m) => !m);
+                setSelected(new Set());
+              }}
+              className="text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+              data-testid="toggle-bulk-mode"
+            >
+              {bulkMode ? "Done" : "Select"}
+            </button>
+          )}
         </div>
+
+        {bulkMode && selected.size > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              const items = Array.from(selected).map((key) => {
+                const [kind, id] = key.split("::") as ["learning" | "general", string];
+                return { noteId: id, kind };
+              });
+              bulkUnlink.mutate({ topicId, items });
+            }}
+            disabled={bulkUnlink.isPending}
+            className="mb-2 w-full rounded border border-rose-300 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100 disabled:opacity-50 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200"
+            data-testid="bulk-unlink"
+          >
+            Unlink {selected.size} selected
+          </button>
+        )}
+
         {linkedNotes.length === 0 ? (
           <p className="text-xs text-stone-500">No notes linked yet.</p>
         ) : (
           <ul className="space-y-1.5" data-testid="linked-notes">
-            {linkedNotes.map((n) => (
-              <li
-                key={n.id}
-                className="flex items-center justify-between gap-2 rounded border border-stone-200 px-2.5 py-1.5 hover:border-stone-400 dark:border-stone-800 dark:hover:border-stone-600"
-              >
-                <button
-                  onClick={() => onJumpToNote(n.id, n.topicId)}
-                  className="flex-1 truncate text-left text-sm text-stone-800 hover:text-stone-950 dark:text-stone-200 dark:hover:text-stone-50"
-                  title={n.title}
-                  data-testid="linked-note-link"
+            {linkedNotes.map((n) => {
+              const key = `${n.kind}::${n.id}`;
+              const isSelected = selected.has(key);
+              return (
+                <li
+                  key={key}
+                  className={cn(
+                    "flex items-center gap-2 rounded border px-2.5 py-1.5",
+                    isSelected
+                      ? "border-rose-400 bg-rose-50 dark:border-rose-500/60 dark:bg-rose-500/10"
+                      : "border-stone-200 hover:border-stone-400 dark:border-stone-800 dark:hover:border-stone-600"
+                  )}
                 >
-                  {n.title}
-                </button>
-                <button
-                  onClick={() => unlink.mutate({ topicId, noteId: n.id })}
-                  className="text-xs text-stone-400 hover:text-stone-700 dark:text-stone-500 dark:hover:text-stone-300"
-                  aria-label="Unlink"
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
+                  {bulkMode && (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelected(key)}
+                      className="h-3.5 w-3.5"
+                      aria-label={`Select ${n.title}`}
+                    />
+                  )}
+                  <button
+                    onClick={() =>
+                      bulkMode
+                        ? toggleSelected(key)
+                        : onJumpToNote(n.id, n.kind, n.parentId)
+                    }
+                    className="flex-1 truncate text-left text-sm text-stone-800 hover:text-stone-950 dark:text-stone-200 dark:hover:text-stone-50"
+                    title={n.title}
+                    data-testid="linked-note-link"
+                  >
+                    {n.title}
+                  </button>
+                  <span
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-[10px]",
+                      SOURCE_BADGE_COLOR[n.source] ?? SOURCE_BADGE_COLOR.auto_substring
+                    )}
+                    title={`Source: ${n.source}; ${n.kind === "general" ? "General note" : "Learning note"}`}
+                  >
+                    {SOURCE_BADGE[n.source] ?? "Auto"}
+                  </span>
+                  {!bulkMode && (
+                    <button
+                      onClick={() => unlink.mutate({ topicId, noteId: n.id, kind: n.kind })}
+                      className="text-xs text-stone-400 hover:text-stone-700 dark:text-stone-500 dark:hover:text-stone-300"
+                      aria-label="Unlink"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -446,12 +544,9 @@ function SidePanel({
       {showLinkPicker && (
         <LinkPicker
           topicId={topicId}
-          excludeNoteIds={linkedNotes.map((n) => n.id)}
+          excludeNoteIds={linkedNotes.filter((n) => n.kind === "learning").map((n) => n.id)}
           onClose={() => setShowLinkPicker(false)}
-          onLinked={() => {
-            utils.curriculum.getTopicDetail.invalidate({ topicId });
-            utils.curriculum.getCurriculum.invalidate();
-          }}
+          onLinked={invalidateAll}
         />
       )}
     </aside>
@@ -522,7 +617,7 @@ function LinkPicker({
             <button
               key={note.id}
               onClick={() => {
-                linkMutation.mutate({ topicId, noteId: note.id });
+                linkMutation.mutate({ topicId, noteId: note.id, kind: "learning" });
                 onClose();
               }}
               className="w-full truncate rounded px-2 py-1.5 text-left text-sm text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-900"

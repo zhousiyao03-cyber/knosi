@@ -5,9 +5,14 @@ import {
   curriculumAreas,
   curriculumTopics,
   curriculumTopicNotes,
+  curriculumTopicGeneralNotes,
+  type LinkSource,
 } from "../db/schema/curriculum";
 import { learningNotes } from "../db/schema/learning";
+import { notes as generalNotes } from "../db/schema/notes";
 import { DEFAULT_CURRICULUM } from "./seed-data";
+
+export type NoteKind = "learning" | "general";
 
 type TopicWithKeywords = {
   id: string;
@@ -55,15 +60,17 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   return inter / union;
 }
 
-function topicMatchesNote(noteTitle: string, topic: TopicWithKeywords): boolean {
+// Returns the match source if matched, or null. "auto_substring" is the
+// strongest auto signal (explicit keyword hit); "auto_jaccard" is fuzzier.
+function matchTopic(noteTitle: string, topic: TopicWithKeywords): LinkSource | null {
   const noteNorm = normalize(noteTitle);
   for (const kw of topic.keywords) {
-    if (kw && noteNorm.includes(normalize(kw))) return true;
+    if (kw && noteNorm.includes(normalize(kw))) return "auto_substring";
   }
   const noteTokens = new Set(tokenize(noteTitle));
   const topicTokens = new Set(tokenize(topic.title));
-  if (jaccard(noteTokens, topicTokens) >= 0.55) return true;
-  return false;
+  if (jaccard(noteTokens, topicTokens) >= 0.55) return "auto_jaccard";
+  return null;
 }
 
 export async function userHasCurriculum(userId: string): Promise<boolean> {
@@ -132,40 +139,51 @@ export async function seedDefaultCurriculum(userId: string): Promise<void> {
     }
   }
 
-  await autoLinkExistingNotes(userId, topicSeeds);
+  await autoLinkExistingNotes(userId, topicSeeds, "learning");
+  await autoLinkExistingNotes(userId, topicSeeds, "general");
 }
 
 async function autoLinkExistingNotes(
   userId: string,
-  topics: TopicWithKeywords[]
+  topics: TopicWithKeywords[],
+  kind: NoteKind
 ): Promise<void> {
   if (topics.length === 0) return;
-  const notes = await db
-    .select({ id: learningNotes.id, title: learningNotes.title })
-    .from(learningNotes)
-    .where(eq(learningNotes.userId, userId));
 
-  if (notes.length === 0) return;
+  const noteRows =
+    kind === "learning"
+      ? await db
+          .select({ id: learningNotes.id, title: learningNotes.title })
+          .from(learningNotes)
+          .where(eq(learningNotes.userId, userId))
+      : await db
+          .select({ id: generalNotes.id, title: generalNotes.title })
+          .from(generalNotes)
+          .where(eq(generalNotes.userId, userId));
 
-  const links: { topicId: string; noteId: string }[] = [];
+  if (noteRows.length === 0) return;
+
+  type LinkRow = { topicId: string; noteId: string; source: LinkSource };
+  const links: LinkRow[] = [];
   const matchedTopicIds = new Set<string>();
 
-  for (const note of notes) {
+  for (const note of noteRows) {
+    if (!note.title?.trim()) continue;
     for (const topic of topics) {
-      if (topicMatchesNote(note.title, topic)) {
-        links.push({ topicId: topic.id, noteId: note.id });
+      const source = matchTopic(note.title, topic);
+      if (source) {
+        links.push({ topicId: topic.id, noteId: note.id, source });
         matchedTopicIds.add(topic.id);
       }
     }
   }
 
   if (links.length > 0) {
+    const target =
+      kind === "learning" ? curriculumTopicNotes : curriculumTopicGeneralNotes;
     const chunkSize = 200;
     for (let i = 0; i < links.length; i += chunkSize) {
-      await db
-        .insert(curriculumTopicNotes)
-        .values(links.slice(i, i + chunkSize))
-        .onConflictDoNothing();
+      await db.insert(target).values(links.slice(i, i + chunkSize)).onConflictDoNothing();
     }
   }
 
@@ -192,12 +210,13 @@ export async function resetCurriculum(userId: string): Promise<void> {
   await seedDefaultCurriculum(userId);
 }
 
-// Auto-link a single note (used on createNote / updateNote). Idempotent.
+// Auto-link a single note (learning or general). Idempotent.
 // Returns count of new links inserted.
 export async function autoLinkNote(
   userId: string,
   noteId: string,
-  noteTitle: string
+  noteTitle: string,
+  kind: NoteKind = "learning"
 ): Promise<number> {
   if (!noteTitle?.trim()) return 0;
 
@@ -219,33 +238,41 @@ export async function autoLinkNote(
     }
   }
 
-  const matches: TopicWithKeywords[] = [];
+  const matched: { topicId: string; source: LinkSource }[] = [];
   for (const t of topicRows) {
     const candidate: TopicWithKeywords = {
       id: t.id,
       title: t.title,
       keywords: titleToKeywords.get(t.title) ?? [],
     };
-    if (topicMatchesNote(noteTitle, candidate)) matches.push(candidate);
+    const source = matchTopic(noteTitle, candidate);
+    if (source) matched.push({ topicId: t.id, source });
   }
 
-  if (matches.length === 0) return 0;
+  if (matched.length === 0) return 0;
 
-  const before = await db
-    .select({ topicId: curriculumTopicNotes.topicId })
-    .from(curriculumTopicNotes)
-    .where(eq(curriculumTopicNotes.noteId, noteId));
+  const target = kind === "learning" ? curriculumTopicNotes : curriculumTopicGeneralNotes;
+
+  const before =
+    kind === "learning"
+      ? await db
+          .select({ topicId: curriculumTopicNotes.topicId })
+          .from(curriculumTopicNotes)
+          .where(eq(curriculumTopicNotes.noteId, noteId))
+      : await db
+          .select({ topicId: curriculumTopicGeneralNotes.topicId })
+          .from(curriculumTopicGeneralNotes)
+          .where(eq(curriculumTopicGeneralNotes.noteId, noteId));
   const existing = new Set(before.map((r) => r.topicId));
 
-  const inserts = matches
-    .filter((m) => !existing.has(m.id))
-    .map((m) => ({ topicId: m.id, noteId }));
+  const inserts = matched
+    .filter((m) => !existing.has(m.topicId))
+    .map((m) => ({ topicId: m.topicId, noteId, source: m.source }));
 
   if (inserts.length === 0) return 0;
 
-  await db.insert(curriculumTopicNotes).values(inserts).onConflictDoNothing();
+  await db.insert(target).values(inserts).onConflictDoNothing();
 
-  // Bootstrap mastery from blank → learning for any newly matched topic
   await db
     .update(curriculumTopics)
     .set({ mastery: "learning" })
@@ -262,6 +289,7 @@ export async function autoLinkNote(
   return inserts.length;
 }
 
+// Re-run auto-link for both kinds against the user's current notes.
 export async function rerunAutoLink(userId: string): Promise<number> {
   const topicRows = await db
     .select({ id: curriculumTopics.id, title: curriculumTopics.title })
@@ -286,18 +314,29 @@ export async function rerunAutoLink(userId: string): Promise<number> {
   }));
 
   const linkCountForUser = async () => {
-    const r = await db
+    const learning = await db
       .select({ count: sql<number>`count(*)` })
       .from(curriculumTopicNotes)
       .innerJoin(curriculumTopics, eq(curriculumTopics.id, curriculumTopicNotes.topicId))
       .innerJoin(curriculumAreas, eq(curriculumAreas.id, curriculumTopics.areaId))
       .innerJoin(curriculumTracks, eq(curriculumTracks.id, curriculumAreas.trackId))
       .where(eq(curriculumTracks.userId, userId));
-    return r[0]?.count ?? 0;
+    const general = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(curriculumTopicGeneralNotes)
+      .innerJoin(
+        curriculumTopics,
+        eq(curriculumTopics.id, curriculumTopicGeneralNotes.topicId)
+      )
+      .innerJoin(curriculumAreas, eq(curriculumAreas.id, curriculumTopics.areaId))
+      .innerJoin(curriculumTracks, eq(curriculumTracks.id, curriculumAreas.trackId))
+      .where(eq(curriculumTracks.userId, userId));
+    return (learning[0]?.count ?? 0) + (general[0]?.count ?? 0);
   };
 
   const before = await linkCountForUser();
-  await autoLinkExistingNotes(userId, topics);
+  await autoLinkExistingNotes(userId, topics, "learning");
+  await autoLinkExistingNotes(userId, topics, "general");
   const after = await linkCountForUser();
 
   return after - before;

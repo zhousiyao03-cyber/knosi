@@ -12,9 +12,15 @@ const MASTERY_TINT: Record<string, string> = {
   mastered: "border-emerald-500/60 text-emerald-700 dark:text-emerald-300",
 };
 
-export function CurriculumTopicsBar({ noteId }: { noteId: string }) {
+export function CurriculumTopicsBar({
+  noteId,
+  kind = "learning",
+}: {
+  noteId: string;
+  kind?: "learning" | "general";
+}) {
   const utils = trpc.useUtils();
-  const linkedQuery = trpc.curriculum.getTopicsForNote.useQuery({ noteId });
+  const linkedQuery = trpc.curriculum.getTopicsForNote.useQuery({ noteId, kind });
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const linked = useMemo(() => linkedQuery.data ?? [], [linkedQuery.data]);
@@ -22,7 +28,7 @@ export function CurriculumTopicsBar({ noteId }: { noteId: string }) {
 
   const unlink = trpc.curriculum.unlinkNote.useMutation({
     onSuccess: () => {
-      utils.curriculum.getTopicsForNote.invalidate({ noteId });
+      utils.curriculum.getTopicsForNote.invalidate({ noteId, kind });
       utils.curriculum.getCurriculum.invalidate();
     },
   });
@@ -51,7 +57,7 @@ export function CurriculumTopicsBar({ noteId }: { noteId: string }) {
           </Link>
           <button
             type="button"
-            onClick={() => unlink.mutate({ topicId: topic.id, noteId })}
+            onClick={() => unlink.mutate({ topicId: topic.id, noteId, kind })}
             className="opacity-50 hover:opacity-100"
             aria-label={`Unlink ${topic.title}`}
           >
@@ -71,10 +77,11 @@ export function CurriculumTopicsBar({ noteId }: { noteId: string }) {
       {pickerOpen && (
         <CurriculumTopicPicker
           noteId={noteId}
+          kind={kind}
           excludedIds={linkedIds}
           onClose={() => setPickerOpen(false)}
           onLinked={() => {
-            utils.curriculum.getTopicsForNote.invalidate({ noteId });
+            utils.curriculum.getTopicsForNote.invalidate({ noteId, kind });
             utils.curriculum.getCurriculum.invalidate();
           }}
         />
@@ -85,11 +92,13 @@ export function CurriculumTopicsBar({ noteId }: { noteId: string }) {
 
 function CurriculumTopicPicker({
   noteId,
+  kind,
   excludedIds,
   onClose,
   onLinked,
 }: {
   noteId: string;
+  kind: "learning" | "general";
   excludedIds: Set<string>;
   onClose: () => void;
   onLinked: () => void;
@@ -104,6 +113,9 @@ function CurriculumTopicPicker({
       onClose();
     },
   });
+  const onPickTopic = (topicId: string) => {
+    linkMutation.mutate({ topicId, noteId, kind });
+  };
 
   const items = (searchQuery.data ?? []).filter((t) => !excludedIds.has(t.id));
   const grouped = useMemo(() => {
@@ -165,7 +177,7 @@ function CurriculumTopicPicker({
                 {group.topics.map((topic) => (
                   <button
                     key={topic.id}
-                    onClick={() => linkMutation.mutate({ topicId: topic.id, noteId })}
+                    onClick={() => onPickTopic(topic.id)}
                     className="w-full rounded px-2 py-1 text-left text-sm text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-900"
                     data-testid="curriculum-picker-item"
                   >
