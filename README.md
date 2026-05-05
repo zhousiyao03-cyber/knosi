@@ -45,6 +45,7 @@ Write notes with a Notion-level editor, index your knowledge with hybrid RAG, an
 - **Rich Text Editor** — Notion-style block editor powered by Tiptap v3. Code blocks with language selector, Mermaid diagrams, Excalidraw whiteboards, callouts, toggles, tables with toolbar, side-by-side image rows, TOC block and collapsible sidebar, drag-and-drop sorting, slash commands, search & replace, and mixed Markdown paste.
 - **Notes** — Full-width cover images, type/tag metadata, hover-to-insert controls, block-level move/copy/delete/transform, auto-save with loss prevention, public read-only sharing links, and one-click daily journal with plan inheritance.
 - **Learning Notebooks** — Topic-oriented study sessions with AI-generated outlines, blind-spot analysis, review question generation, and Ask AI scoped to the topic's note context.
+- **Curriculum Map** — `/learn/map` knowledge gap analysis across target roles (AI Engineer, Backend Architect). ~240 seeded topics with 4-state mastery (blank/heard/learning/mastered). Auto-links existing notes by string matching; click a topic to open a side panel with mastery toggle, linked notes, and quick "Create new note" action. Note editor surfaces curriculum tags inline.
 - **OSS Project Notes** — Per-project note collections with repo metadata, tag filtering, per-note read-only links, and long-term analysis archiving.
 
 ### AI
