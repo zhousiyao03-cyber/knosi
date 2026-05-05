@@ -349,6 +349,90 @@ export function TopicEditActions({
   );
 }
 
+// ───── Editable description block (used inside SidePanel) ─────
+
+export function EditableDescription({
+  topicId,
+  description,
+}: {
+  topicId: string;
+  description: string | null | undefined;
+}) {
+  const utils = trpc.useUtils();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(description ?? "");
+
+  const save = trpc.curriculum.setTopicDescription.useMutation({
+    onSuccess: () => {
+      utils.curriculum.getTopicDetail.invalidate({ topicId });
+      setEditing(false);
+    },
+  });
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate({ topicId, description: draft.trim() });
+        }}
+      >
+        <textarea
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={5}
+          className="w-full rounded border border-stone-300 bg-white p-2 text-sm dark:border-stone-700 dark:bg-stone-900"
+          placeholder="Topic description (markdown allowed)"
+          data-testid="description-textarea"
+        />
+        <div className="mt-2 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(description ?? "");
+              setEditing(false);
+            }}
+            className="rounded border border-stone-300 px-2 py-1 text-xs dark:border-stone-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={save.isPending}
+            className="rounded bg-stone-900 px-2 py-1 text-xs text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900"
+          >
+            Save
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setDraft(description ?? "");
+        setEditing(true);
+      }}
+      className="block w-full text-left"
+      title="Click to edit"
+      data-testid="description-edit-trigger"
+    >
+      {description ? (
+        <p className="whitespace-pre-wrap text-sm text-stone-700 hover:text-stone-900 dark:text-stone-300 dark:hover:text-stone-100">
+          {description}
+        </p>
+      ) : (
+        <p className="text-xs italic text-stone-400 hover:text-stone-600 dark:hover:text-stone-300">
+          No description yet — click to add one.
+        </p>
+      )}
+    </button>
+  );
+}
+
 // ───── Generate description (used inside SidePanel) ─────
 
 export function GenerateDescriptionButton({ topicId }: { topicId: string }) {

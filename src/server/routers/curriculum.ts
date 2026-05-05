@@ -3,6 +3,8 @@ import { z } from "zod/v4";
 import { db } from "../db";
 import {
   curriculumAreas,
+  curriculumAudits,
+  curriculumMasteryLog,
   curriculumTopicGeneralNotes,
   curriculumTopicNotes,
   curriculumTopics,
@@ -255,12 +257,52 @@ export const curriculumRouter = router({
       const owned = await ensureTopicOwnedByUser(input.topicId, ctx.userId);
       if (!owned) throw new Error("Topic not found");
 
+      const before = await db
+        .select({ mastery: curriculumTopics.mastery })
+        .from(curriculumTopics)
+        .where(eq(curriculumTopics.id, input.topicId))
+        .limit(1);
+      const oldState = before[0]?.mastery;
+
       await db
         .update(curriculumTopics)
         .set({ mastery: input.mastery, updatedAt: new Date() })
         .where(eq(curriculumTopics.id, input.topicId));
 
+      // Append a log row only when the state actually changed, so the chart
+      // doesn't get spammed by accidental double-clicks.
+      if (oldState !== input.mastery) {
+        await db.insert(curriculumMasteryLog).values({
+          id: crypto.randomUUID(),
+          userId: ctx.userId,
+          topicId: input.topicId,
+          mastery: input.mastery,
+        });
+      }
+
       return { ok: true };
+    }),
+
+  // Daily mastery counts per state. Used by the progress chart.
+  getMasteryHistory: protectedProcedure
+    .input(z.object({ days: z.number().int().min(7).max(365).default(90) }))
+    .query(async ({ ctx, input }) => {
+      const cutoff = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
+      const rows = await db
+        .select({
+          changedAt: curriculumMasteryLog.changedAt,
+          mastery: curriculumMasteryLog.mastery,
+          topicId: curriculumMasteryLog.topicId,
+        })
+        .from(curriculumMasteryLog)
+        .where(
+          and(
+            eq(curriculumMasteryLog.userId, ctx.userId),
+            sql`${curriculumMasteryLog.changedAt} >= ${cutoff.getTime() / 1000}`
+          )
+        )
+        .orderBy(asc(curriculumMasteryLog.changedAt));
+      return rows;
     }),
 
   linkNote: protectedProcedure
@@ -720,6 +762,158 @@ Topic: ${row.topicTitle}`,
     const added = await rerunAutoLink(ctx.userId);
     return { added };
   }),
+
+  // ── Audit ──
+  runAudit: protectedProcedure
+    .input(z.object({ trackId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const trackOwned = await db
+        .select({
+          id: curriculumTracks.id,
+          title: curriculumTracks.title,
+        })
+        .from(curriculumTracks)
+        .where(
+          and(
+            eq(curriculumTracks.id, input.trackId),
+            eq(curriculumTracks.userId, ctx.userId)
+          )
+        )
+        .limit(1);
+      const track = trackOwned[0];
+      if (!track) throw new Error("Track not found");
+
+      // Build a compact summary of topic states + linked note titles.
+      const topicRows = await db
+        .select({
+          topicId: curriculumTopics.id,
+          topicTitle: curriculumTopics.title,
+          mastery: curriculumTopics.mastery,
+          areaTitle: curriculumAreas.title,
+        })
+        .from(curriculumTopics)
+        .innerJoin(curriculumAreas, eq(curriculumAreas.id, curriculumTopics.areaId))
+        .where(eq(curriculumAreas.trackId, input.trackId))
+        .orderBy(asc(curriculumAreas.orderIndex), asc(curriculumTopics.orderIndex));
+
+      const linkRows = await db
+        .select({
+          topicId: curriculumTopicNotes.topicId,
+          noteTitle: learningNotes.title,
+        })
+        .from(curriculumTopicNotes)
+        .innerJoin(learningNotes, eq(learningNotes.id, curriculumTopicNotes.noteId))
+        .innerJoin(curriculumTopics, eq(curriculumTopics.id, curriculumTopicNotes.topicId))
+        .innerJoin(curriculumAreas, eq(curriculumAreas.id, curriculumTopics.areaId))
+        .where(eq(curriculumAreas.trackId, input.trackId));
+      const generalLinkRows = await db
+        .select({
+          topicId: curriculumTopicGeneralNotes.topicId,
+          noteTitle: generalNotes.title,
+        })
+        .from(curriculumTopicGeneralNotes)
+        .innerJoin(generalNotes, eq(generalNotes.id, curriculumTopicGeneralNotes.noteId))
+        .innerJoin(
+          curriculumTopics,
+          eq(curriculumTopics.id, curriculumTopicGeneralNotes.topicId)
+        )
+        .innerJoin(curriculumAreas, eq(curriculumAreas.id, curriculumTopics.areaId))
+        .where(eq(curriculumAreas.trackId, input.trackId));
+
+      const notesByTopic = new Map<string, string[]>();
+      for (const r of [...linkRows, ...generalLinkRows]) {
+        const arr = notesByTopic.get(r.topicId) ?? [];
+        arr.push(r.noteTitle);
+        notesByTopic.set(r.topicId, arr);
+      }
+
+      const inventory = topicRows
+        .map((t) => {
+          const linked = notesByTopic.get(t.topicId) ?? [];
+          const linkedSummary =
+            linked.length > 0
+              ? ` — notes: ${linked.slice(0, 4).join("; ")}${linked.length > 4 ? "…" : ""}`
+              : "";
+          return `[${t.areaTitle}] ${t.topicTitle} (mastery=${t.mastery})${linkedSummary}`;
+        })
+        .join("\n");
+
+      const result = await generateStructuredData(
+        {
+          schema: z.object({
+            summary: z.string().min(20),
+            strengths: z.array(z.string()).min(0).max(8),
+            weak_areas: z.array(z.string()).min(0).max(8),
+            missing_must_knows: z.array(z.string()).min(0).max(10),
+            next_steps: z.array(z.string()).min(1).max(6),
+          }),
+          name: "curriculum_track_audit",
+          description:
+            "An honest gap-analysis of the user's curriculum coverage for this role.",
+          prompt: `You are auditing the knowledge coverage of a senior engineer for the role: "${track.title}".
+You will see every topic in their curriculum with its self-assessed mastery and the titles of notes linked to each topic.
+
+Be honest, specific, and concise. Avoid generic encouragement.
+
+- summary: 2-3 sentences. Where do they stand vs a senior bar?
+- strengths: 3-6 areas they actually have evidence for (linked notes + non-blank mastery).
+- weak_areas: 3-6 topics that look thin (mastery low or zero notes despite being important for this role).
+- missing_must_knows: 3-8 important sub-topics that you would expect a senior in this role to know but appear absent.
+- next_steps: 2-4 concrete actions, in priority order.
+
+Curriculum inventory:
+${inventory}`,
+        },
+        { userId: ctx.userId },
+      );
+
+      const id = crypto.randomUUID();
+      await db.insert(curriculumAudits).values({
+        id,
+        userId: ctx.userId,
+        trackId: input.trackId,
+        summary: result.summary,
+        strengths: JSON.stringify(result.strengths),
+        weakAreas: JSON.stringify(result.weak_areas),
+        missingMustKnows: JSON.stringify(result.missing_must_knows),
+        nextSteps: JSON.stringify(result.next_steps),
+      });
+
+      return { id, ...result };
+    }),
+
+  listAudits: protectedProcedure
+    .input(z.object({ trackId: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const where = input.trackId
+        ? and(
+            eq(curriculumAudits.userId, ctx.userId),
+            eq(curriculumAudits.trackId, input.trackId)
+          )
+        : eq(curriculumAudits.userId, ctx.userId);
+      const rows = await db
+        .select({
+          id: curriculumAudits.id,
+          trackId: curriculumAudits.trackId,
+          summary: curriculumAudits.summary,
+          strengths: curriculumAudits.strengths,
+          weakAreas: curriculumAudits.weakAreas,
+          missingMustKnows: curriculumAudits.missingMustKnows,
+          nextSteps: curriculumAudits.nextSteps,
+          createdAt: curriculumAudits.createdAt,
+        })
+        .from(curriculumAudits)
+        .where(where)
+        .orderBy(desc(curriculumAudits.createdAt))
+        .limit(20);
+      return rows.map((r) => ({
+        ...r,
+        strengths: JSON.parse(r.strengths) as string[],
+        weakAreas: JSON.parse(r.weakAreas) as string[],
+        missingMustKnows: JSON.parse(r.missingMustKnows) as string[],
+        nextSteps: JSON.parse(r.nextSteps) as string[],
+      }));
+    }),
 
   resetToDefault: protectedProcedure.mutation(async ({ ctx }) => {
     await resetCurriculum(ctx.userId);

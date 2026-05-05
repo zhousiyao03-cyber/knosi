@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
   AreaActions,
+  EditableDescription,
   GenerateDescriptionButton,
   NewAreaButton,
   NewTopicInline,
@@ -73,27 +74,29 @@ export default function CurriculumMapPage() {
     const targetTopicId = searchParams?.get("topicId");
     if (!targetTopicId) return;
 
+    let foundTrackId: string | null = null;
     for (const track of tracks) {
       for (const area of track.areas) {
         if (area.topics.some((t) => t.id === targetTopicId)) {
-          setExplicitTrackId(track.id);
-          setSelectedTopicId(targetTopicId);
-          deepLinkAppliedRef.current = true;
-
-          // Defer scroll until after render commits the new track.
-          requestAnimationFrame(() => {
-            const el = document.querySelector(
-              `[data-topic-id="${targetTopicId}"]`
-            );
-            el?.scrollIntoView({ behavior: "smooth", block: "center" });
-          });
-          return;
+          foundTrackId = track.id;
+          break;
         }
       }
+      if (foundTrackId) break;
     }
-    // If topicId doesn't match anything (stale link), still mark applied so we
-    // don't loop forever as user clicks around.
+
     deepLinkAppliedRef.current = true;
+    if (!foundTrackId) return;
+
+    // Defer state updates out of the effect body to avoid cascading renders.
+    queueMicrotask(() => {
+      setExplicitTrackId(foundTrackId);
+      setSelectedTopicId(targetTopicId);
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-topic-id="${targetTopicId}"]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    });
   }, [tracks, searchParams]);
 
   const activeTrack = useMemo(() => {
@@ -433,13 +436,7 @@ function SidePanel({
           </span>
           <GenerateDescriptionButton topicId={topic.id} />
         </div>
-        {topic.description ? (
-          <p className="whitespace-pre-wrap text-sm text-stone-700 dark:text-stone-300">
-            {topic.description}
-          </p>
-        ) : (
-          <p className="text-xs italic text-stone-400">No description yet.</p>
-        )}
+        <EditableDescription topicId={topic.id} description={topic.description} />
       </section>
 
       <section className="mb-4">
