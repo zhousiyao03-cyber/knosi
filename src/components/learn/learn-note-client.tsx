@@ -14,6 +14,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { CurriculumTopicsBar } from "@/components/learn/curriculum-topics-bar";
 
 const TiptapEditor = dynamic(
   () =>
@@ -203,6 +204,8 @@ export function LearnNoteClient({
           <ArrowLeft className="h-4 w-4" /> Back to topic
         </Link>
       </div>
+
+      <CurriculumTopicsBar noteId={noteId} />
 
       <header className="sticky top-0 z-10 -mx-6 mb-4 flex items-start justify-between gap-3 border-b border-stone-200 bg-white px-6 py-3 dark:border-stone-800 dark:bg-stone-950">
         <div className="min-w-0 flex-1">

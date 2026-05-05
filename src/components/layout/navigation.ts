@@ -6,6 +6,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   Leaf,
+  Map,
   MessageCircle,
   Mic,
   Settings2,
@@ -39,6 +40,7 @@ export const navigationGroups: NavGroup[] = [
     label: "LEARN",
     items: [
       { href: "/learn", label: "Learning", icon: GraduationCap },
+      { href: "/learn/map", label: "Map", icon: Map },
       { href: "/projects", label: "Projects", icon: FolderGit2 },
       { href: "/speak", label: "Speak", icon: Mic },
       { href: "/words", label: "Words", icon: BookOpen },
