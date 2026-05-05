@@ -18,17 +18,21 @@ const MASTERY_LABELS: Record<string, string> = {
 };
 
 const MASTERY_COLORS: Record<string, string> = {
-  blank: "border-zinc-700/40 bg-transparent text-zinc-500 hover:border-zinc-500",
-  heard: "border-sky-500/40 bg-sky-500/10 text-sky-200 hover:border-sky-400",
-  learning: "border-amber-500/40 bg-amber-500/10 text-amber-200 hover:border-amber-400",
-  mastered: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:border-emerald-400",
+  blank:
+    "border-stone-200 bg-white text-stone-600 hover:border-stone-400 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400 dark:hover:border-stone-600 dark:hover:bg-stone-800/60",
+  heard:
+    "border-sky-300 bg-sky-50 text-sky-800 hover:border-sky-500 hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-200 dark:hover:border-sky-400",
+  learning:
+    "border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-500 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:border-amber-400",
+  mastered:
+    "border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-500 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-200 dark:hover:border-emerald-400",
 };
 
 const MASTERY_DOT: Record<string, string> = {
-  blank: "bg-zinc-600",
-  heard: "bg-sky-400",
-  learning: "bg-amber-400",
-  mastered: "bg-emerald-400",
+  blank: "bg-stone-400 dark:bg-stone-600",
+  heard: "bg-sky-500 dark:bg-sky-400",
+  learning: "bg-amber-500 dark:bg-amber-400",
+  mastered: "bg-emerald-500 dark:bg-emerald-400",
 };
 
 const MASTERY_ORDER = ["blank", "heard", "learning", "mastered"] as const;
@@ -80,9 +84,9 @@ export default function CurriculumMapPage() {
 
   if (curriculumQuery.isLoading) {
     return (
-      <div className="p-8 text-zinc-400">
+      <div className="p-8 text-stone-600 dark:text-stone-400">
         <div className="text-lg">Setting up your curriculum…</div>
-        <div className="text-sm mt-2 text-zinc-500">
+        <div className="mt-2 text-sm text-stone-500">
           First visit triggers seed and auto-link of existing notes. This takes a few seconds.
         </div>
       </div>
@@ -91,10 +95,10 @@ export default function CurriculumMapPage() {
 
   if (!activeTrack) {
     return (
-      <div className="p-8 text-zinc-400">
+      <div className="p-8 text-stone-600 dark:text-stone-400">
         <div>No curriculum yet.</div>
         <button
-          className="mt-4 px-3 py-1.5 rounded border border-zinc-700 hover:border-zinc-500 text-sm"
+          className="mt-4 rounded border border-stone-300 px-3 py-1.5 text-sm hover:border-stone-500 dark:border-stone-700 dark:hover:border-stone-500"
           onClick={() => curriculumQuery.refetch()}
         >
           Reload
@@ -108,14 +112,16 @@ export default function CurriculumMapPage() {
       <div className="flex-1 overflow-y-auto p-6 lg:p-10">
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-zinc-100">Curriculum Map</h1>
-            <p className="text-sm text-zinc-500 mt-1">
+            <h1 className="text-2xl font-semibold text-stone-900 dark:text-stone-100">
+              Curriculum Map
+            </h1>
+            <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
               Your knowledge gap analysis across target roles.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
-              className="px-3 py-1.5 rounded border border-zinc-700 hover:border-zinc-500 text-xs text-zinc-300"
+              className="rounded border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
               onClick={() => rerunMutation.mutate()}
               disabled={rerunMutation.isPending}
               data-testid="rerun-autolink"
@@ -123,7 +129,7 @@ export default function CurriculumMapPage() {
               {rerunMutation.isPending ? "Linking…" : "Re-link notes"}
             </button>
             <button
-              className="px-3 py-1.5 rounded border border-zinc-700 hover:border-zinc-500 text-xs text-zinc-300"
+              className="rounded border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
               onClick={onResetClick}
               disabled={resetMutation.isPending}
               data-testid="reset-curriculum"
@@ -139,10 +145,10 @@ export default function CurriculumMapPage() {
               key={track.id}
               onClick={() => setExplicitTrackId(track.id)}
               className={cn(
-                "px-3 py-1.5 rounded-md text-sm border transition-colors",
+                "rounded-md border px-3 py-1.5 text-sm transition-colors",
                 track.id === activeTrack.id
-                  ? "border-zinc-500 bg-zinc-800 text-zinc-100"
-                  : "border-zinc-800 text-zinc-400 hover:border-zinc-600"
+                  ? "border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900"
+                  : "border-stone-200 bg-white text-stone-700 hover:border-stone-400 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400 dark:hover:border-stone-600"
               )}
               data-track-id={track.id}
             >
@@ -152,7 +158,7 @@ export default function CurriculumMapPage() {
           ))}
         </nav>
 
-        <div className="mb-8 flex items-center gap-4 text-xs text-zinc-400">
+        <div className="mb-8 flex items-center gap-4 text-xs text-stone-600 dark:text-stone-400">
           <Stat label="Mastered" value={stats.mastered} total={stats.total} dotClass={MASTERY_DOT.mastered} />
           <Stat label="Learning" value={stats.learning} total={stats.total} dotClass={MASTERY_DOT.learning} />
           <Stat label="Heard" value={stats.heard} total={stats.total} dotClass={MASTERY_DOT.heard} />
@@ -162,7 +168,7 @@ export default function CurriculumMapPage() {
         <div className="space-y-8">
           {activeTrack.areas.map((area) => (
             <section key={area.id} data-area-id={area.id}>
-              <h2 className="text-sm font-semibold text-zinc-300 mb-3 uppercase tracking-wide">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-stone-300">
                 {area.title}
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
@@ -211,8 +217,8 @@ function Stat({
   return (
     <div className="flex items-center gap-1.5">
       <span className={cn("h-2 w-2 rounded-full", dotClass)} />
-      <span className="text-zinc-300">{label}</span>
-      <span className="text-zinc-500">
+      <span className="text-stone-700 dark:text-stone-300">{label}</span>
+      <span className="text-stone-500 dark:text-stone-500">
         {value}
         {label !== "Total" && total > 0 && ` (${pct}%)`}
       </span>
@@ -271,8 +277,8 @@ function SidePanel({
 
   if (detailQuery.isLoading || !detailQuery.data) {
     return (
-      <aside className="fixed right-0 top-0 z-30 h-full w-[380px] border-l border-zinc-800 bg-zinc-950 p-6">
-        <div className="text-zinc-400">Loading…</div>
+      <aside className="fixed right-0 top-0 z-30 h-full w-[380px] border-l border-stone-200 bg-white p-6 dark:border-stone-800 dark:bg-stone-950">
+        <div className="text-stone-500 dark:text-stone-400">Loading…</div>
       </aside>
     );
   }
@@ -281,22 +287,26 @@ function SidePanel({
 
   return (
     <aside
-      className="fixed right-0 top-0 z-30 h-full w-[380px] border-l border-zinc-800 bg-zinc-950 p-5 overflow-y-auto"
+      className="fixed right-0 top-0 z-30 h-full w-[380px] overflow-y-auto border-l border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-950"
       data-testid="topic-side-panel"
     >
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <h2 className="text-base font-semibold text-zinc-100 leading-snug">{topic.title}</h2>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <h2 className="text-base font-semibold leading-snug text-stone-900 dark:text-stone-100">
+          {topic.title}
+        </h2>
         <button
           onClick={onClose}
           aria-label="Close"
-          className="text-zinc-500 hover:text-zinc-300 text-xl leading-none"
+          className="text-xl leading-none text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
         >
           ×
         </button>
       </div>
 
       <section className="mb-6">
-        <div className="text-[11px] uppercase tracking-wide text-zinc-500 mb-2">Mastery</div>
+        <div className="mb-2 text-[11px] uppercase tracking-wide text-stone-500">
+          Mastery
+        </div>
         <div className="flex gap-1.5" data-testid="mastery-toggle">
           {MASTERY_ORDER.map((state) => (
             <button
@@ -306,7 +316,7 @@ function SidePanel({
                 "flex-1 rounded border px-2 py-1.5 text-xs transition-colors",
                 topic.mastery === state
                   ? MASTERY_COLORS[state]
-                  : "border-zinc-800 text-zinc-500 hover:border-zinc-600"
+                  : "border-stone-200 bg-white text-stone-600 hover:border-stone-400 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-500 dark:hover:border-stone-600"
               )}
               data-mastery-option={state}
             >
@@ -318,27 +328,31 @@ function SidePanel({
 
       {topic.description && (
         <section className="mb-6">
-          <div className="text-[11px] uppercase tracking-wide text-zinc-500 mb-1.5">Description</div>
-          <p className="text-sm text-zinc-300 whitespace-pre-wrap">{topic.description}</p>
+          <div className="mb-1.5 text-[11px] uppercase tracking-wide text-stone-500">
+            Description
+          </div>
+          <p className="whitespace-pre-wrap text-sm text-stone-700 dark:text-stone-300">
+            {topic.description}
+          </p>
         </section>
       )}
 
       <section className="mb-4">
-        <div className="text-[11px] uppercase tracking-wide text-zinc-500 mb-2">
+        <div className="mb-2 text-[11px] uppercase tracking-wide text-stone-500">
           Linked notes ({linkedNotes.length})
         </div>
         {linkedNotes.length === 0 ? (
-          <p className="text-xs text-zinc-500">No notes linked yet.</p>
+          <p className="text-xs text-stone-500">No notes linked yet.</p>
         ) : (
           <ul className="space-y-1.5" data-testid="linked-notes">
             {linkedNotes.map((n) => (
               <li
                 key={n.id}
-                className="flex items-center justify-between gap-2 rounded border border-zinc-800 px-2.5 py-1.5 hover:border-zinc-600"
+                className="flex items-center justify-between gap-2 rounded border border-stone-200 px-2.5 py-1.5 hover:border-stone-400 dark:border-stone-800 dark:hover:border-stone-600"
               >
                 <button
                   onClick={() => onJumpToNote(n.id, n.topicId)}
-                  className="flex-1 text-left text-sm text-zinc-200 truncate"
+                  className="flex-1 truncate text-left text-sm text-stone-800 hover:text-stone-950 dark:text-stone-200 dark:hover:text-stone-50"
                   title={n.title}
                   data-testid="linked-note-link"
                 >
@@ -346,7 +360,7 @@ function SidePanel({
                 </button>
                 <button
                   onClick={() => unlink.mutate({ topicId, noteId: n.id })}
-                  className="text-xs text-zinc-500 hover:text-zinc-300"
+                  className="text-xs text-stone-400 hover:text-stone-700 dark:text-stone-500 dark:hover:text-stone-300"
                   aria-label="Unlink"
                 >
                   ✕
@@ -359,14 +373,14 @@ function SidePanel({
 
       <div className="flex flex-col gap-2">
         <button
-          className="w-full rounded border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:border-zinc-500"
+          className="w-full rounded border border-stone-300 bg-white px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
           onClick={() => setShowLinkPicker(true)}
           data-testid="link-existing-note"
         >
           + Link existing note
         </button>
         <button
-          className="w-full rounded border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:border-zinc-500"
+          className="w-full rounded border border-stone-300 bg-white px-3 py-2 text-xs text-stone-700 hover:bg-stone-50 disabled:opacity-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
           onClick={() => createNote.mutate({ topicId })}
           disabled={createNote.isPending}
           data-testid="create-note-for-topic"
@@ -375,7 +389,7 @@ function SidePanel({
         </button>
         <Link
           href="/learn"
-          className="block text-center text-[11px] text-zinc-500 hover:text-zinc-300 mt-1"
+          className="mt-1 block text-center text-[11px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
         >
           Open notebook →
         </Link>
@@ -426,28 +440,35 @@ function LinkPicker({
       data-testid="link-picker"
     >
       <div
-        className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-950 p-4"
+        className="w-full max-w-md rounded-lg border border-stone-200 bg-white p-4 shadow-lg dark:border-stone-800 dark:bg-stone-950"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-zinc-100">Link existing note</h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300">×</button>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+            Link existing note
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+          >
+            ×
+          </button>
         </div>
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search notes…"
-          className="w-full mb-3 rounded border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600"
+          className="mb-3 w-full rounded border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-600 dark:focus:border-stone-500"
           autoFocus
           data-testid="link-picker-search"
         />
-        <div className="max-h-64 overflow-y-auto space-y-1">
+        <div className="max-h-64 space-y-1 overflow-y-auto">
           {allNotesQuery.isLoading && (
-            <div className="text-xs text-zinc-500 py-2">Loading…</div>
+            <div className="py-2 text-xs text-stone-500">Loading…</div>
           )}
           {!allNotesQuery.isLoading && items.length === 0 && (
-            <div className="text-xs text-zinc-500 py-2">No matches.</div>
+            <div className="py-2 text-xs text-stone-500">No matches.</div>
           )}
           {items.map((note) => (
             <button
@@ -456,7 +477,7 @@ function LinkPicker({
                 linkMutation.mutate({ topicId, noteId: note.id });
                 onClose();
               }}
-              className="w-full text-left rounded px-2 py-1.5 text-sm text-zinc-300 hover:bg-zinc-900 truncate"
+              className="w-full truncate rounded px-2 py-1.5 text-left text-sm text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-900"
               title={note.title}
               data-testid="link-picker-item"
             >

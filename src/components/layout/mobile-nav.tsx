@@ -31,6 +31,15 @@ export function MobileNav({
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useDarkModeState();
 
+  // Longest-prefix match so nested routes don't light up parents.
+  const activeHref =
+    navigationItems
+      .map((i) => i.href)
+      .filter((href) =>
+        href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href)
+      )
+      .sort((a, b) => b.length - a.length)[0] ?? null;
+
   const toggleDark = () => {
     const next = !dark;
     setDark(next);
@@ -106,10 +115,7 @@ export function MobileNav({
 
             <nav className="flex-1 space-y-1">
               {navigationItems.map((item) => {
-                const isActive =
-                  item.href === "/dashboard"
-                    ? pathname === "/dashboard"
-                    : pathname.startsWith(item.href);
+                const isActive = item.href === activeHref;
                 const Icon = item.icon;
 
                 return (

@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 
 const MASTERY_TINT: Record<string, string> = {
-  blank: "border-zinc-300 text-zinc-500 dark:border-zinc-700 dark:text-zinc-400",
+  blank: "border-stone-300 text-stone-600 dark:border-stone-700 dark:text-stone-400",
   heard: "border-sky-400/60 text-sky-700 dark:text-sky-300",
   learning: "border-amber-400/60 text-amber-700 dark:text-amber-300",
   mastered: "border-emerald-500/60 text-emerald-700 dark:text-emerald-300",
@@ -125,7 +125,7 @@ function CurriculumTopicPicker({
       data-testid="curriculum-topic-picker"
     >
       <div
-        className="w-full max-w-lg rounded-lg border border-stone-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+        className="w-full max-w-lg rounded-lg border border-stone-200 bg-white p-4 shadow-lg dark:border-stone-800 dark:bg-stone-950"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">
@@ -142,7 +142,7 @@ function CurriculumTopicPicker({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search topics…"
-          className="mb-3 w-full rounded border border-stone-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="mb-3 w-full rounded border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-600"
           autoFocus
           data-testid="curriculum-picker-search"
         />
@@ -163,7 +163,7 @@ function CurriculumTopicPicker({
                   <button
                     key={topic.id}
                     onClick={() => linkMutation.mutate({ topicId: topic.id, noteId })}
-                    className="w-full text-left rounded px-2 py-1 text-sm hover:bg-stone-100 dark:hover:bg-zinc-900"
+                    className="w-full rounded px-2 py-1 text-left text-sm text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-900"
                     data-testid="curriculum-picker-item"
                   >
                     {topic.title}

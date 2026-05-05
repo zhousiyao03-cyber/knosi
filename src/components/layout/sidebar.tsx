@@ -41,6 +41,16 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const ent = useEntitlements();
+
+  // Resolve a single "active href" by longest-prefix match across all nav
+  // items, so nested routes like /learn/map don't also light up /learn.
+  const allHrefs = navigationGroups.flatMap((g) => g.items.map((i) => i.href));
+  const activeHref =
+    allHrefs
+      .filter((href) =>
+        href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href)
+      )
+      .sort((a, b) => b.length - a.length)[0] ?? null;
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
     const saved = localStorage.getItem("theme");
@@ -117,10 +127,7 @@ export function Sidebar({
               )}
               <div className="space-y-0.5">
                 {group.items.map((item) => {
-                  const isActive =
-                    item.href === "/dashboard"
-                      ? pathname === "/dashboard"
-                      : pathname.startsWith(item.href);
+                  const isActive = item.href === activeHref;
                   const Icon = item.icon;
                   const lockFeature = LOCK_BY_HREF[item.href];
                   const locked =
