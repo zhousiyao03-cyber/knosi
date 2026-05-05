@@ -46,5 +46,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly",
       priority: 0.3,
     },
+    // AI-readable site descriptors. Listed in the sitemap so search and
+    // retrieval crawlers (OAI-SearchBot, PerplexityBot, Bingbot, ...) can
+    // discover them without relying on directory listings.
+    {
+      url: `${SITE_URL}/llms.txt`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${SITE_URL}/llms-full.txt`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
   ];
 }

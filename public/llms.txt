@@ -1,0 +1,62 @@
+# Knosi
+
+> A self-hostable, AI-native second brain. Capture Claude and ChatGPT
+> outputs into searchable, reusable knowledge, then ask AI on top of
+> your own corpus. Open source under AGPL-3.0.
+
+Knosi is a personal knowledge management platform built for developers
+and AI-heavy knowledge workers. It pairs a Notion-style block editor
+with chunk-level hybrid RAG (semantic + keyword + neighborhood
+expansion) so the answers you pull out of Claude or ChatGPT become
+permanent, searchable knowledge instead of disposable chat history.
+
+The hosted product runs at https://www.knosi.xyz. The same code is
+fully self-hostable on a single VPS or k3s cluster — Docker Compose
+works out of the box, no feature gating between hosted and self-host.
+
+## Key links
+
+- [Landing page](https://www.knosi.xyz/) — product overview, screenshots, FAQ
+- [Pricing](https://www.knosi.xyz/pricing) — hosted Pro tier ($9/mo) vs free self-host
+- [GitHub](https://github.com/zhousiyao03-cyber/knosi) — source, issues, releases
+- [README](https://github.com/zhousiyao03-cyber/knosi/blob/main/README.md) — full feature list, quick start, architecture
+- [Full LLM context](https://www.knosi.xyz/llms-full.txt) — long-form, AI-friendly description of the project
+
+## What Knosi does
+
+- **Notion-style editor** — Tiptap v3 with code blocks, Mermaid diagrams,
+  Excalidraw whiteboards, callouts, toggles, tables, slash commands,
+  search & replace, and Markdown paste.
+- **Hybrid RAG** — chunk-level semantic + keyword retrieval with
+  adjacent-paragraph expansion and clickable source citations.
+  Falls back to keyword-only when no embedding provider is configured.
+- **Claude Code Daemon** — route Ask AI through your local Claude
+  Pro / Max subscription instead of paying for separate API credits.
+- **Learning notebooks** — topic-oriented study sessions with
+  AI-generated outlines, blind-spot analysis, and review questions.
+- **Curriculum map** — `/learn/map` knowledge gap visualization across
+  target roles (AI engineer, backend architect) with ~240 seeded topics
+  and 4-state mastery tracking.
+- **Focus tracker** — desktop Tauri collector pairs with a `/focus`
+  web dashboard for app-level time tracking.
+- **Portfolio tracker** — positions with Yahoo Finance / CoinGecko
+  prices, AI position analysis, and news aggregation.
+- **Speak / Words** — shadow-drill modules for English fluency.
+- **PWA** — installable web app with full dark mode.
+
+## Tech stack
+
+Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4,
+Tiptap v3, tRPC v11, Drizzle ORM on libsql/Turso (SQLite-compatible),
+Vercel AI SDK v6, Milvus for vectors, Auth via email/password +
+GitHub/Google OAuth + pi-ai (Claude Pro/Max OAuth).
+
+## Author
+
+Built by Zhou Siyao (周思尧) — senior frontend engineer at ByteDance
+Singapore Marketing Center. Contact: zhousiyao03@gmail.com.
+
+## License
+
+AGPL-3.0. Self-hosted deployments stay free with all features unlocked.
+The hosted Pro tier funds development.

@@ -1,0 +1,546 @@
+# Knosi — Full Project Context
+
+> Long-form, AI-readable description of Knosi. This file is intended for
+> large language models that need a single self-contained reference for
+> what Knosi is, what it does, who it's for, and how it works.
+
+Last updated: 2026-05-05.
+Source of truth: https://github.com/zhousiyao03-cyber/knosi.
+Hosted product: https://www.knosi.xyz.
+
+---
+
+## Elevator pitch
+
+Knosi is a self-hostable, AI-native second brain. It captures the
+high-signal answers you pull out of Claude or ChatGPT, turns them into
+structured notes, indexes them with chunk-level hybrid retrieval, and
+lets you ask AI on top of your own corpus instead of starting every
+conversation from a blank context.
+
+The hosted product runs at knosi.xyz. The same codebase is fully
+self-hostable under AGPL-3.0 — Docker Compose, single-VPS Hetzner
+deployment, and k3s setups are all documented in the repository.
+Self-hosted instances get every feature for free; the hosted Pro tier
+exists to fund development, not to gate functionality.
+
+## Who Knosi is for
+
+- Developers and AI-heavy knowledge workers who treat Claude / ChatGPT
+  as a daily research tool and want their good answers to survive past
+  the chat window.
+- Independent builders running their own infrastructure who want a
+  Notion-shaped knowledge base they can fully own.
+- Engineers studying for new domains (AI engineering, backend
+  architecture) who want a structured curriculum view of what they
+  already know vs. what is still a blank spot.
+- Anyone with a Claude Pro / Max subscription who would rather route
+  their AI queries through an existing flat-rate plan than burn extra
+  per-token API credits.
+
+If you only need a plain note-taking app, Notion or Obsidian will serve
+you well. Knosi is differentiated by being designed around the
+"AI conversation → permanent knowledge" loop as a first-class workflow.
+
+## What's distinctive
+
+1. **Hybrid RAG by default.** Semantic retrieval, BM25-style keyword
+   recall, and adjacent-paragraph expansion all run together; results
+   come back with clickable source citations to the originating note.
+   When no embedding provider is configured the system still works
+   — it falls back to keyword-only retrieval.
+
+2. **Bring-your-own-Claude.** The Claude Code Daemon routes Ask AI
+   through your local Claude CLI session, so a Claude Pro / Max
+   subscription replaces the need for a separate API budget. The
+   daemon supports both local dev and remote self-hosted deployments,
+   with Redis-backed live token fan-out and Redis/SSE wakeups so it
+   doesn't have to idle-poll.
+
+3. **Capture from Claude Web and Claude Code.** A remote MCP endpoint
+   lets Claude Web connect via OAuth and write into a `knowledge:write_inbox`
+   scope. The Knosi CLI plus a Claude Code skill template lets you
+   save explicit conversation excerpts from a local Claude Code
+   session. Both flows land raw captures in an `AI Inbox` folder.
+
+4. **Per-user provider config.** AI providers are not configured in
+   environment variables — they are added per-user in `/settings`.
+   You can mix providers across roles (Chat / Task / Embedding), so
+   a typical setup might be DeepSeek for chat, GPT-4o-mini for
+   structured tasks, and OpenAI text-embedding-3-small for embeddings.
+
+5. **Self-hosted parity.** Every feature in the hosted product is
+   available under AGPL-3.0 self-host. There is no "open core" gating.
+
+## Active modules (May 2026)
+
+The single source of truth for the active sidebar layout is
+`src/components/layout/navigation.ts`. As of this writing, the live
+groups and modules are:
+
+- **CAPTURE**
+  - `/dashboard` — Home (today's focus, 30-day heatmap, recent notes)
+  - `/notes` — Notion-style note workspace
+  - `/ask` — Ask AI over your corpus (hybrid RAG)
+  - `/council` — Multi-perspective AI council prompt UI
+- **LEARN**
+  - `/learn` — Topic-oriented learning notebooks
+  - `/learn/map` — Curriculum map (knowledge gap analysis)
+  - `/projects` — OSS project notes / discovery
+  - `/speak` — Shadow-drill English fluency module
+  - `/words` — Per-word pronunciation drill
+- **TRACK**
+  - `/portfolio` — Portfolio tracker (positions, AI analysis, news)
+  - `/focus` — Focus Tracker dashboard (paired with desktop collector)
+- **INSIGHTS**
+  - `/usage` — Token usage dashboard
+  - `/preferences` — User preferences
+- **REST**
+  - `/drifter` — Quiet, low-stakes browsing surface
+
+Optional modules (Token Usage, Portfolio, OSS Projects, Focus Tracker)
+are gated behind environment flags in self-hosted deployments — set
+both the server-side and `NEXT_PUBLIC_` flag to `true` to surface them.
+
+## Feature inventory
+
+### Core Knowledge
+
+- **Rich text editor.** Notion-style block editor on Tiptap v3.
+  Includes code blocks with language selector, Mermaid diagrams (with
+  `securityLevel: "strict"` for XSS hardening), Excalidraw whiteboards,
+  callouts, toggles, tables with toolbar, side-by-side image rows,
+  TOC block with collapsible sidebar, drag-and-drop block sorting,
+  slash commands, search-and-replace, and mixed Markdown paste.
+- **Notes.** Full-width cover images, type and tag metadata, hover-
+  to-insert controls, block-level move/copy/delete/transform, auto-
+  save with loss prevention, public read-only sharing links, and a
+  one-click daily journal that inherits from a plan template.
+- **Learning notebooks.** Topic-oriented study sessions with AI-
+  generated outlines, blind-spot analysis, review-question generation,
+  and Ask AI scoped to the topic's note context.
+- **Curriculum map.** A `/learn/map` view of knowledge gaps across
+  target roles (currently AI Engineer and Backend Architect) with
+  ~240 seeded topics. Each topic has a 4-state mastery toggle:
+  blank, heard, learning, mastered. Auto-links existing notes by
+  string matching; click a topic to open a side panel with the
+  mastery toggle, linked notes, and a quick "Create new note"
+  action that pre-fills curriculum tags. The note editor surfaces
+  curriculum tags inline so you can see how a note maps back into
+  the curriculum.
+- **OSS project notes.** Per-project note collections with repo
+  metadata, tag filtering, per-note read-only links, and long-term
+  analysis archiving.
+
+### AI
+
+- **Ask AI.** Chunk-level hybrid RAG with semantic retrieval, keyword
+  recall, adjacent-paragraph expansion, and clickable source
+  citations. Falls back to keyword-only when no embedding provider
+  is configured.
+- **Claude Code Daemon.** Routes Ask AI through your local Claude
+  Pro / Max subscription via the Knosi CLI. No extra API spend.
+  Works against both local dev and the self-hosted web deployment,
+  with Redis-backed live token fan-out plus Redis/SSE wakeups so
+  the daemon does not have to idle-poll claims.
+- **Structured AI calls.** Learning outline generation, OSS analysis,
+  and portfolio news summarization all run through the configured
+  provider independently of the chat daemon.
+- **Claude capture integrations.**
+  - Claude Web → remote MCP endpoint (`/api/mcp` + OAuth at
+    `/.well-known/oauth-authorization-server`). Adds Knosi as a
+    custom connector in Claude Web. Scopes: `knowledge:read`,
+    `knowledge:write_inbox`. Captures land in `AI Inbox`.
+  - Claude Code → Knosi CLI + personal skill at
+    `~/.claude/skills/save-to-knosi/SKILL.md`. Save explicit
+    conversation excerpts into `AI Inbox` from inside Claude Code.
+
+### Developer Workflow
+
+- **Token usage dashboard.** Auto-reads local Claude Code session
+  files (`~/.claude/projects/`) and Codex state databases
+  (`~/.codex/state*.sqlite`). Aggregates across all workspaces and
+  subagents. Manual entry is supported for OpenAI API and other
+  off-disk sources.
+- **Focus tracker.** Server-side ingestion plus a `/focus` web UI
+  for app-level time tracking. Pairs with a desktop Tauri collector
+  (focus-tracker repository) — there is a macOS DMG download for
+  Apple Silicon. Sign in with the same Knosi account used in the web app.
+- **Installable PWA.** Standalone web app manifest with dedicated
+  192×192, 512×512, and Apple touch icons that work on the self-
+  hosted Hetzner deployment.
+
+### Optional Modules
+
+- **Portfolio tracker.** Position management with Yahoo Finance and
+  CoinGecko real-time prices, AI position analysis, and news
+  aggregation via Marketaux or Google News RSS. Server-side cron
+  jobs auto-refresh prices and news.
+- **Speak.** Shadow-drill module at `/speak`. One native English
+  sentence at a time, browser TTS plays it, you shadow it, press
+  Next. Per-sentence lifetime practice count synced across devices.
+  Ships with 30 hand-picked working-professional sentences.
+- **Words.** Per-word pronunciation drill at `/words`. Each card
+  shows stress visualization, IPA, brief Chinese meaning, and a
+  native example sentence. 100 hand-picked seeds. Add your own
+  words; AI enriches them on save. Browser TTS reused from `/speak`.
+- **Search.** `Cmd+K` global note search with keyword highlighting.
+- **Dark mode.** Global toggle, full dark mode coverage.
+
+## Hosted vs self-hosted
+
+Knosi is AGPL-3.0 and fully self-hostable for free.
+
+The hosted product at knosi.xyz offers a paid Pro tier
+($9 / month or $90 / year) with included Knosi AI (no API key
+needed), 80 Ask AI calls per day, unlimited notes, 10 GB image
+storage, and access to the Portfolio, Focus, OSS Projects, and
+Claude Capture modules. See https://www.knosi.xyz/pricing for the
+full plan comparison.
+
+Self-hosted deployments are unaffected — every feature stays free.
+
+## Tech stack
+
+| Layer            | Technology                                  |
+|------------------|---------------------------------------------|
+| Framework        | Next.js 16 (App Router) + React 19          |
+| Styling          | Tailwind CSS v4                             |
+| API              | tRPC v11 + Zod v4                           |
+| Database         | Drizzle ORM + SQLite via libsql / Turso     |
+| Auth             | Auth.js v5 (GitHub / Google + email/password)|
+| AI orchestration | Vercel AI SDK v6                            |
+| Vector search    | Milvus (production) + in-memory fallback    |
+| Object storage   | S3-compatible (R2 / MinIO / S3)             |
+| Editor           | Tiptap v3 (ProseMirror)                     |
+| Diagrams         | Mermaid + Excalidraw                        |
+| Content fetch    | @mozilla/readability + linkedom             |
+| Testing          | Playwright (E2E)                            |
+| Deployment       | Docker Compose / Hetzner-style self-hosting |
+
+## High-level architecture
+
+- **Edge layer.** Caddy reverse proxy on the production server,
+  Cloudflare in front for DNS / DDoS / analytics. The hosted product
+  uses a single Hetzner Ubuntu host running Docker Compose; the same
+  stack ships in `docker-compose.prod.yml`.
+- **App.** Next.js 16 App Router. The authenticated route group is
+  `src/app/(app)/`; each subdirectory is a sidebar module.
+- **API.** tRPC v11 with Zod v4. Each module has its own router
+  under `src/server/routers/`, mounted into the root `_app.ts`.
+- **Database.** Drizzle ORM on libsql (SQLite-compatible). Local dev
+  uses a file-backed database under `data/`; production uses Turso.
+  Migrations live in `drizzle/`.
+- **AI.** All AI plumbing lives under `src/server/ai/`:
+  - `agentic-rag.ts` — top-level retrieval pipeline
+  - `chat-prepare.ts` + `chat-system-prompt.ts` — chat orchestration
+  - `chunker.ts` + `indexer.ts` — note chunking and indexing
+  - `reranker.ts` — cross-encoder reranking on top of recall
+  - `embeddings.ts` — provider-agnostic embedding adapter
+  - `provider/*.ts` — OpenAI-compatible / Local / Daemon adapters
+  - `tools/*.ts` — tool-use definitions for the chat agent
+- **Capture surfaces.**
+  - `/api/mcp` exposes a remote MCP endpoint for Claude Web.
+  - The Knosi CLI (npm: `@knosi/cli`) handles auth, daemon mode,
+    save-to-knosi flows, and skill installation.
+- **Background jobs.** Cron entries on the host server kick a
+  protected `/api/jobs/tick` endpoint to drive scheduled work
+  (price refresh, news aggregation, indexer catch-up).
+
+The repository's CLAUDE.md and AGENTS.md describe the working
+agreement — they are useful context for anyone modifying the code.
+
+## Quick start
+
+### Docker (recommended)
+
+```bash
+git clone https://github.com/zhousiyao03-cyber/knosi.git
+cd knosi
+docker compose up -d
+# → http://localhost:3000
+```
+
+### Local development
+
+```bash
+git clone https://github.com/zhousiyao03-cyber/knosi.git
+cd knosi
+pnpm install
+cp .env.example .env.local
+pnpm db:push
+pnpm dev
+# → http://localhost:3200
+```
+
+In development mode a test account is auto-provisioned:
+`test@secondbrain.local` / `test123456`. It is only created
+when `NODE_ENV=development`.
+
+### Hetzner single-server deploy
+
+The repo includes a production Docker Compose stack:
+- `docker-compose.prod.yml` — app + Redis + Caddy
+- `ops/hetzner/Caddyfile` — HTTPS reverse proxy
+- `ops/hetzner/bootstrap.sh` — swap, Docker, firewall, `/srv/knosi`
+- `ops/hetzner/deploy.sh` — server-side deployment entrypoint
+- `.github/workflows/deploy-hetzner.yml` — push-to-main auto deploy
+
+Push to `main` triggers a GitHub Action that lints, rsyncs the
+repository to the server, runs `ops/hetzner/deploy.sh`, rebuilds
+the image, performs a rolling restart, and waits for the health
+check on `http://127.0.0.1:3000/login`.
+
+## Configuration overview
+
+### Required
+
+```bash
+TURSO_DATABASE_URL=file:data/second-brain.db   # or libsql://... in prod
+AUTH_SECRET=<openssl rand -base64 32>
+KNOSI_SECRET_KEY=<openssl rand -hex 32>        # encrypts stored API keys
+```
+
+Without `KNOSI_SECRET_KEY` the server refuses to start.
+
+### Auth providers
+
+```bash
+AUTH_GITHUB_ID=...
+AUTH_GITHUB_SECRET=...
+AUTH_GOOGLE_ID=...
+AUTH_GOOGLE_SECRET=...
+AUTH_URL=https://knosi.example.com   # required in prod for OAuth callbacks
+AUTH_TRUST_HOST=true
+```
+
+### Object storage (image uploads)
+
+```bash
+S3_ENDPOINT=https://s3.example.com
+S3_REGION=auto
+S3_BUCKET=knosi-assets
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_PUBLIC_BASE_URL=https://assets.example.com
+```
+
+### Feature flags
+
+| Module                  | Server flag             | Client flag                          |
+|-------------------------|-------------------------|--------------------------------------|
+| Token Usage Dashboard   | `ENABLE_TOKEN_USAGE`    | `NEXT_PUBLIC_ENABLE_TOKEN_USAGE`     |
+| Portfolio Tracker       | `ENABLE_PORTFOLIO`      | `NEXT_PUBLIC_ENABLE_PORTFOLIO`       |
+| OSS Project Notes       | `ENABLE_OSS_PROJECTS`   | `NEXT_PUBLIC_ENABLE_OSS_PROJECTS`    |
+| Focus Tracker           | `ENABLE_FOCUS_TRACKER`  | `NEXT_PUBLIC_ENABLE_FOCUS_TRACKER`   |
+
+### AI rate limit
+
+```bash
+AI_DAILY_LIMIT=50   # per-user daily cap; 0 = unlimited
+```
+
+## AI provider configuration
+
+AI providers are configured per user in `/settings`, not via env vars.
+Sign in, click "+ Add provider", and pick one of:
+
+- **OpenAI-compatible API.** OpenAI, DeepSeek, Moonshot, SiliconFlow,
+  Groq, or any custom OpenAI-compatible endpoint. Provide the base
+  URL, API key, and a label.
+- **Local model.** Ollama / LM Studio / any OpenAI-compatible local
+  server (defaults to `http://127.0.0.1:11434/v1` for Ollama).
+- **Claude Code Daemon.** Routes Ask AI through your local Claude
+  Pro / Max subscription via the Knosi CLI daemon. No API key
+  required.
+- **Transformers.js.** In-process embedding-only kind for the RAG
+  indexer when you don't want to call out at all.
+
+After adding providers, assign one to each AI Role
+(Chat / Task / Embedding) on the same Settings page. Roles can use
+different providers and models — a typical setup is DeepSeek for
+chat, GPT-4o-mini for structured tasks, OpenAI
+`text-embedding-3-small` for embeddings.
+
+## Claude Code Daemon
+
+To route Ask AI through your local Claude subscription:
+
+```bash
+# global, against the hosted product
+npx @knosi/cli --url https://www.knosi.xyz
+
+# during local dev
+pnpm daemon
+```
+
+Requirements: Claude CLI installed and logged in (`claude login`).
+The daemon opens a notification stream for queued AI tasks, executes
+them via your local Claude CLI, and streams results back.
+
+## Claude Web connector (MCP)
+
+Knosi exposes a remote MCP surface for Claude Web. The connector
+points to:
+
+```
+/.well-known/oauth-authorization-server
+/api/mcp
+```
+
+In Claude Web, add a custom connector that points at your Knosi
+deployment. The OAuth flow uses your existing Knosi account and
+grants scoped access for `knowledge:read` and
+`knowledge:write_inbox`. Saved conversations land in the root-level
+`AI Inbox` folder as raw captures.
+
+## Save-to-Knosi from Claude Code
+
+```bash
+# 1. Log the CLI into your Knosi deployment
+npx @knosi/cli auth login https://www.knosi.xyz
+
+# 2. Install the personal Claude Code skill
+npx @knosi/cli install-skill
+
+# 3. Save a raw conversation payload
+cat payload.json | npx @knosi/cli save-ai-note --json
+```
+
+The installed skill template is written to
+`~/.claude/skills/save-to-knosi/SKILL.md` and is intended for
+explicit user-triggered saves only.
+
+## Project structure
+
+```
+src/
+  app/                Next.js App Router pages and API routes
+    (app)/            Authenticated route group (each dir = sidebar module)
+    api/              tRPC and webhook endpoints
+    layout.tsx        Root layout, metadata, JSON-LD
+    page.tsx          Public landing
+    sitemap.ts        Sitemap (public pages only — share/* excluded)
+    robots.ts         AI-aware robots policy
+  components/
+    editor/           Tiptap editor: extensions, blocks, toolbar, paste
+    layout/           Sidebar, navigation, mobile nav
+    marketing/        Landing page + landing data (FAQ, links)
+    ui/               Shared UI primitives (toast, search dialog, ...)
+  server/
+    db/               Drizzle schema + libsql connection
+    routers/          tRPC routers (one file per module)
+    ai/               RAG pipeline, chunker, indexer, reranker,
+                      provider abstraction, agent tools
+    focus/            Focus tracker interval slicing + aggregation
+  lib/                Client utilities, tRPC client, note templates
+e2e/                  Playwright E2E tests
+eval/                 RAG and agent eval datasets + run results
+ops/                  Deployment scripts (Hetzner k3s, Turso rollout)
+drizzle/              Auto-generated migrations
+docs/changelog/       Per-task change log
+docs/superpowers/     Design specs (`specs/`) and historical plans
+public/               Static assets, including this file
+```
+
+## Privacy and security posture
+
+- Auth-gated routes are explicitly disallowed in `robots.txt` and
+  return `noindex` headers as a belt-and-suspenders measure.
+- `/share/<token>` is a private capability URL. Share tokens are
+  never enumerated in the sitemap — listing them there would turn
+  "anyone with the link" into "indexed by search engines and
+  scrapable forever". Each share page also returns
+  `<meta name="robots" content="noindex">` for engines that ignore
+  robots.txt on already-known URLs.
+- Stored API keys are encrypted at rest with `KNOSI_SECRET_KEY`;
+  losing the key forces every user to re-enter their provider
+  credentials but does not allow plaintext recovery.
+- Mermaid is configured with `securityLevel: "strict"` to prevent
+  XSS via diagram syntax.
+- The hosted product enforces a per-user daily Ask AI rate limit
+  via `AI_DAILY_LIMIT`.
+
+## AI crawler policy
+
+The site `robots.txt` at https://www.knosi.xyz/robots.txt is
+classified by crawler intent, not a single allow/deny:
+
+- **Allow** — search and retrieval bots (`OAI-SearchBot`,
+  `Claude-SearchBot`, `PerplexityBot`) and user-triggered fetchers
+  (`ChatGPT-User`, `Claude-User`, `Google-Agent`, `Perplexity-User`).
+  These return real-time citations to users; we want to be
+  discoverable and accurately quoted.
+- **Block** — training-only crawlers (`GPTBot`, `ClaudeBot`,
+  `Meta-ExternalAgent`, `CCBot`, `anthropic-ai`, `cohere-ai`,
+  `FacebookBot`, `Amazonbot`) plus opt-out tokens
+  (`Google-Extended`, `Applebot-Extended`) and known undeclared /
+  non-compliant scrapers (`Bytespider`, `ImagesiftBot`, `Diffbot`).
+- **Default `*`** — same policy as classic search bots: allow public
+  pages, disallow private/auth-gated routes.
+
+This signals: cite us in answers, but please don't ingest us into
+training corpora.
+
+## Frequently asked
+
+**What is Knosi?**
+Knosi is a self-hostable, AI-native second brain for developers.
+It turns Claude / ChatGPT outputs into searchable, reusable
+knowledge.
+
+**Is Knosi just a note-taking app?**
+No. It is designed around the AI workflow first — note-taking,
+retrieval, and AI-powered querying are unified so the output of
+your AI sessions becomes long-term knowledge instead of disposable
+chat history.
+
+**Why not just use Notion or Obsidian?**
+Those tools are great, but they are not built around capturing and
+reusing AI output as a first-class workflow. Knosi is.
+
+**Do I need an API key?**
+Not on the hosted version. On a self-hosted instance you bring
+your own provider — OpenAI, Anthropic, DeepSeek, a local model,
+or the Claude Code Daemon if you already pay for Claude Pro / Max.
+
+**Can I self-host it?**
+Yes. Knosi runs anywhere Node.js and SQLite run — Docker, k3s,
+a single VPS, or your laptop. The repository includes the full
+deploy setup used by knosi.xyz (Caddy + Docker on Hetzner) as a
+reference.
+
+**Who is it for?**
+Developers, AI-heavy knowledge workers, independent builders, and
+anyone who wants AI outputs to become reusable knowledge instead
+of disposable chat history.
+
+## Author and contact
+
+Built by Zhou Siyao (周思尧) — senior frontend engineer at ByteDance
+Singapore Marketing Center.
+
+- Email: zhousiyao03@gmail.com
+- X / Twitter: https://x.com/zhousiyao03
+- GitHub: https://github.com/zhousiyao03-cyber
+
+## License
+
+Knosi is released under the GNU Affero General Public License v3.0
+(AGPL-3.0). You can use, modify, and self-host freely. If you run
+a modified version as a network service, you must publish your
+source changes under the same license.
+
+## Canonical references
+
+- Hosted product: https://www.knosi.xyz
+- Pricing: https://www.knosi.xyz/pricing
+- GitHub repository: https://github.com/zhousiyao03-cyber/knosi
+- README (canonical feature list): https://github.com/zhousiyao03-cyber/knosi/blob/main/README.md
+- Short llms.txt: https://www.knosi.xyz/llms.txt
+- Sitemap: https://www.knosi.xyz/sitemap.xml
+- Robots policy: https://www.knosi.xyz/robots.txt
+- Privacy policy: https://www.knosi.xyz/legal/privacy
+- Terms of service: https://www.knosi.xyz/legal/terms
+- Refund policy: https://www.knosi.xyz/legal/refund
+- Companion focus tracker (desktop): https://github.com/zhousiyao03-cyber/focus-tracker
