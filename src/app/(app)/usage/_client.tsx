@@ -1,17 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { BarChart3 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatTokens, estimateCost, aggregateByDate } from "@/lib/usage-utils";
 import type { UsageRecord } from "@/lib/usage-utils";
 import { TokenCard } from "@/components/usage/token-card";
-import {
-  ActivityHeatmap,
-  DailyTokenChart,
-  DailyCostChart,
-  ModelDistributionChart,
-} from "@/components/usage/charts";
+import { ActivityHeatmap } from "@/components/usage/charts";
+
+const ChartFallback = () => (
+  <div className="h-64 animate-pulse rounded-lg bg-stone-100 dark:bg-stone-800" />
+);
+
+const DailyTokenChart = dynamic(
+  () => import("@/components/usage/charts/daily-token-chart").then((m) => m.DailyTokenChart),
+  { ssr: false, loading: ChartFallback }
+);
+const DailyCostChart = dynamic(
+  () => import("@/components/usage/charts/daily-cost-chart").then((m) => m.DailyCostChart),
+  { ssr: false, loading: ChartFallback }
+);
+const ModelDistributionChart = dynamic(
+  () => import("@/components/usage/charts/model-distribution-chart").then((m) => m.ModelDistributionChart),
+  { ssr: false, loading: ChartFallback }
+);
 
 const TIME_RANGES = [
   { label: "7d", days: 7 },

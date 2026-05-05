@@ -26,6 +26,19 @@ const nextConfig: NextConfig = {
     "thrift",
   ],
   transpilePackages: ["@excalidraw/excalidraw"],
+  experimental: {
+    optimizePackageImports: [
+      "@tiptap/react",
+      "@tiptap/starter-kit",
+      "@tiptap/pm",
+      "@ai-sdk/react",
+      "ai",
+      "@dnd-kit/core",
+      "@dnd-kit/sortable",
+      "lowlight",
+      "lucide-react",
+    ],
+  },
 };
 
 export default nextConfig;

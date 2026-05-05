@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { cookies } from "next/headers";
-import { FloatingAskAiDock } from "@/components/ask/floating-ask-ai-dock";
+import { FloatingAskAiDock } from "@/components/ask/floating-ask-ai-dock-lazy";
 import { TrialBanner } from "@/components/billing/trial-banner";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Sidebar } from "@/components/layout/sidebar";
