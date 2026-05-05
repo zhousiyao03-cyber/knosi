@@ -44,3 +44,4 @@ export * from "./ai-providers";
 export * from "./preferences";
 export * from "./speak";
 export * from "./words";
+export * from "./curriculum";
