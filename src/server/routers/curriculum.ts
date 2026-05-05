@@ -13,6 +13,7 @@ import {
 import { learningNotes, learningTopics } from "../db/schema/learning";
 import { notes as generalNotes } from "../db/schema/notes";
 import { protectedProcedure, router } from "../trpc";
+import { generateStructuredData } from "../ai/provider";
 import {
   ensureCurriculumSeeded,
   resetCurriculum,
@@ -473,6 +474,246 @@ export const curriculumRouter = router({
         .orderBy(desc(learningNotes.updatedAt))
         .limit(input.limit);
       return rows;
+    }),
+
+  // ── CRUD: tracks ───────────────────────────────────────────────
+  createTrack: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().trim().min(1).max(80),
+        icon: z.string().trim().max(8).optional(),
+        description: z.string().trim().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const max = await db
+        .select({ m: sql<number>`coalesce(max(${curriculumTracks.orderIndex}), -1)` })
+        .from(curriculumTracks)
+        .where(eq(curriculumTracks.userId, ctx.userId));
+      const nextOrder = (max[0]?.m ?? -1) + 1;
+      const id = crypto.randomUUID();
+      await db.insert(curriculumTracks).values({
+        id,
+        userId: ctx.userId,
+        title: input.title,
+        icon: input.icon ?? "📚",
+        description: input.description,
+        orderIndex: nextOrder,
+      });
+      return { id };
+    }),
+
+  updateTrack: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        title: z.string().trim().min(1).max(80).optional(),
+        icon: z.string().trim().max(8).optional(),
+        description: z.string().trim().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owned = await db
+        .select({ id: curriculumTracks.id })
+        .from(curriculumTracks)
+        .where(and(eq(curriculumTracks.id, input.id), eq(curriculumTracks.userId, ctx.userId)))
+        .limit(1);
+      if (owned.length === 0) throw new Error("Track not found");
+
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.title !== undefined) patch.title = input.title;
+      if (input.icon !== undefined) patch.icon = input.icon;
+      if (input.description !== undefined) patch.description = input.description;
+
+      await db.update(curriculumTracks).set(patch).where(eq(curriculumTracks.id, input.id));
+      return { ok: true };
+    }),
+
+  deleteTrack: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .delete(curriculumTracks)
+        .where(and(eq(curriculumTracks.id, input.id), eq(curriculumTracks.userId, ctx.userId)));
+      return { ok: true };
+    }),
+
+  // ── CRUD: areas ────────────────────────────────────────────────
+  createArea: protectedProcedure
+    .input(
+      z.object({
+        trackId: z.string(),
+        title: z.string().trim().min(1).max(80),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const trackOk = await db
+        .select({ id: curriculumTracks.id })
+        .from(curriculumTracks)
+        .where(and(eq(curriculumTracks.id, input.trackId), eq(curriculumTracks.userId, ctx.userId)))
+        .limit(1);
+      if (trackOk.length === 0) throw new Error("Track not found");
+
+      const max = await db
+        .select({ m: sql<number>`coalesce(max(${curriculumAreas.orderIndex}), -1)` })
+        .from(curriculumAreas)
+        .where(eq(curriculumAreas.trackId, input.trackId));
+      const id = crypto.randomUUID();
+      await db.insert(curriculumAreas).values({
+        id,
+        trackId: input.trackId,
+        title: input.title,
+        orderIndex: (max[0]?.m ?? -1) + 1,
+      });
+      return { id };
+    }),
+
+  updateArea: protectedProcedure
+    .input(z.object({ id: z.string(), title: z.string().trim().min(1).max(80) }))
+    .mutation(async ({ ctx, input }) => {
+      const ownerOk = await db
+        .select({ id: curriculumAreas.id })
+        .from(curriculumAreas)
+        .innerJoin(curriculumTracks, eq(curriculumTracks.id, curriculumAreas.trackId))
+        .where(and(eq(curriculumAreas.id, input.id), eq(curriculumTracks.userId, ctx.userId)))
+        .limit(1);
+      if (ownerOk.length === 0) throw new Error("Area not found");
+
+      await db
+        .update(curriculumAreas)
+        .set({ title: input.title, updatedAt: new Date() })
+        .where(eq(curriculumAreas.id, input.id));
+      return { ok: true };
+    }),
+
+  deleteArea: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const ownerOk = await db
+        .select({ id: curriculumAreas.id })
+        .from(curriculumAreas)
+        .innerJoin(curriculumTracks, eq(curriculumTracks.id, curriculumAreas.trackId))
+        .where(and(eq(curriculumAreas.id, input.id), eq(curriculumTracks.userId, ctx.userId)))
+        .limit(1);
+      if (ownerOk.length === 0) throw new Error("Area not found");
+
+      await db.delete(curriculumAreas).where(eq(curriculumAreas.id, input.id));
+      return { ok: true };
+    }),
+
+  // ── CRUD: topics ──────────────────────────────────────────────
+  createTopic: protectedProcedure
+    .input(
+      z.object({
+        areaId: z.string(),
+        title: z.string().trim().min(1).max(120),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const ownerOk = await db
+        .select({ id: curriculumAreas.id })
+        .from(curriculumAreas)
+        .innerJoin(curriculumTracks, eq(curriculumTracks.id, curriculumAreas.trackId))
+        .where(and(eq(curriculumAreas.id, input.areaId), eq(curriculumTracks.userId, ctx.userId)))
+        .limit(1);
+      if (ownerOk.length === 0) throw new Error("Area not found");
+
+      const max = await db
+        .select({ m: sql<number>`coalesce(max(${curriculumTopics.orderIndex}), -1)` })
+        .from(curriculumTopics)
+        .where(eq(curriculumTopics.areaId, input.areaId));
+      const id = crypto.randomUUID();
+      await db.insert(curriculumTopics).values({
+        id,
+        areaId: input.areaId,
+        title: input.title,
+        orderIndex: (max[0]?.m ?? -1) + 1,
+      });
+      return { id };
+    }),
+
+  updateTopic: protectedProcedure
+    .input(z.object({ id: z.string(), title: z.string().trim().min(1).max(120) }))
+    .mutation(async ({ ctx, input }) => {
+      const owned = await ensureTopicOwnedByUser(input.id, ctx.userId);
+      if (!owned) throw new Error("Topic not found");
+
+      await db
+        .update(curriculumTopics)
+        .set({ title: input.title, updatedAt: new Date() })
+        .where(eq(curriculumTopics.id, input.id));
+      return { ok: true };
+    }),
+
+  deleteTopic: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const owned = await ensureTopicOwnedByUser(input.id, ctx.userId);
+      if (!owned) throw new Error("Topic not found");
+
+      await db.delete(curriculumTopics).where(eq(curriculumTopics.id, input.id));
+      return { ok: true };
+    }),
+
+  generateDescription: protectedProcedure
+    .input(z.object({ topicId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const owned = await ensureTopicOwnedByUser(input.topicId, ctx.userId);
+      if (!owned) throw new Error("Topic not found");
+
+      const ctxRows = await db
+        .select({
+          topicTitle: curriculumTopics.title,
+          areaTitle: curriculumAreas.title,
+          trackTitle: curriculumTracks.title,
+        })
+        .from(curriculumTopics)
+        .innerJoin(curriculumAreas, eq(curriculumAreas.id, curriculumTopics.areaId))
+        .innerJoin(curriculumTracks, eq(curriculumTracks.id, curriculumAreas.trackId))
+        .where(eq(curriculumTopics.id, input.topicId))
+        .limit(1);
+      const row = ctxRows[0];
+      if (!row) throw new Error("Topic not found");
+
+      const output = await generateStructuredData(
+        {
+          schema: z.object({
+            description: z.string().min(20),
+          }),
+          name: "curriculum_topic_description",
+          description: "A concise English description of a curriculum topic.",
+          prompt: `Write a concise (60-100 words) English description for the curriculum topic below. Focus on:
+- what the topic is, and why it matters
+- the 1-2 most important sub-concepts a senior engineer should know
+- one common pitfall or production gotcha if applicable
+Do NOT use marketing language, do NOT repeat the title back, do NOT add headings or bullet points (plain prose only).
+
+Track: ${row.trackTitle}
+Area: ${row.areaTitle}
+Topic: ${row.topicTitle}`,
+        },
+        { userId: ctx.userId },
+      );
+
+      const description = output.description.trim();
+      await db
+        .update(curriculumTopics)
+        .set({ description, updatedAt: new Date() })
+        .where(eq(curriculumTopics.id, input.topicId));
+
+      return { description };
+    }),
+
+  setTopicDescription: protectedProcedure
+    .input(z.object({ topicId: z.string(), description: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const owned = await ensureTopicOwnedByUser(input.topicId, ctx.userId);
+      if (!owned) throw new Error("Topic not found");
+      await db
+        .update(curriculumTopics)
+        .set({ description: input.description, updatedAt: new Date() })
+        .where(eq(curriculumTopics.id, input.topicId));
+      return { ok: true };
     }),
 
   rerunAutoLink: protectedProcedure.mutation(async ({ ctx }) => {

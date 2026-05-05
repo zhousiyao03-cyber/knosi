@@ -7,6 +7,14 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/routers/_app";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import {
+  AreaActions,
+  GenerateDescriptionButton,
+  NewAreaButton,
+  NewTopicInline,
+  NewTrackButton,
+  TopicEditActions,
+} from "@/components/learn/curriculum-editors";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 
@@ -196,6 +204,7 @@ export default function CurriculumMapPage() {
               {track.title}
             </button>
           ))}
+          <NewTrackButton />
         </nav>
 
         <div className="mb-8 flex items-center gap-4 text-xs text-stone-600 dark:text-stone-400">
@@ -208,8 +217,9 @@ export default function CurriculumMapPage() {
         <div className="space-y-8">
           {activeTrack.areas.map((area) => (
             <section key={area.id} data-area-id={area.id}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-stone-300">
-                {area.title}
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-stone-300">
+                <span>{area.title}</span>
+                <AreaActions areaId={area.id} title={area.title} />
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                 {area.topics.map((topic) => (
@@ -219,9 +229,13 @@ export default function CurriculumMapPage() {
                     onClick={() => setSelectedTopicId(topic.id)}
                   />
                 ))}
+                <NewTopicInline areaId={area.id} />
               </div>
             </section>
           ))}
+          <div className="pt-2">
+            <NewAreaButton trackId={activeTrack.id} />
+          </div>
         </div>
       </div>
 
@@ -369,7 +383,7 @@ function SidePanel({
       className="fixed right-0 top-0 z-30 h-full w-full sm:w-[380px] overflow-y-auto border-l border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-950"
       data-testid="topic-side-panel"
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-2 flex items-start justify-between gap-3">
         <h2 className="text-base font-semibold leading-snug text-stone-900 dark:text-stone-100">
           {topic.title}
         </h2>
@@ -380,6 +394,13 @@ function SidePanel({
         >
           ×
         </button>
+      </div>
+      <div className="mb-4">
+        <TopicEditActions
+          topicId={topic.id}
+          title={topic.title}
+          onDeleted={onClose}
+        />
       </div>
 
       <section className="mb-6">
@@ -405,16 +426,21 @@ function SidePanel({
         </div>
       </section>
 
-      {topic.description && (
-        <section className="mb-6">
-          <div className="mb-1.5 text-[11px] uppercase tracking-wide text-stone-500">
+      <section className="mb-6">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <span className="text-[11px] uppercase tracking-wide text-stone-500">
             Description
-          </div>
+          </span>
+          <GenerateDescriptionButton topicId={topic.id} />
+        </div>
+        {topic.description ? (
           <p className="whitespace-pre-wrap text-sm text-stone-700 dark:text-stone-300">
             {topic.description}
           </p>
-        </section>
-      )}
+        ) : (
+          <p className="text-xs italic text-stone-400">No description yet.</p>
+        )}
+      </section>
 
       <section className="mb-4">
         <div className="mb-2 flex items-center justify-between">
