@@ -1,19 +1,22 @@
 @AGENTS.md
 
-# Second Brain — 开发规范
+# Knosi — 开发规范
 
 ## 项目概述
 
-个人知识管理平台，替代 Notion，集成 AI 能力。技术栈：Next.js 16 + React 19 + Tailwind CSS v4 + Tiptap v3 + tRPC v11 + SQLite (libsql/Turso) + Drizzle ORM + Vercel AI SDK v6。
+个人知识管理平台 [knosi.xyz](https://www.knosi.xyz)。技术栈：Next.js 16 + React 19 + Tailwind CSS v4 + Tiptap v3 + tRPC v11 + SQLite (libsql/Turso) + Drizzle ORM + Vercel AI SDK v6 + Milvus + pi-ai (Claude Pro/Max OAuth)。完整依赖见 `package.json`。
+
+当前模块清单见 `src/components/layout/navigation.ts`（事实源）。设计稿见 `docs/superpowers/specs/`，落地记录见 `docs/changelog/`，历史规划见 `docs/archive/`。
 
 ## 开发流程约束
 
-### 1. 每个 Phase 完成后必须留档
+### 1. 每个非平凡任务完成后必须留档
 
-每完成一个 Phase，必须在 `docs/changelog/` 下创建对应的 markdown 文件记录：
-- 文件命名：`phase-{N}.md`
-- 内容包含：完成的功能列表、新增/修改的文件清单、数据库变更、已知问题
-- 同步更新 `README.md` 中的进度 checklist
+每完成一个非平凡的功能/修复/重构，必须在 `docs/changelog/` 下创建对应的 markdown 文件记录：
+- 文件命名：`YYYY-MM-DD-<topic>.md`（推荐）或 `<topic>.md`
+- 内容包含：完成的功能列表、新增/修改的文件清单、数据库变更、验证结果、已知问题
+- 如有用户可见的新功能，同步更新 `README.md` 的 Features 部分
+- 设计稿（如果先于实现）放在 `docs/superpowers/specs/` 下，命名 `YYYY-MM-DD-<topic>-design.md`
 
 ### 2. 每次修改必须自验证
 
@@ -34,10 +37,10 @@ pnpm test:e2e
 
 ### 3. E2E 测试要求
 
-- 每个 Phase 必须有对应的 E2E 测试文件：`e2e/phase{N}.spec.ts`
+- 每个新模块必须有对应的 E2E 测试文件：`e2e/<module>.spec.ts`
 - 新增的 UI 功能必须有 E2E 测试覆盖（至少覆盖核心用户流程）
 - CRUD 功能必须测试：创建 → 列表展示 → 编辑 → 删除 完整流程
-- 测试必须全部通过后才能认为 Phase 完成
+- 测试必须全部通过后才能认为任务完成
 
 ### 3.1 AI / RAG 改动必须跑 eval
 
@@ -72,10 +75,16 @@ pnpm eval:compare eval/results/agent/baseline.json eval/results/agent/run-<label
   - rollout 后必须用实际查询验证线上表 / 列已经存在
   - 没做完这一步，不算“已上线完成”
 
-### 5. 每个 Phase 完成后必须 commit
+### 5. 每个任务完成后必须 commit
 
 验证全部通过后，创建一个 git commit 留底：
-- commit message 格式：`feat: complete phase {N} - {简要描述}`
+- commit message 用 conventional commits + scope，例如：
+  - `feat(words): NEW badge + All/New filter`
+  - `fix(speak): replace effect-setState pattern`
+  - `docs(words): phase 1 changelog + README entry`
+  - `ops(words): production Turso rollout script`
+  - `test(words): e2e for sidebar, Next, Add modal`
+- 一个模块的多次 commit 可以分开（feat / test / docs / ops 各自一条），更易 review
 - 确保只提交项目文件，不要提交 `data/*.db`、`.next/`、`node_modules/` 等
 - commit 前先 `git status` 确认待提交文件列表合理
 - **任务完成且验证通过后，直接 `git push` 到远程，不需要询问用户确认**
@@ -83,7 +92,7 @@ pnpm eval:compare eval/results/agent/baseline.json eval/results/agent/run-<label
 
 ### 6. 自动清理 — 禁止垃圾文件
 
-每个 Phase 完成时，必须检查并清理以下类型的废物文件：
+每个任务完成时，必须检查并清理以下类型的废物文件：
 - 框架脚手架生成但未使用的默认文件（如默认 SVG、示例页面）
 - 不再被任何代码 import/引用的文件
 - 空目录
@@ -124,40 +133,24 @@ pnpm db:studio      # 打开 Drizzle Studio
 
 ## 项目结构
 
-```
-src/
-├── app/              # Next.js App Router 页面和 API 路由
-│   └── (app)/        # 认证后的主路由组（notes, learn, projects, portfolio, ask, focus, usage 等）
-├── components/       # React 组件
-│   ├── ui/           # 通用 UI 组件（toast, search-dialog 等）
-│   ├── layout/       # 布局组件（sidebar, mobile-nav）
-│   └── editor/       # Tiptap 编辑器（核心组件 + 扩展块）
-│       ├── tiptap-editor.tsx       # 主编辑器（扩展注册、block 操作、拖拽、粘贴处理）
-│       ├── editor-commands.ts      # Slash 命令定义
-│       ├── editor-block-ops.ts     # 块级操作（移动、复制、删除、插入）
-│       ├── slash-command.tsx        # Slash 命令菜单 UI
-│       ├── bubble-toolbar.tsx       # 文本选中浮动工具栏
-│       ├── table-toolbar.tsx        # 表格操作工具栏
-│       ├── search-replace.tsx       # 搜索替换
-│       ├── callout-block.tsx        # Callout 提示块
-│       ├── toggle-block.tsx         # 折叠/展开块
-│       ├── code-block-with-lang.tsx # 代码块（语言选择器）
-│       ├── mermaid-block.tsx        # Mermaid 图表块（全屏查看 + 编辑）
-│       ├── excalidraw-block.tsx     # Excalidraw 画板块
-│       ├── image-row-block.tsx      # 并排图片行（拖拽排序、resize、拖出提取）
-│       ├── toc-block.tsx            # 目录块
-│       ├── toc-sidebar.tsx          # 侧边目录导航
-│       ├── markdown-table-paste.ts  # 混合 Markdown 粘贴（Mermaid + 表格自动转换）
-│       └── knowledge-note-editor.tsx # 笔记编辑器封装
-├── server/
-│   ├── db/           # 数据库连接和 schema（Drizzle ORM + libsql）
-│   ├── routers/      # tRPC routers（notes, learning-notebook, oss-projects, portfolio 等）
-│   ├── ai/           # AI 逻辑（chunking, indexer, hybrid RAG, provider 抽象, URL 抓取）
-│   └── focus/        # Focus Tracker 区间切片与聚合
-└── lib/              # 工具函数和客户端配置（tRPC client, cn(), note-templates）
-e2e/                  # Playwright E2E 测试
-docs/changelog/       # Phase 完成留档
-```
+主要目录指针（具体文件清单按需 `ls` / `grep`，避免文档腐烂）：
+
+- `src/app/(app)/` — 认证后路由组，每个子目录对应一个侧边栏模块。当前模块清单见 `src/components/layout/navigation.ts`
+- `src/components/editor/` — Tiptap v3 编辑器（核心 `tiptap-editor.tsx` + 各类自定义块 + slash command + bubble toolbar + wiki link + inline Ask AI）
+- `src/components/layout/` — sidebar / navigation / mobile-nav / app-brand / plan-card
+- `src/components/ui/` — 通用 UI（toast、search-dialog 等）
+- `src/server/db/` — Drizzle ORM + libsql 连接，schema 在 `schema.ts` 单文件
+- `src/server/routers/` — tRPC routers（每个模块一个文件，根 router 在 `_app.ts`）
+- `src/server/ai/` — RAG (`agentic-rag.ts`) + chat 准备/system prompt + chunking + indexer + reranker + embeddings + tools (`tools/`) + provider 抽象 (`provider/`)
+- `src/server/focus/` — Focus Tracker 区间切片与聚合
+- `src/lib/` — 工具函数、tRPC client、note templates、`cn()`
+- `e2e/` — Playwright E2E 测试
+- `eval/` — RAG (`ground-truth.json`) + agent (`agent-cases.json`) eval 数据集与跑分结果
+- `docs/changelog/` — 任务留档
+- `docs/superpowers/specs/` — 设计稿
+- `docs/archive/` — 历史规划（PLAN-original / v0-plan / v1-plan）
+- `ops/` — 部署脚本（Hetzner k3s、Turso rollout）
+- `drizzle/` — 自动生成的迁移文件
 
 ## 代码规范
 

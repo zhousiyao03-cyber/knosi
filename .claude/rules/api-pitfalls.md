@@ -2,7 +2,7 @@
 
 以下是开发中遇到的与训练数据不一致的 API 差异，compact 后恢复时务必参考：
 
-## Vercel AI SDK v6 (ai@^5 / @ai-sdk/react@^3)
+## Vercel AI SDK v6 (ai@^6 / @ai-sdk/react@^3)
 - `ai/react` 模块不存在，React hooks 在独立包 `@ai-sdk/react` 中
 - `useChat` 不再有 `api`/`input`/`handleInputChange`/`handleSubmit`/`isLoading` 属性
 - `useChat` 现在需要 `transport` 参数：`new TextStreamChatTransport({ api: "/api/chat" })` from `ai`
@@ -10,9 +10,9 @@
 - `streamText()` 的结果用 `.toTextStreamResponse()`（不是 `toDataStreamResponse`）
 - `message.parts` 数组替代了 `message.content`，用 `part.type === "text"` 渲染
 
-## React 19
+## React 19 / Next.js 16
 - `useRef` 必须传初始值：`useRef<T>(undefined)`
-- Next.js 15 页面 params 是 `Promise`，需要 `use(params)` 解包
+- 页面 `params` 是 `Promise`（Next.js 15+），需要 `use(params)` 解包；server components 里直接 `await params`
 
 ## Tiptap
 - SSR 环境必须设置 `immediatelyRender: false` 避免 hydration 错误
