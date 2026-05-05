@@ -59,8 +59,9 @@ interface Props {
   editor: Editor;
   anchor: InlineAskAiAnchor | null;
   onClose: () => void;
-  /** Full plain text of the current note for system-prompt context. */
-  noteText: string;
+  /** Returns the full plain text of the current note (called lazily on submit
+   * to avoid re-running editor.getText() on every parent render). */
+  getNoteText: () => string;
 }
 
 function getMessageText(parts: Array<{ type: string; text?: string }> = []) {
@@ -108,7 +109,7 @@ export function InlineAskAiPopover({
   editor,
   anchor,
   onClose,
-  noteText,
+  getNoteText,
 }: Props) {
   const [input, setInput] = useState("");
   const [pinnedSources, setPinnedSources] = useState<MentionSource[]>([]);
@@ -196,7 +197,7 @@ export function InlineAskAiPopover({
       {
         body: {
           sourceScope: "direct",
-          contextNoteText: noteText.slice(0, 8000),
+          contextNoteText: getNoteText().slice(0, 8000),
           pinnedSources: pinnedSources.map((s) => ({
             id: s.id,
             type: s.type,

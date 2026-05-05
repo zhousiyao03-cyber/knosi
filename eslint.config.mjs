@@ -10,6 +10,9 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next, extended with ** so nested
     // build outputs (inside git worktrees) are also ignored.
     "**/.next/**",
+    // E2E test runs produce sibling .next-e2e* dirs full of compiled output;
+    // scanning them yielded thousands of phantom errors locally.
+    "**/.next-e2e*/**",
     "**/out/**",
     "**/build/**",
     "next-env.d.ts",

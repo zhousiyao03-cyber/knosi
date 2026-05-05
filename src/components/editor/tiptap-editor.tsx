@@ -549,15 +549,42 @@ export function TiptapEditor({
     [placeholder, slashCommandExtension, wikiLinkTriggerExtension]
   );
 
+  // Defer expensive serialization until typing pauses. onUpdate fires on every
+  // keystroke; getJSON()/JSON.stringify on a long doc is O(n) and stalls the
+  // input (especially IME). Coalesce to one flush per quiet window.
+  const pendingEditorRef = useRef<TiptapEditorInstance | null>(null);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const flushPendingChange = useCallback(() => {
+    flushTimerRef.current = undefined;
+    const ed = pendingEditorRef.current;
+    pendingEditorRef.current = null;
+    if (!ed) return;
+    const json = ed.getJSON();
+    const text = extractPlainTextFromContent(json);
+    onChange?.(JSON.stringify(json), text);
+  }, [onChange]);
+
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        // Flush any pending change synchronously on unmount so the parent
+        // doesn't lose the last keystroke before navigation.
+        flushPendingChange();
+      }
+    };
+  }, [flushPendingChange]);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions,
     content: parseEditorContent(content),
     editable,
     onUpdate: ({ editor: currentEditor }) => {
-      const json = JSON.stringify(currentEditor.getJSON());
-      const text = extractPlainTextFromContent(currentEditor.getJSON());
-      onChange?.(json, text);
+      pendingEditorRef.current = currentEditor;
+      if (flushTimerRef.current) return;
+      flushTimerRef.current = setTimeout(flushPendingChange, 250);
     },
     editorProps: {
       attributes: {
@@ -962,7 +989,7 @@ export function TiptapEditor({
           key={`inline-ask-${inlineAskOpenId}`}
           editor={editor}
           anchor={inlineAskAnchor}
-          noteText={editor.getText()}
+          getNoteText={() => editor.getText()}
           onClose={() => setInlineAskAnchor(null)}
         />
       )}
