@@ -42,9 +42,32 @@ export function TocSidebar({ editor }: TocSidebarProps) {
     headingsRef.current = headings;
   }, [headings]);
 
-  const updateHeadings = useCallback(() => {
-    if (!editor) return;
-    setHeadings(scanHeadings(editor));
+  // Coalesce rescans behind a quiet-window timer. `editor.on("update")` fires
+  // on every keystroke; a full `descendants()` walk + setState per key is what
+  // makes long docs feel laggy. Bail out via structural equality so React
+  // doesn't reconcile the heading buttons when nothing material changed.
+  const rescanTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const scheduleRescan = useCallback(() => {
+    if (rescanTimerRef.current) return;
+    rescanTimerRef.current = setTimeout(() => {
+      rescanTimerRef.current = undefined;
+      setHeadings((prev) => {
+        const next = scanHeadings(editor);
+        if (
+          prev.length === next.length &&
+          prev.every(
+            (h, i) =>
+              h.pos === next[i].pos &&
+              h.level === next[i].level &&
+              h.text === next[i].text
+          )
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    }, 300);
   }, [editor]);
 
   // Track which heading is closest to cursor — reads headings via ref to
@@ -64,14 +87,18 @@ export function TocSidebar({ editor }: TocSidebarProps) {
   }, [editor]);
 
   useEffect(() => {
-    editor.on("update", updateHeadings);
+    editor.on("update", scheduleRescan);
     editor.on("selectionUpdate", updateActiveHeading);
 
     return () => {
-      editor.off("update", updateHeadings);
+      editor.off("update", scheduleRescan);
       editor.off("selectionUpdate", updateActiveHeading);
+      if (rescanTimerRef.current) {
+        clearTimeout(rescanTimerRef.current);
+        rescanTimerRef.current = undefined;
+      }
     };
-  }, [editor, updateHeadings, updateActiveHeading]);
+  }, [editor, scheduleRescan, updateActiveHeading]);
 
   const handleClick = useCallback(
     (pos: number) => {

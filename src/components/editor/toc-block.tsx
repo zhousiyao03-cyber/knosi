@@ -7,7 +7,7 @@ import {
   type NodeViewProps,
 } from "@tiptap/react";
 import type { Editor } from "@tiptap/react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 interface TocEntry {
   level: number;
@@ -46,17 +46,44 @@ function indentClass(level: number): string {
 function TocNodeView({ editor }: NodeViewProps) {
   const [entries, setEntries] = useState<TocEntry[]>(() => scanHeadings(editor));
 
-  const refresh = useCallback(() => {
-    setEntries(scanHeadings(editor));
+  // Coalesce rescans behind a quiet-window timer (long docs would otherwise
+  // run a full doc descendants() walk + setState on every keystroke). Bail
+  // out via structural equality so React skips reconciliation when nothing
+  // material changed.
+  const rescanTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const scheduleRescan = useCallback(() => {
+    if (rescanTimerRef.current) return;
+    rescanTimerRef.current = setTimeout(() => {
+      rescanTimerRef.current = undefined;
+      setEntries((prev) => {
+        const next = scanHeadings(editor);
+        if (
+          prev.length === next.length &&
+          prev.every(
+            (h, i) =>
+              h.pos === next[i].pos &&
+              h.level === next[i].level &&
+              h.text === next[i].text
+          )
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    }, 300);
   }, [editor]);
 
   useEffect(() => {
-    // Re-scan whenever the document changes
-    editor.on("update", refresh);
+    editor.on("update", scheduleRescan);
     return () => {
-      editor.off("update", refresh);
+      editor.off("update", scheduleRescan);
+      if (rescanTimerRef.current) {
+        clearTimeout(rescanTimerRef.current);
+        rescanTimerRef.current = undefined;
+      }
     };
-  }, [editor, refresh]);
+  }, [editor, scheduleRescan]);
 
   const handleClick = useCallback(
     (pos: number) => {
