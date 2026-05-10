@@ -2,6 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { LocalSearchProvider } from "@/components/local-search/provider";
 
 const SearchDialogModal = dynamic(
   () =>
@@ -11,15 +13,35 @@ const SearchDialogModal = dynamic(
   }
 );
 
+const LOCAL_SEARCH_PREF_KEY = "knosi.local-search.enabled";
+
+function readLocalSearchPref(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(LOCAL_SEARCH_PREF_KEY) === "1";
+}
+
 export function SearchDialog() {
   const [open, setOpen] = useState(false);
+  // Read once on mount; the dialog itself owns the runtime toggle.
+  const [localEnabled, setLocalEnabled] = useState(false);
+  const { data: session } = useSession();
+  const userId = session?.user?.id ?? null;
 
-  const openDialog = useCallback(() => {
-    setOpen(true);
+  const openDialog = useCallback(() => setOpen(true), []);
+  const closeDialog = useCallback(() => setOpen(false), []);
+
+  const setLocal = useCallback((next: boolean) => {
+    setLocalEnabled(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LOCAL_SEARCH_PREF_KEY, next ? "1" : "0");
+    }
   }, []);
 
-  const closeDialog = useCallback(() => {
-    setOpen(false);
+  useEffect(() => {
+    // Hydrate the user preference from localStorage. We can't initialize the
+    // useState directly because localStorage is unavailable during SSR.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- effect syncs external storage into local state
+    setLocalEnabled(readLocalSearchPref());
   }, []);
 
   useEffect(() => {
@@ -29,7 +51,6 @@ export function SearchDialog() {
         setOpen((current) => !current);
       }
     };
-
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
@@ -44,5 +65,16 @@ export function SearchDialog() {
     return null;
   }
 
-  return <SearchDialogModal onClose={closeDialog} />;
+  // Only mount the LocalSearchProvider while the dialog is open AND the
+  // feature is enabled — that's when wasm is actually useful, and it avoids
+  // pulling 187 KB of wasm for users who never search.
+  return (
+    <LocalSearchProvider enabled={localEnabled} userKey={userId ?? "anonymous"}>
+      <SearchDialogModal
+        onClose={closeDialog}
+        localEnabled={localEnabled}
+        onToggleLocal={setLocal}
+      />
+    </LocalSearchProvider>
+  );
 }

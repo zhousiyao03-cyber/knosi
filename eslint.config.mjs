@@ -19,6 +19,12 @@ const eslintConfig = defineConfig([
     // Isolated git worktrees — never lint these.
     ".claude/worktrees/**",
     ".worktrees/**",
+    // Submodule of the wasm search engine — its `pkg/` ships
+    // wasm-bindgen-generated JS that intentionally violates a few of
+    // our lint rules (and we have no control over the output).
+    "vendor/**",
+    // Auto-generated wasm bindings copied into public/ for the runtime.
+    "public/wasm/**",
   ]),
 ]);
 

@@ -327,6 +327,33 @@ export const notesRouter = router({
       return results;
     }),
 
+  /**
+   * Dump every note's title + plain text in one shot, for client-side
+   * full-text indexing (minisearch-rs running in wasm). Returns the bare
+   * minimum needed to build a BM25 index. The `updatedAt` field lets the
+   * client decide whether to rebuild or trust its IndexedDB cache.
+   *
+   * Notes without `plainText` are excluded — they'd contribute zero signal.
+   */
+  dumpForIndex: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await db
+      .select({
+        id: notes.id,
+        title: notes.title,
+        plainText: notes.plainText,
+        updatedAt: notes.updatedAt,
+      })
+      .from(notes)
+      .where(and(eq(notes.userId, ctx.userId), isNotNull(notes.plainText)));
+
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      plainText: r.plainText ?? "",
+      updatedAt: r.updatedAt,
+    }));
+  }),
+
   enableShare: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
