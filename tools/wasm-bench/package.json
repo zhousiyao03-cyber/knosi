@@ -1,0 +1,16 @@
+{
+  "name": "wasm-bench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sandbox: compare JS markdown parsers vs Rust+wasm (pulldown-cmark)",
+  "type": "module",
+  "scripts": {
+    "gen": "node scripts/gen-samples.mjs",
+    "bench": "node scripts/bench.mjs"
+  },
+  "dependencies": {
+    "marked": "^14.1.3",
+    "markdown-it": "^14.1.0",
+    "markdown-wasm": "^1.2.0"
+  }
+}
