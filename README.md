@@ -401,7 +401,7 @@ Set both to `true` to show the module in the sidebar and enable its routes.
 | API | tRPC v11 + Zod v4 |
 | Database | Drizzle ORM + SQLite via libsql / Turso |
 | Auth | Auth.js v5 (GitHub / Google OAuth + email-password) |
-| AI | Vercel AI SDK v6 |
+| AI | Vercel AI SDK v6 (`ai@6` + `@ai-sdk/react@3`) |
 | Object Storage | S3-compatible (R2 / MinIO / S3) |
 | Editor | Tiptap v3 (ProseMirror) |
 | Diagrams | Mermaid + Excalidraw |
