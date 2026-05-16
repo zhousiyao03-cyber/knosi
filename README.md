@@ -447,6 +447,21 @@ npm run daemon        # Start local Claude Code AI daemon
 npm run usage:daemon  # Start usage reporter + analysis daemon
 ```
 
+### Eval
+
+Whenever you touch retrieval, ranking, or chat-prep code under `src/server/ai/`,
+run the eval suite and attach the compare output to the PR description:
+
+```bash
+pnpm eval:prepare                                                          # one-time env prep
+pnpm eval:rag --user <id> --top-k 16 --out eval/results/run-<label>.json   # RAG retrieval scores
+pnpm eval:agent --user <id> --out eval/results/agent/run-<label>.json      # agent tool-use scores
+pnpm eval:compare eval/results/baseline.json eval/results/run-<label>.json # per-case Δ vs baseline
+```
+
+Datasets live in `eval/ground-truth.json` (retrieval) and `eval/agent-cases.json`
+(agent). See `docs/eval/README.md` for the full workflow.
+
 ---
 
 ## Contributing
