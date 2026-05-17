@@ -428,6 +428,7 @@ src/
     focus/          Focus Tracker interval slicing and aggregation
   lib/              Client utilities and tRPC client
 e2e/                Playwright E2E tests
+eval/               RAG + agent eval datasets and run results
 docs/changelog/     Engineering change log
 ```
 
